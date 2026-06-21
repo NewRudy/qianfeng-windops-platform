@@ -233,6 +233,10 @@ function formatSignedPct(value: number): string {
   return `${value >= 0 ? "+" : ""}${formatFixed(value)}%`;
 }
 
+function workOrderSuffix(turbineId: string): string {
+  return turbineId.match(/(\d+)$/)?.[1]?.padStart(2, "0") ?? "00";
+}
+
 function calculatePowerShortfallPct(sample: GearboxScadaSample): number {
   if (sample.expectedKw <= 0) return 0;
   return round(((sample.expectedKw - sample.powerKw) / sample.expectedKw) * 100);
@@ -579,7 +583,7 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
           closedActionLabel: "现场复核已完成",
           closedState: "现场复核完成",
           draftCode: "WO-GX-待创建",
-          finalCode: `WO-GX-${input.caseDate}-02`,
+          finalCode: `WO-GX-${input.caseDate}-${workOrderSuffix(input.turbineId)}`,
           generatedState: "已生成",
           initialState: "待生成",
           steps: [

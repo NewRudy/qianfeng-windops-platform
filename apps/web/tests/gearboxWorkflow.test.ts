@@ -128,7 +128,7 @@ describe("gearbox workflow case", () => {
     const severeDiagnostics = getGearboxCaseDiagnostics(gearboxCaseCatalog[1].input);
 
     expect(severeCase.turbineId).toBe("HS-WTG-03");
-    expect(severeCase.modules.workorder.ticket?.finalCode).toBe("WO-GX-20260621-02");
+    expect(severeCase.modules.workorder.ticket?.finalCode).toBe("WO-GX-20260621-03");
     expect(severeCase.modules.maintenance.metrics).toContainEqual({ label: "建议运行方式", value: "限功率 70%" });
     expect(severeDiagnostics.riskConfidencePct).toBeGreaterThan(baseDiagnostics.riskConfidencePct);
     expect(severeDiagnostics.healthScore).toBeLessThan(baseDiagnostics.healthScore);
