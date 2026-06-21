@@ -19,7 +19,7 @@ root.innerHTML = `
       </div>
       <div class="source-pill">
         <span></span>
-        老爷岭山体 GLTF · CC-BY-4.0
+        老爷岭山体 3D Tiles · CC-BY-4.0
       </div>
     </header>
 
@@ -41,7 +41,7 @@ root.innerHTML = `
           </div>
           <div>
             <dt>数据边界</dt>
-            <dd>老爷岭公开 GLTF，运维事件为透明模拟</dd>
+            <dd>老爷岭公开 3D Tiles，运维事件为透明模拟</dd>
           </div>
         </dl>
         <button id="focus-turbine" type="button">聚焦风机</button>

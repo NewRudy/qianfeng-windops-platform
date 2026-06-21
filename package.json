@@ -6,10 +6,14 @@
   "scripts": {
     "dev": "npm --workspace apps/web run dev",
     "build": "npm --workspace apps/web run build",
+    "assets:laoyeling": "node scripts/convert-laoyeling-tileset.mjs",
     "test": "npm --workspace apps/web run test",
     "typecheck": "npm --workspace apps/web run typecheck"
   },
   "workspaces": [
     "apps/web"
-  ]
+  ],
+  "devDependencies": {
+    "3d-tiles-tools": "^0.5.3"
+  }
 }

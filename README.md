@@ -38,10 +38,11 @@
 
 ## 当前可运行入口
 
-第一条 GIS+BIM 闭环的前端入口在 `apps/web`，使用 CesiumJS 加载本机老爷岭山体 GLTF，并把首台风机放到山体上：
+第一条 GIS+BIM 闭环的前端入口在 `apps/web`。山地底座统一走 3D Tiles 入口：先用 Cesium 官方 `3d-tiles-tools` 把本机老爷岭 GLTF 生成 3D Tiles 1.1 tileset，再由 CesiumJS 加载 `tileset.json`，并把首台风机放到山体上：
 
 ```bash
 npm install
+npm run assets:laoyeling
 npm run dev
 ```
 
@@ -54,9 +55,12 @@ http://127.0.0.1:1146/
 当前外部资产不提交到 Git：
 
 - 山体：`/Users/rudy/Downloads/laoyeling_mountain/scene.gltf`
+- 山体 3D Tiles 输出：`data/external/tilesets/laoyeling-mountain/tileset.json`
 - 风机首版 GLB：`/Volumes/RUDY/105. 风机科研项目/MF-TurbineMonitor/public/models/equipment.glb`
 
 老爷岭模型来自 Sketchfab，作者李延权，许可证为 CC-BY-4.0。界面必须保留来源和数据边界。
+
+注意：当前 `npm run assets:laoyeling` 生成的是单瓦片 3D Tiles 1.1 包装，作用是统一 GIS+BIM 运行时数据入口；它还不是真正多级 LOD 的倾斜摄影切片。后续接入 OSGB、真实倾斜摄影或点云时，仍需要专业切片工具生成多瓦片、多层级 3D Tiles。
 
 ## 工程原则
 

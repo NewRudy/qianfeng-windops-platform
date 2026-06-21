@@ -1,6 +1,7 @@
 import {
   Cartesian2,
   Cartesian3,
+  Cesium3DTileset,
   Color,
   EllipsoidTerrainProvider,
   HeadingPitchRoll,
@@ -65,24 +66,8 @@ export async function createWindFarmScene({
   );
   const localFrame = Transforms.eastNorthUpToFixedFrame(origin);
 
-  const mountain = await Model.fromGltfAsync({
-    url: toViteFsUrl(config.mountain.absolutePath),
-    modelMatrix: modelMatrixFromOffset(localFrame, config.mountain.offset),
-    scale: config.mountain.scale,
-  });
+  const mountain = await Cesium3DTileset.fromUrl(toViteFsUrl(config.mountain.absolutePath));
   viewer.scene.primitives.add(mountain);
-
-  const turbine = await Model.fromGltfAsync({
-    url: toViteFsUrl(config.turbine.absolutePath),
-    modelMatrix: modelMatrixFromOffset(localFrame, config.turbine.offset),
-    scale: config.turbine.scale,
-    minimumPixelSize: 96,
-  });
-  turbine.id = {
-    kind: "turbine",
-    turbineId: config.turbine.turbineId,
-  } satisfies PickableModelId;
-  viewer.scene.primitives.add(turbine);
 
   const turbinePosition = Matrix4.multiplyByPoint(
     localFrame,
@@ -91,6 +76,9 @@ export async function createWindFarmScene({
   );
 
   addTurbineGeometry(viewer, localFrame, config.turbine);
+  void loadTurbineBimModel(viewer, localFrame, config.turbine).catch((error: unknown) => {
+    console.warn("Failed to load turbine BIM GLB. Keeping interactive Cesium fallback.", error);
+  });
 
   viewer.entities.add({
     id: `${config.turbine.turbineId}-label`,
@@ -150,6 +138,31 @@ function modelMatrixFromOffset(localFrame: Matrix4, offset: LocalOffset): Matrix
     new Cartesian3(offset.east, offset.north, offset.up),
     new Matrix4(),
   );
+}
+
+async function loadTurbineBimModel(
+  viewer: Viewer,
+  localFrame: Matrix4,
+  turbineAsset: TurbineAsset,
+): Promise<void> {
+  const modelUrl = toViteFsUrl(turbineAsset.absolutePath);
+  const response = await fetch(modelUrl, { method: "HEAD" });
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!response.ok || contentType.includes("text/html")) {
+    return;
+  }
+
+  const turbine = await Model.fromGltfAsync({
+    url: modelUrl,
+    modelMatrix: modelMatrixFromOffset(localFrame, turbineAsset.offset),
+    scale: turbineAsset.scale,
+    minimumPixelSize: 96,
+  });
+  turbine.id = {
+    kind: "turbine",
+    turbineId: turbineAsset.turbineId,
+  } satisfies PickableModelId;
+  viewer.scene.primitives.add(turbine);
 }
 
 function addTurbineGeometry(viewer: Viewer, localFrame: Matrix4, turbine: TurbineAsset): void {

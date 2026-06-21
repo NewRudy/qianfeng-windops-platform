@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 import { firstSliceSceneConfig, toViteFsUrl } from "../src/scene/sceneConfig";
 
 describe("first slice scene config", () => {
-  it("uses the downloaded Laoyeling mountain as the GIS background", () => {
+  it("uses the generated Laoyeling 3D Tiles tileset as the GIS background", () => {
     expect(firstSliceSceneConfig.mountain.absolutePath).toBe(
-      "/Users/rudy/Downloads/laoyeling_mountain/scene.gltf",
+      "/Users/rudy/Documents/geo_agent/qianfeng-windops-platform/data/external/tilesets/laoyeling-mountain/tileset.json",
     );
+    expect(firstSliceSceneConfig.mountain.absolutePath).toContain("tileset.json");
     expect(firstSliceSceneConfig.mountain.credit).toContain("CC-BY-4.0");
   });
 
@@ -19,8 +20,8 @@ describe("first slice scene config", () => {
   });
 
   it("converts absolute asset paths into Vite dev-server file URLs", () => {
-    expect(toViteFsUrl("/Users/rudy/Downloads/laoyeling_mountain/scene.gltf")).toBe(
-      "/@fs/Users/rudy/Downloads/laoyeling_mountain/scene.gltf",
+    expect(toViteFsUrl("/Users/rudy/Downloads/laoyeling_mountain/tileset.json")).toBe(
+      "/@fs/Users/rudy/Downloads/laoyeling_mountain/tileset.json",
     );
     expect(
       toViteFsUrl("/Volumes/RUDY/105. 风机科研项目/MF-TurbineMonitor/public/models/equipment.glb"),

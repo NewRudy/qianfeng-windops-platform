@@ -12,6 +12,12 @@ export interface ModelAsset {
   credit: string;
 }
 
+export interface TilesetAsset {
+  name: string;
+  absolutePath: string;
+  credit: string;
+}
+
 export interface TurbineAsset extends ModelAsset {
   turbineId: string;
   riskLevel: "normal" | "warning" | "critical";
@@ -29,7 +35,7 @@ export interface SceneConfig {
     latitude: number;
     height: number;
   };
-  mountain: ModelAsset;
+  mountain: TilesetAsset;
   turbine: TurbineAsset;
 }
 
@@ -52,15 +58,10 @@ export const firstSliceSceneConfig: SceneConfig = {
   },
   mountain: {
     name: "Laoyeling Mountain",
-    absolutePath: "/Users/rudy/Downloads/laoyeling_mountain/scene.gltf",
-    scale: 1800,
-    offset: {
-      east: 0,
-      north: 0,
-      up: -35,
-    },
+    absolutePath:
+      "/Users/rudy/Documents/geo_agent/qianfeng-windops-platform/data/external/tilesets/laoyeling-mountain/tileset.json",
     credit:
-      'This work is based on "Laoyeling Mountain" by Li Yanquan, licensed under CC-BY-4.0.',
+      '3D Tiles 1.1 wrapper generated from "Laoyeling Mountain" by Li Yanquan, licensed under CC-BY-4.0.',
   },
   turbine: {
     name: "HS-WTG-01",
@@ -71,7 +72,7 @@ export const firstSliceSceneConfig: SceneConfig = {
     offset: {
       east: 260,
       north: -120,
-      up: 72,
+      up: 220,
     },
     geometry: {
       towerHeight: 180,
