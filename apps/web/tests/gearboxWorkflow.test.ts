@@ -120,6 +120,11 @@ describe("gearbox workflow case", () => {
     const inspectionText = inspection.inspectionItems?.map((item) => `${item.step} ${item.result} ${item.basis}`).join(" ");
 
     expect(alerts.action?.module).toBe("inspection");
+    expect(alerts.body).toContain("BIM 中定位齿轮箱主疑似部件");
+    expect(alerts.decision?.input).toContain("BIM 齿轮箱定位");
+    expect(alerts.decision?.input).toContain("叶根/塔筒反证项");
+    expect(alerts.decision?.model).toContain("BIM 部件映射");
+    expect(alerts.decision?.result).toContain("主疑似部件");
     expect(inspection.action?.module).toBe("maintenance");
     expect(inspection.inspectionItems).toHaveLength(4);
     expect(statuses).toEqual(["confirmed", "excluded", "pending", "pending"]);

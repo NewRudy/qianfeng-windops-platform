@@ -722,14 +722,14 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       },
       alerts: {
         action: { label: "进入隐患排查", module: "inspection", primary: true },
-        body: "SCADA 残差、油温与 CMS 侧频三项证据一致，建议转入预测维护。",
+        body: "告警中心只承接已经通过融合判据的事件：SCADA 残差、油温与 CMS 侧频三项证据一致后，先在 BIM 中定位齿轮箱主疑似部件，再把叶根螺栓和塔筒结构作为反证项进入隐患排查。",
         decision: {
-          confirm: "值长确认告警级别、限功率策略和复核窗口后，才进入隐患排查清单。",
-          evidence: "告警不是单阈值触发，而是由 SCADA、CMS、油温三类主证据共同支撑。",
-          input: "融合判据输出、BIM 部件定位、AI 值班建议",
-          model: "P1 告警分级规则 + 人工值班确认边界",
+          confirm: "值长确认告警级别、BIM 疑似部件和结构反证项后，才进入隐患排查清单。",
+          evidence: "告警不是单阈值触发，而是由 SCADA、CMS、油温三类主证据共同支撑，并由 BIM 定位到齿轮箱高速轴轴承。",
+          input: "融合判据输出、BIM 齿轮箱定位、叶根/塔筒反证项、AI 值班建议",
+          model: "P1 告警分级规则 + BIM 部件映射 + 人工值班确认边界",
           operation: "确认告警闭环",
-          result: "进入齿轮箱 P1 预警研判，准备隐患排查",
+          result: "锁定齿轮箱主疑似部件，带着反证项进入隐患排查",
         },
         evidenceRows: [
           {

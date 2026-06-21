@@ -335,6 +335,35 @@ function renderInspectionItems(items: InspectionItem[] = []): string {
     .join("");
 }
 
+function renderBimLocalizationCard(risks: ComponentRisk[] = []): string {
+  const primaryRisk = risks.find((risk) => risk.component === "gearbox") ?? risks[0];
+  const counterRisks = risks.filter((risk) => risk.component !== primaryRisk?.component);
+  if (!primaryRisk) return "";
+
+  return `
+    <section class="bim-localization-card" aria-label="BIM 部件定位与排除项">
+      <header>
+        <span>BIM 定位</span>
+        <strong>告警落到具体部件</strong>
+      </header>
+      <button class="primary" type="button" data-bim-part="${html(primaryRisk.part)}" data-open-module="${html(primaryRisk.module)}">
+        <span>疑似主部件</span>
+        <strong>${html(primaryRisk.title)} · ${html(primaryRisk.status)}</strong>
+        <small>融合判据指向 ${html(primaryRisk.title)}，点击聚焦 BIM 部件并进入研判。</small>
+      </button>
+      <div>
+        ${counterRisks.map((risk) => `
+          <button type="button" data-bim-part="${html(risk.part)}" data-open-module="${html(risk.module)}">
+            <span>反证 / 联动</span>
+            <strong>${html(risk.title)}</strong>
+            <small>${html(risk.status)}</small>
+          </button>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
 function renderAction(action?: WorkflowAction, extraAttribute = ""): string {
   if (!action) return "";
   const primaryClass = action.primary ? " primary" : "";
@@ -637,6 +666,7 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
         ${renderOperationReviewCard(module.decision, `${workflowCase.turbineId} ${workflowCase.eventCode}`)}
+        ${renderBimLocalizationCard(workflowCase.componentRisks)}
         <details class="module-evidence-stack">
           <summary>展开告警证据链与事件说明</summary>
           ${renderModuleEvidenceNote(module.body)}
@@ -1696,6 +1726,13 @@ function bindWorkflowSurfaceEvents(): void {
       if (!moduleName) return;
       openWorkflowModule(moduleName);
       setEventTimelineStage(moduleName === "workorder" ? "workorder-draft" : "evidence-review");
+      const part = button.dataset.bimPart as BimPartKey | undefined;
+      if (part) {
+        const componentName = part === "gearbox" ? "gearbox" : "";
+        if (componentName) setActiveComponent(componentName);
+        void getBimViewer().focusPart(part);
+        return;
+      }
       if (["scada", "cms", "alerts", "inspection", "maintenance", "workorder"].includes(moduleName)) {
         setActiveComponent("gearbox");
         void getBimViewer().focusPart("gearbox");
