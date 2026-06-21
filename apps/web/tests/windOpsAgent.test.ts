@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAgentEvidenceCards,
+  buildAgentOperatorFocus,
   buildAgentPrompt,
   buildAgentToolTrace,
   classifyAgentIntent,
+  enforceAgentAnswerBoundaries,
   runWindOpsAgent,
 } from "../server/windOpsAgent";
 import { gearboxWorkflowCase } from "../src/workflow/gearboxWorkflow";
@@ -40,6 +42,16 @@ describe("WindOps diagnostic agent", () => {
     expect(trace.at(-1)?.status).toBe("review");
   });
 
+  it("chooses one operator focus instead of showing every workflow at once", () => {
+    const counterFocus = buildAgentOperatorFocus("counter_evidence", gearboxWorkflowCase);
+    const workOrderFocus = buildAgentOperatorFocus("workorder", gearboxWorkflowCase);
+
+    expect(counterFocus.recommendedModule).toBe("bolts");
+    expect(counterFocus.why).toContain("反证");
+    expect(workOrderFocus.recommendedModule).toBe("workorder");
+    expect(workOrderFocus.humanCheck).toContain("才允许派发");
+  });
+
   it("returns a structured fallback response when the model is not configured", async () => {
     const result = await runWindOpsAgent(
       {
@@ -55,8 +67,36 @@ describe("WindOps diagnostic agent", () => {
     expect(result.evidenceCards.length).toBeGreaterThan(0);
     expect(result.chartRefs.map((ref) => ref.module)).toContain("bolts");
     expect(result.bimHighlights.some((highlight) => highlight.part === "gearbox")).toBe(true);
-    expect(result.workOrderDraft?.status).toBe("草案待确认");
+    expect(result.operatorFocus.recommendedModule).toBe("bolts");
+    expect(result.workOrderDraft).toBeUndefined();
     expect(result.riskBoundary).toContain("人工确认");
+  });
+
+  it("only includes work order draft for maintenance or work order questions", async () => {
+    const result = await runWindOpsAgent(
+      {
+        caseId: "hs-wtg-02-gearbox-bearing",
+        question: "生成工单草案",
+      },
+      {},
+    );
+
+    expect(result.intent).toBe("workorder");
+    expect(result.operatorFocus.recommendedModule).toBe("workorder");
+    expect(result.workOrderDraft?.status).toBe("草案待确认");
+  });
+
+  it("guards model wording from claiming automatic dispatch or execution", () => {
+    const guarded = enforceAgentAnswerBoundaries(
+      "下一步：已自动生成一份现场复核工单草案，并正式派发，立即执行。",
+      "explain_alarm",
+    );
+
+    expect(guarded).not.toContain("自动生成");
+    expect(guarded).not.toContain("正式派发");
+    expect(guarded).not.toContain("立即执行");
+    expect(guarded).toContain("值长确认");
+    expect(guarded).toContain("人工确认");
   });
 
   it("uses the model only for answer text while preserving deterministic UI structure", async () => {
@@ -80,6 +120,7 @@ describe("WindOps diagnostic agent", () => {
 
     expect(result.source).toBe("llm");
     expect(result.answerText).toContain("模型答复");
+    expect(result.operatorFocus.recommendedModule).toBe("alerts");
     expect(result.evidenceCards).toHaveLength(3);
     expect(result.toolTrace).toHaveLength(5);
   });

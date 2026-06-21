@@ -1389,6 +1389,98 @@ button {
   white-space: pre-line;
 }
 
+.agent-duty-focus,
+.agent-detail-group {
+  padding: 10px;
+  border: 1px solid rgba(91, 224, 246, 0.14);
+  background: rgba(1, 14, 22, 0.66);
+}
+
+.agent-duty-focus {
+  display: grid;
+  gap: 10px;
+  border-color: rgba(91, 224, 246, 0.3);
+  box-shadow: inset 3px 0 0 rgba(91, 224, 246, 0.66);
+}
+
+.agent-duty-focus header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.agent-duty-focus header span,
+.agent-duty-focus article span {
+  color: rgba(91, 224, 246, 0.76);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.agent-duty-focus header strong {
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.agent-duty-focus > div {
+  display: grid;
+  gap: 8px;
+}
+
+.agent-duty-focus article {
+  display: grid;
+  gap: 4px;
+  padding: 9px;
+  border: 1px solid rgba(91, 224, 246, 0.12);
+  background: rgba(255, 255, 255, 0.038);
+}
+
+.agent-duty-focus article strong {
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.agent-duty-focus article p {
+  margin: 0;
+  color: rgba(222, 246, 249, 0.76);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.agent-duty-focus button {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(91, 224, 246, 0.42);
+  background: linear-gradient(135deg, rgba(22, 94, 120, 0.88), rgba(7, 35, 52, 0.9));
+  color: #edfcff;
+  font-weight: 900;
+}
+
+.agent-detail-group {
+  display: grid;
+  gap: 10px;
+}
+
+.agent-detail-group summary {
+  cursor: pointer;
+  color: rgba(202, 236, 241, 0.74);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.agent-detail-group[open] summary {
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(91, 224, 246, 0.14);
+  color: #ffffff;
+}
+
+.agent-detail-group .agent-link-grid,
+.agent-detail-group .agent-report-sections,
+.agent-detail-group .agent-tool-trace {
+  margin-top: 10px;
+}
+
 .agent-evidence-grid,
 .agent-link-grid,
 .agent-report-sections {

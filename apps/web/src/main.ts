@@ -981,6 +981,13 @@ type AiDiagnosisResponse = {
     value: string;
   }>;
   intent: string;
+  operatorFocus: {
+    decision: string;
+    humanCheck: string;
+    primaryQuestion: string;
+    recommendedModule: WorkflowModuleKey;
+    why: string;
+  };
   reportSections: Array<{
     body: string;
     title: string;
@@ -1146,6 +1153,30 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
         <p>${html(result.answerText)}</p>
       </section>
 
+      <section class="agent-duty-focus">
+        <header>
+          <span>值班焦点</span>
+          <strong>先处理这一步</strong>
+        </header>
+        <div>
+          <article>
+            <span>当前判断</span>
+            <strong>${html(result.operatorFocus.decision)}</strong>
+          </article>
+          <article>
+            <span>为什么看这里</span>
+            <p>${html(result.operatorFocus.why)}</p>
+          </article>
+          <article>
+            <span>人工边界</span>
+            <p>${html(result.operatorFocus.humanCheck)}</p>
+          </article>
+        </div>
+        <button type="button" data-agent-open-module="${html(result.operatorFocus.recommendedModule)}">
+          ${html(result.operatorFocus.primaryQuestion)}
+        </button>
+      </section>
+
       <section class="agent-evidence-grid" aria-label="AI 证据卡">
         ${result.evidenceCards.map((card) => `
           <button class="agent-evidence-card ${html(card.severity)}" type="button" data-agent-open-module="${html(card.module)}">
@@ -1157,35 +1188,38 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
         `).join("")}
       </section>
 
-      <section class="agent-link-grid" aria-label="AI 图表联动">
-        <h4>图表联动</h4>
-        ${result.chartRefs.map((ref) => `
-          <button type="button" data-agent-open-module="${html(ref.module)}">
-            <span>${html(ref.label)}</span>
-            <strong>${html(ref.focus)}</strong>
-            <small>${html(ref.reason)}</small>
-          </button>
-        `).join("")}
-      </section>
+      <details class="agent-detail-group">
+        <summary>展开图表联动、BIM 定位与报告正文</summary>
+        <section class="agent-link-grid" aria-label="AI 图表联动">
+          <h4>图表联动</h4>
+          ${result.chartRefs.map((ref) => `
+            <button type="button" data-agent-open-module="${html(ref.module)}">
+              <span>${html(ref.label)}</span>
+              <strong>${html(ref.focus)}</strong>
+              <small>${html(ref.reason)}</small>
+            </button>
+          `).join("")}
+        </section>
 
-      <section class="agent-link-grid" aria-label="AI BIM 定位">
-        <h4>BIM 定位</h4>
-        ${result.bimHighlights.map((highlight) => `
-          <button class="${html(highlight.severity)}" type="button" data-agent-bim-part="${html(highlight.part)}">
-            <span>${html(highlight.label)}</span>
-            <strong>${html(highlight.reason)}</strong>
-          </button>
-        `).join("")}
-      </section>
+        <section class="agent-link-grid" aria-label="AI BIM 定位">
+          <h4>BIM 定位</h4>
+          ${result.bimHighlights.map((highlight) => `
+            <button class="${html(highlight.severity)}" type="button" data-agent-bim-part="${html(highlight.part)}">
+              <span>${html(highlight.label)}</span>
+              <strong>${html(highlight.reason)}</strong>
+            </button>
+          `).join("")}
+        </section>
 
-      <section class="agent-report-sections">
-        ${result.reportSections.map((section) => `
-          <article>
-            <h4>${html(section.title)}</h4>
-            <p>${html(section.body)}</p>
-          </article>
-        `).join("")}
-      </section>
+        <section class="agent-report-sections">
+          ${result.reportSections.map((section) => `
+            <article>
+              <h4>${html(section.title)}</h4>
+              <p>${html(section.body)}</p>
+            </article>
+          `).join("")}
+        </section>
+      </details>
 
       ${result.workOrderDraft ? `
         <section class="agent-workorder-card">
@@ -1208,18 +1242,21 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
         </section>
       ` : ""}
 
-      <section class="agent-tool-trace">
-        <h4>AI 工具轨迹</h4>
-        <ol>
-          ${result.toolTrace.map((item) => `
-            <li class="${html(item.status)}">
-              <span>${html(item.label)}</span>
-              <strong>${html(item.output)}</strong>
-              <small>${html(item.tool)}</small>
-            </li>
-          `).join("")}
-        </ol>
-      </section>
+      <details class="agent-detail-group">
+        <summary>展开 AI 工具轨迹</summary>
+        <section class="agent-tool-trace">
+          <h4>AI 工具轨迹</h4>
+          <ol>
+            ${result.toolTrace.map((item) => `
+              <li class="${html(item.status)}">
+                <span>${html(item.label)}</span>
+                <strong>${html(item.output)}</strong>
+                <small>${html(item.tool)}</small>
+              </li>
+            `).join("")}
+          </ol>
+        </section>
+      </details>
 
       <section class="ai-report-boundary">
         <span>边界说明</span>
@@ -1280,6 +1317,13 @@ async function requestAiDiagnosisReport(
       chartRefs: [],
       evidenceCards: [],
       intent: "explain_alarm",
+      operatorFocus: {
+        decision: "后端不可达",
+        humanCheck: "恢复后端前不得把 AI 文字当成工程处置依据。",
+        primaryQuestion: "查看 AI 诊断包",
+        recommendedModule: "brief",
+        why: "当前只保留本地规则包，无法调用后端 Agent 汇总工具轨迹。",
+      },
       reportSections: [{ title: "规则兜底", body: brief.conclusion }],
       riskBoundary: "AI 服务暂不可用，当前只展示本地规则诊断包；现场操作必须人工确认。",
       source: "fallback",

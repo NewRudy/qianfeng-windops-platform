@@ -78,6 +78,14 @@ export type AgentToolTraceItem = {
   tool: string;
 };
 
+export type AgentOperatorFocus = {
+  decision: string;
+  humanCheck: string;
+  primaryQuestion: string;
+  recommendedModule: WorkflowModuleKey;
+  why: string;
+};
+
 export type WindOpsAgentResponse = {
   answerText: string;
   bimHighlights: AgentBimHighlight[];
@@ -86,6 +94,7 @@ export type WindOpsAgentResponse = {
   evidenceCards: AgentEvidenceCard[];
   intent: AgentIntent;
   model: string;
+  operatorFocus: AgentOperatorFocus;
   reportSections: AgentReportSection[];
   riskBoundary: string;
   source: "fallback" | "llm";
@@ -252,6 +261,60 @@ export function buildAgentWorkOrderDraft(workflowCase: GearboxWorkflowCase): Age
   };
 }
 
+export function buildAgentOperatorFocus(intent: AgentIntent, workflowCase: GearboxWorkflowCase): AgentOperatorFocus {
+  const brief = workflowCase.modules.brief.aiBrief;
+  const ticket = workflowCase.modules.workorder.ticket;
+  const maintenanceWindow = workflowCase.modules.maintenance.metrics?.find((item) => item.label === "建议处置窗口")?.value ?? "48 - 72 h";
+  const baseDecision = brief?.primaryFinding ?? `${workflowCase.component}风险`;
+
+  const focusByIntent: Record<AgentIntent, AgentOperatorFocus> = {
+    counter_evidence: {
+      decision: "先确认是不是结构侧误报",
+      humanCheck: "结构工程师确认螺栓松弛未形成环向扩展后，才能把齿轮箱作为主闭环。",
+      primaryQuestion: "先看螺栓/结构反证",
+      recommendedModule: "bolts",
+      why: "用户问“为什么不是螺栓问题”时，先看反证，避免把传动链风险误派成叶根检修。",
+    },
+    evidence_chain: {
+      decision: "先确认多源证据是否同向",
+      humanCheck: "诊断工程师复核同一时间窗和数据质量后，才允许升级告警级别。",
+      primaryQuestion: "先看融合判据",
+      recommendedModule: "fusion",
+      why: "SCADA、CMS、油温和结构监测必须在同一事件窗口内互相解释，不能只看单条曲线。",
+    },
+    explain_alarm: {
+      decision: baseDecision,
+      humanCheck: "值班员确认非限电、非人为降载、非通信异常后，再进入证据复核。",
+      primaryQuestion: "先看告警为什么成立",
+      recommendedModule: "alerts",
+      why: "当前不是普通阈值闪烁，而是运行残差、振动侧频和油温同向触发的预测维护事件。",
+    },
+    maintenance_plan: {
+      decision: `按 ${maintenanceWindow} 安排复核窗口`,
+      humanCheck: "值长确认低风速窗口、运行方式和安全许可后，处置策略才可转工单。",
+      primaryQuestion: "先看预测维护策略",
+      recommendedModule: "maintenance",
+      why: "运维用户关心的不是再看更多曲线，而是是否限功率、什么时候复核、需要哪些资源。",
+    },
+    report: {
+      decision: "报告只汇总已验证证据",
+      humanCheck: "报告可用于交接班和汇报，但停机、登塔、检修仍需人工签核。",
+      primaryQuestion: "先看 AI 诊断包",
+      recommendedModule: "brief",
+      why: "图文报告必须从结构化证据包生成，不能把大模型回答当成新的事实来源。",
+    },
+    workorder: {
+      decision: `只生成 ${ticket?.priority ?? "P1"} 工单草案`,
+      humanCheck: "低风速窗口、安全许可、备件工器具、复盘回写责任全部确认后才允许派发。",
+      primaryQuestion: "先看工单人工确认门",
+      recommendedModule: "workorder",
+      why: "AI 可以把证据转成工单草案，但不能替值长和现场工程师派发停机/登塔动作。",
+    },
+  };
+
+  return focusByIntent[intent];
+}
+
 export function buildFallbackAgentAnswer(intent: AgentIntent, workflowCase: GearboxWorkflowCase): string {
   const brief = workflowCase.modules.brief.aiBrief;
   const maintenance = workflowCase.modules.maintenance;
@@ -323,6 +386,7 @@ export function buildAgentPrompt(intent: AgentIntent, question: string, workflow
     "请只基于下列工具输出回答，不编造真实接入、自动停机、准确率或企业客户。",
     "回答要像现场工程师能用的结论：先判断，再给证据，再给下一步。最多 5 句。",
     "如果用户问工单，只能生成草案，必须说明待人工确认。",
+    "除非用户明确问工单或处置策略，不要说已经生成工单；严禁说自动生成、自动派发、立即执行。",
     "",
     `用户问题：${question || "解释当前预警"}`,
     `意图：${intent}`,
@@ -331,6 +395,27 @@ export function buildAgentPrompt(intent: AgentIntent, question: string, workflow
     `建议动作：${brief?.recommendedAction ?? ""}`,
     `证据卡：${evidence.map((item) => `${item.source}:${item.value}:${item.interpretation}`).join("；")}`,
   ].join("\n");
+}
+
+export function enforceAgentAnswerBoundaries(answerText: string, intent: AgentIntent): string {
+  let guarded = answerText
+    .replace(/自动生成/g, "生成草案")
+    .replace(/自动派发/g, "人工确认后派发")
+    .replace(/正式派发/g, "人工确认后派发")
+    .replace(/立即执行/g, "人工确认后执行");
+
+  if (!["maintenance_plan", "workorder"].includes(intent)) {
+    guarded = guarded.replace(
+      /已[^。！？]*工单草案[^。！？]*[。！？]?/g,
+      "如需处置，先完成证据复核和人工确认，再由值长确认是否打开工单草案。",
+    );
+  }
+
+  if (!/人工确认|人工审核|值长确认|现场工程师确认/.test(guarded)) {
+    guarded = `${guarded}\n边界：AI 只辅助研判，停机、登塔、检修和派单必须人工确认。`;
+  }
+
+  return guarded;
 }
 
 export async function runWindOpsAgent(
@@ -345,6 +430,7 @@ export async function runWindOpsAgent(
   const chartRefs = buildAgentChartRefs(context.workflowCase);
   const bimHighlights = buildAgentBimHighlights(context.workflowCase);
   const toolTrace = buildAgentToolTrace(context.workflowCase);
+  const operatorFocus = buildAgentOperatorFocus(intent, context.workflowCase);
   const riskBoundary = "AI 输出用于值班研判和工单草案；停机、检修、登塔和安全操作必须人工确认，并由现场工程师按规程执行。";
   const model = config.model?.trim() || DEFAULT_MODEL;
   let answerText = buildFallbackAgentAnswer(intent, context.workflowCase);
@@ -390,6 +476,7 @@ export async function runWindOpsAgent(
       clearTimeout(timeout);
     }
   }
+  answerText = enforceAgentAnswerBoundaries(answerText, intent);
 
   const spokenId = context.workflowCase.turbineId.match(/(\d+)$/)?.[1];
   const voiceText = `${spokenId ? `${Number(spokenId)}号机` : context.workflowCase.turbineId}齿轮箱一级预警。已生成证据链和工单草案，请人工确认。`;
@@ -402,6 +489,7 @@ export async function runWindOpsAgent(
     evidenceCards,
     intent,
     model,
+    operatorFocus,
     reportSections: buildAgentReportSections(intent, context.workflowCase, answerText),
     riskBoundary,
     source,
@@ -409,7 +497,7 @@ export async function runWindOpsAgent(
     title: `${context.workflowCase.turbineId} AI 值班诊断`,
     toolTrace,
     voiceText,
-    workOrderDraft: buildAgentWorkOrderDraft(context.workflowCase),
+    workOrderDraft: ["maintenance_plan", "workorder"].includes(intent) ? buildAgentWorkOrderDraft(context.workflowCase) : undefined,
   };
 }
 
@@ -442,6 +530,13 @@ export function createWindOpsAgentMiddleware(config: AiDiagnosisConfig) {
         evidenceCards: [],
         intent: "explain_alarm",
         model: config.model || DEFAULT_MODEL,
+        operatorFocus: {
+          decision: "请求异常",
+          humanCheck: "请求恢复前不得形成工程处置结论。",
+          primaryQuestion: "重新进入诊断包",
+          recommendedModule: "brief",
+          why: "后端未获得有效问题和事件上下文。",
+        },
         reportSections: [],
         riskBoundary: "请求格式异常，无法形成工程判断。",
         source: "fallback",
