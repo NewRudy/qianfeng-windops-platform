@@ -86,6 +86,15 @@ export type ModelGate = {
   status: "pass" | "watch" | "block";
 };
 
+export type WorkflowDecision = {
+  confirm: string;
+  evidence: string;
+  input: string;
+  model: string;
+  operation: string;
+  result: string;
+};
+
 export type InspectionItem = {
   basis: string;
   owner: string;
@@ -159,6 +168,7 @@ export type WorkflowModule = {
   body?: string;
   boltChart?: BoltChart;
   cmsChart?: CmsChart;
+  decision?: WorkflowDecision;
   evidenceRows?: WorkflowEvidence[];
   fusionSignals?: FusionSignal[];
   hero?: {
@@ -551,6 +561,14 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       fusion: {
         action: { label: "进入告警研判", module: "alerts", primary: true },
         body: `判定门槛：SCADA 功率残差、CMS 侧频、油温热平衡三项核心证据中 ${exceededCoreSignals}/3 项越限；螺栓/结构监测用于排除叶根主风险并保留山地阵风载荷联动。`,
+        decision: {
+          confirm: "诊断工程师复核模型门控后，才把事件从数据异常升级为 P1 预测维护预警。",
+          evidence: `核心证据 ${exceededCoreSignals}/3 越限；SCADA 残差、CMS 侧频、油温热异常同向，螺栓监测作为结构反证保留。`,
+          input: "同一事件窗口内的 SCADA、CMS、油温、螺栓/结构监测",
+          model: "OpenOA 功率基线 + GMF 包络谱 + 热平衡残差 + 结构排查门控",
+          operation: "运行融合判据",
+          result: exceededCoreSignals >= 2 ? "升级为齿轮箱 P1 预测维护事件" : "继续观察，不生成工单",
+        },
         fusionSignals: [
           {
             contribution: "运行异常主证据",
@@ -630,6 +648,14 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       scada: {
         action: { label: "联动 CMS 振动", module: "cms" },
         body: `判断：同风速段输出持续低于期望功率曲线，最大功率缺口 ${formatFixed(diagnostics.maxPowerShortfallPct)}%，超过 ${input.thresholds.scadaPowerShortfallPct}% 预警线，同时油温较同类机组高 ${formatFixed(diagnostics.oilTempDeltaC)} ℃。`,
+        decision: {
+          confirm: "值班员确认该时段未发生限电、通信丢包或人为降载后，再把功率残差作为有效主证据。",
+          evidence: `${input.scadaSamples.length} 个 10 min SCADA 采样窗中 ${diagnostics.scadaAbnormalSamples} 个异常，最大功率缺口 ${formatSignedPct(diagnostics.maxPowerShortfallPct)}，油温偏高 ${formatFixed(diagnostics.oilTempDeltaC)} ℃。`,
+          input: `${input.scadaSamples.length} 个 10 min 风速、功率、油温窗口`,
+          model: "OpenOA 风速-功率基线 + 同场同机型油温对标",
+          operation: "运行 SCADA 残差校核",
+          result: scadaAlarm ? "运行侧异常成立，转入 CMS 部件证据复核" : "运行侧未形成连续异常",
+        },
         kicker: "Evidence 01 / SCADA",
         metrics: [
           { label: "风速", value: `${formatFixed(diagnostics.focusSample.windSpeed)} m/s` },
@@ -643,6 +669,14 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       cms: {
         action: { label: "进入告警研判", module: "alerts" },
         body: `机理+数值判断：啮合频率及两侧边带同步抬升，当前侧频 ${formatFixed(diagnostics.cmsSidebandRatio)}x 基线，超过 ${formatFixed(input.thresholds.cmsSidebandRatio)}x 关注阈值；结合 SCADA 残差，指向齿轮箱早期磨损。`,
+        decision: {
+          confirm: "诊断工程师确认采样质量和转速工况后，再把侧频证据作为部件定位依据。",
+          evidence: `CMS 高频包络谱显示 GMF 侧频 ${formatFixed(diagnostics.cmsSidebandRatio)}x 基线，超过 ${formatFixed(input.thresholds.cmsSidebandRatio)}x 关注阈值。`,
+          input: "20 kHz 高频振动包络谱、转速工况、GMF 频率及边带",
+          model: "齿轮啮合频率 GMF + 边带幅值比 + ISO 10816 关注线",
+          operation: "运行 CMS 侧频复核",
+          result: cmsAlarm ? "部件证据指向齿轮箱高速轴轴承早期磨损" : "振动证据不足，回到观察",
+        },
         cmsChart,
         kicker: "Evidence 02 / CMS",
         metrics: [
@@ -655,6 +689,14 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       bolts: {
         action: { label: "回到告警研判", module: "alerts" },
         body: "排查结论：当前主风险不来自叶根螺栓，但山地阵风载荷会放大传动链冲击，保留联动监视。",
+        decision: {
+          confirm: "结构工程师确认螺栓松弛未形成环向扩展后，才把它作为载荷放大因素而不是主故障。",
+          evidence: `${boltChart.channels.length} 路叶根螺栓在线，最低通道 ${diagnostics.boltLowestChannel.id} 松弛 ${formatFixed(diagnostics.boltLowestChannel.relaxationPct)}%，关注通道 ${diagnostics.boltWarningChannels} 路。`,
+          input: `${boltChart.channels.length} 路叶根螺栓预紧力、塔筒一阶频率、山地阵风载荷`,
+          model: "预紧力松弛阈值 + 环向扩展排查 + 结构反证",
+          operation: "运行结构反证校核",
+          result: boltWatch ? "结构侧进入关注，但不改写齿轮箱主故障判断" : "结构侧无显著异常",
+        },
         boltChart,
         kicker: "Evidence 03 / Bolt & Structure",
         metrics: [
@@ -668,6 +710,14 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       alerts: {
         action: { label: "进入隐患排查", module: "inspection", primary: true },
         body: "SCADA 残差、油温与 CMS 侧频三项证据一致，建议转入预测维护。",
+        decision: {
+          confirm: "值长确认告警级别、限功率策略和复核窗口后，才进入隐患排查清单。",
+          evidence: "告警不是单阈值触发，而是由 SCADA、CMS、油温三类主证据共同支撑。",
+          input: "融合判据输出、BIM 部件定位、AI 值班建议",
+          model: "P1 告警分级规则 + 人工值班确认边界",
+          operation: "确认告警闭环",
+          result: "进入齿轮箱 P1 预警研判，准备隐患排查",
+        },
         evidenceRows: [
           {
             confidence: "0.84",
@@ -703,6 +753,14 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       inspection: {
         action: { label: "形成维护策略", module: "maintenance", primary: true },
         body: "排查原则：先锁定传动链主风险，再排除叶根/塔筒结构主风险；现场复核只保留能改变处置策略的动作。",
+        decision: {
+          confirm: "现场班组确认复核动作可执行后，才转为预测维护策略，不把所有告警都派成检修单。",
+          evidence: "主风险已锁定齿轮箱高速轴轴承；叶根结构主故障被排除；油液、内窥、CMS 复测会改变后续处置。",
+          input: "告警证据、BIM 定位、结构反证、现场可执行窗口",
+          model: "故障树排查 + 能改变决策的最小检查项",
+          operation: "生成隐患排查路径",
+          result: "保留 4 项排查动作，剔除无关巡检项",
+        },
         inspectionItems: [
           {
             basis: `SCADA 最大功率缺口 ${formatSignedPct(diagnostics.maxPowerShortfallPct)}，CMS 侧频 ${formatFixed(diagnostics.cmsSidebandRatio)}x 基线`,
@@ -744,6 +802,14 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       maintenance: {
         action: { label: "生成运维工单", module: "workorder", primary: true },
         body: `策略：${input.maintenance.strategy}`,
+        decision: {
+          confirm: "集控值班长确认低风速窗口、备件和安全许可后，才生成可执行工单。",
+          evidence: `预计剩余可运行 ${input.maintenance.estimatedRemainingHours} h，建议 ${input.maintenance.actionWindowHours} 内复核，复核前执行 ${input.maintenance.workMode}。`,
+          input: "风险等级、剩余可运行时间、低风速窗口、备件和班组资源",
+          model: "预测维护策略规则 + 风险窗口排序",
+          operation: "计算处置策略",
+          result: input.maintenance.strategy,
+        },
         kicker: "Action Plan / Predictive Maintenance",
         metrics: [
           { label: "建议处置窗口", value: input.maintenance.actionWindowHours },
@@ -754,6 +820,14 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
         title: "预测性维护建议",
       },
       workorder: {
+        decision: {
+          confirm: "工单草案必须由值长与现场工程师确认后才执行；完成后回写油液、内窥、CMS 复测和样本标签。",
+          evidence: `工单对象 ${input.turbineId} 齿轮箱高速轴轴承，作业窗口 ${input.maintenance.actionWindowHours}，作业前提 ${input.maintenance.workMode}。`,
+          input: "AI 诊断结论、预测维护策略、安全许可和工器具",
+          model: "工单模板 + 人工确认 + 复盘回写",
+          operation: "生成复核工单草案",
+          result: `待生成 ${input.turbineId} 现场复核工单`,
+        },
         kicker: "Closed Loop / Work Order",
         ticket: {
           acceptanceCriteria: [

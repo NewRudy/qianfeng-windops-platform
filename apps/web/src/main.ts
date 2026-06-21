@@ -18,6 +18,7 @@ import {
   type ModelGate,
   type ScadaChart,
   type WorkflowAction,
+  type WorkflowDecision,
   type WorkflowEvidence,
   type WorkflowMetric,
   type WorkflowModule,
@@ -301,6 +302,29 @@ function renderAction(action?: WorkflowAction, extraAttribute = ""): string {
   return `<button class="module-action${primaryClass}" type="button" data-open-module="${html(action.module)}"${extraAttribute}>${html(action.label)}</button>`;
 }
 
+function renderDecisionCard(decision?: WorkflowDecision): string {
+  if (!decision) return "";
+
+  return `
+    <article class="workflow-decision-card">
+      <header>
+        <span>业务动作</span>
+        <strong>${html(decision.operation)}</strong>
+      </header>
+      <dl>
+        <div><dt>输入数据</dt><dd>${html(decision.input)}</dd></div>
+        <div><dt>调用模型</dt><dd>${html(decision.model)}</dd></div>
+        <div><dt>输出结论</dt><dd>${html(decision.result)}</dd></div>
+      </dl>
+      <details>
+        <summary>展开证据与人工边界</summary>
+        <p>${html(decision.evidence)}</p>
+        <p><b>人工确认：</b>${html(decision.confirm)}</p>
+      </details>
+    </article>
+  `;
+}
+
 function renderEventTimeline(steps: EventTimelineStep[]): string {
   return `
     <section class="event-timeline" aria-label="值班事件闭环">
@@ -450,9 +474,13 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-scada">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        ${renderScadaChart(module.scadaChart)}
+        ${renderDecisionCard(module.decision)}
         <dl>${renderMetrics(module.metrics)}</dl>
         <p>${html(module.body ?? "")}</p>
+        <details class="module-evidence-stack">
+          <summary>展开 SCADA 图表证据</summary>
+          ${renderScadaChart(module.scadaChart)}
+        </details>
         ${renderAction(module.action)}
       </section>
     `;
@@ -463,10 +491,14 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-fusion">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
+        ${renderDecisionCard(module.decision)}
         <dl>${renderMetrics(module.metrics)}</dl>
         <p>${html(module.body ?? "")}</p>
-        <div class="fusion-source-grid">${renderFusionSignals(module.fusionSignals)}</div>
-        <ol class="model-gate-list">${renderModelGates(module.modelGates)}</ol>
+        <details class="module-evidence-stack">
+          <summary>展开多源证据与模型门控</summary>
+          <div class="fusion-source-grid">${renderFusionSignals(module.fusionSignals)}</div>
+          <ol class="model-gate-list">${renderModelGates(module.modelGates)}</ol>
+        </details>
         ${renderAction(module.action)}
       </section>
     `;
@@ -477,9 +509,13 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-cms">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        ${renderCmsChart(module.cmsChart)}
+        ${renderDecisionCard(module.decision)}
         <dl>${renderMetrics(module.metrics)}</dl>
         <p>${html(module.body ?? "")}</p>
+        <details class="module-evidence-stack">
+          <summary>展开 CMS 频谱证据</summary>
+          ${renderCmsChart(module.cmsChart)}
+        </details>
         ${renderAction(module.action)}
       </section>
     `;
@@ -490,9 +526,13 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-bolts">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        ${renderBoltChart(module.boltChart)}
+        ${renderDecisionCard(module.decision)}
         <dl>${renderMetrics(module.metrics)}</dl>
         <p>${html(module.body ?? "")}</p>
+        <details class="module-evidence-stack">
+          <summary>展开螺栓/结构证据</summary>
+          ${renderBoltChart(module.boltChart)}
+        </details>
         ${renderAction(module.action)}
       </section>
     `;
@@ -503,12 +543,16 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-alerts">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
+        ${renderDecisionCard(module.decision)}
         <article class="alarm-card">
           <span>ORANGE</span>
           <strong>${html(workflowCase.turbineId)} ${html(workflowCase.eventCode)}</strong>
           <p>${html(module.body ?? "")}</p>
         </article>
-        <ul class="event-list">${renderEvidenceRows(module.evidenceRows)}</ul>
+        <details class="module-evidence-stack">
+          <summary>展开告警证据链</summary>
+          <ul class="event-list">${renderEvidenceRows(module.evidenceRows)}</ul>
+        </details>
         ${renderAction(module.action)}
       </section>
     `;
@@ -519,9 +563,13 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-inspection">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
+        ${renderDecisionCard(module.decision)}
         <dl>${renderMetrics(module.metrics)}</dl>
         <p>${html(module.body ?? "")}</p>
-        <ol class="inspection-list">${renderInspectionItems(module.inspectionItems)}</ol>
+        <details class="module-evidence-stack">
+          <summary>展开排查清单</summary>
+          <ol class="inspection-list">${renderInspectionItems(module.inspectionItems)}</ol>
+        </details>
         ${renderAction(module.action)}
       </section>
     `;
@@ -532,6 +580,7 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-maintenance">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
+        ${renderDecisionCard(module.decision)}
         <dl>${renderMetrics(module.metrics)}</dl>
         <p>${html(module.body ?? "")}</p>
         ${renderAction(module.action, " data-create-workorder")}
@@ -544,6 +593,7 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
     <section class="module-panel module-workorder">
       <div class="module-kicker">${html(module.kicker)}</div>
       <h3>${html(module.title)}</h3>
+      ${renderDecisionCard(module.decision)}
       <div class="workorder-ticket">
         <span id="workorder-state">${html(ticket?.initialState ?? "待生成")}</span>
         <strong id="workorder-code">${html(ticket?.draftCode ?? "WO-待创建")}</strong>
@@ -564,23 +614,26 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
         <span>工器具 / 备件</span>
         <p>${html((ticket?.materials ?? []).join(" / "))}</p>
       </section>
-      <ol class="workorder-steps">
-        ${(ticket?.steps ?? []).map((step, index) => `
-          <li>
-            <span>${String(index + 1).padStart(2, "0")}</span>
-            <div>
-              <strong>${html(step.action)}</strong>
-              <small>${html(step.owner)} / 输出：${html(step.output)}</small>
-            </div>
-          </li>
-        `).join("")}
-      </ol>
-      <section class="workorder-section">
-        <span>验收标准</span>
-        <ul>
-          ${(ticket?.acceptanceCriteria ?? []).map((item) => `<li>${html(item)}</li>`).join("")}
-        </ul>
-      </section>
+      <details class="module-evidence-stack">
+        <summary>展开工单步骤与验收标准</summary>
+        <ol class="workorder-steps">
+          ${(ticket?.steps ?? []).map((step, index) => `
+            <li>
+              <span>${String(index + 1).padStart(2, "0")}</span>
+              <div>
+                <strong>${html(step.action)}</strong>
+                <small>${html(step.owner)} / 输出：${html(step.output)}</small>
+              </div>
+            </li>
+          `).join("")}
+        </ol>
+        <section class="workorder-section">
+          <span>验收标准</span>
+          <ul>
+            ${(ticket?.acceptanceCriteria ?? []).map((item) => `<li>${html(item)}</li>`).join("")}
+          </ul>
+        </section>
+      </details>
       <button class="module-action" type="button" data-close-workorder disabled>${html(ticket?.closeActionLabel ?? "标记完成")}</button>
     </section>
   `;

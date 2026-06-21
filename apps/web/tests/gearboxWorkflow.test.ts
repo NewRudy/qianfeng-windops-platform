@@ -79,6 +79,11 @@ describe("gearbox workflow case", () => {
     const sources = fusion.fusionSignals?.map((signal) => signal.source).join(" ");
     const gateText = fusion.modelGates?.map((gate) => `${gate.layer} ${gate.method} ${gate.rule} ${gate.result}`).join(" ");
 
+    expect(fusion.decision).toMatchObject({
+      operation: "运行融合判据",
+      model: expect.stringContaining("OpenOA"),
+      result: "升级为齿轮箱 P1 预测维护事件",
+    });
     expect(fusion.fusionSignals).toHaveLength(4);
     expect(fusion.modelGates).toHaveLength(4);
     expect(fusion.metrics).toContainEqual({ label: "融合结论", value: "齿轮箱 P1 预警" });
@@ -123,15 +128,21 @@ describe("gearbox workflow case", () => {
     const cmsChart = gearboxWorkflowCase.modules.cms.cmsChart;
     const boltChart = gearboxWorkflowCase.modules.bolts.boltChart;
 
+    expect(gearboxWorkflowCase.modules.scada.decision?.operation).toBe("运行 SCADA 残差校核");
+    expect(gearboxWorkflowCase.modules.scada.decision?.confirm).toContain("人为降载");
     expect(scadaChart?.xAxis.label).toBe("风速 m/s");
     expect(scadaChart?.yAxis.label).toBe("有功功率 kW");
     expect(scadaChart?.points.some((point) => point.abnormal)).toBe(true);
 
+    expect(gearboxWorkflowCase.modules.cms.decision?.operation).toBe("运行 CMS 侧频复核");
+    expect(gearboxWorkflowCase.modules.cms.decision?.result).toContain("齿轮箱高速轴轴承");
     expect(cmsChart?.xAxis.label).toBe("频率 Hz");
     expect(cmsChart?.yAxis.label).toBe("振动幅值 mm/s");
     expect(cmsChart?.threshold.value).toBeGreaterThan(0);
     expect(cmsChart?.peaks.some((peak) => peak.label.includes("啮合"))).toBe(true);
 
+    expect(gearboxWorkflowCase.modules.bolts.decision?.operation).toBe("运行结构反证校核");
+    expect(gearboxWorkflowCase.modules.bolts.decision?.result).toContain("不改写齿轮箱主故障判断");
     expect(boltChart?.channels).toHaveLength(8);
     expect(boltChart?.channels.some((channel) => channel.status === "warning")).toBe(true);
   });
@@ -139,6 +150,9 @@ describe("gearbox workflow case", () => {
   it("has a closed-loop work order checklist", () => {
     const ticket = gearboxWorkflowCase.modules.workorder.ticket;
 
+    expect(gearboxWorkflowCase.modules.maintenance.decision?.operation).toBe("计算处置策略");
+    expect(gearboxWorkflowCase.modules.workorder.decision?.operation).toBe("生成复核工单草案");
+    expect(gearboxWorkflowCase.modules.workorder.decision?.confirm).toContain("确认后才执行");
     expect(ticket?.finalCode).toBe("WO-GX-20260621-02");
     expect(ticket?.priority).toBe("P1 高优先级");
     expect(ticket?.assignee).toBe("传动链专业班组");

@@ -1082,6 +1082,103 @@ button {
   padding-left: 18px;
 }
 
+.workflow-decision-card {
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid rgba(91, 224, 246, 0.2);
+  background:
+    linear-gradient(180deg, rgba(7, 40, 54, 0.82), rgba(2, 14, 22, 0.86)),
+    radial-gradient(circle at 0 0, rgba(246, 197, 104, 0.12), transparent 32%);
+}
+
+.workflow-decision-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.workflow-decision-card header span {
+  color: rgba(246, 197, 104, 0.82);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.workflow-decision-card header strong {
+  color: #fff7e2;
+  font-size: 16px;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.workflow-decision-card dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.workflow-decision-card dl div {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.workflow-decision-card dt {
+  color: rgba(91, 224, 246, 0.76);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.workflow-decision-card dd {
+  margin: 0;
+  color: rgba(236, 251, 255, 0.82);
+  font-size: 12px;
+  line-height: 1.48;
+}
+
+.workflow-decision-card details {
+  padding-top: 8px;
+  border-top: 1px solid rgba(91, 224, 246, 0.12);
+}
+
+.workflow-decision-card summary,
+.module-evidence-stack summary {
+  color: rgba(91, 224, 246, 0.84);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.workflow-decision-card p {
+  margin: 8px 0 0;
+  color: rgba(226, 246, 250, 0.74);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.workflow-decision-card b {
+  color: #fff0c8;
+}
+
+.module-evidence-stack {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid rgba(91, 224, 246, 0.14);
+  background: rgba(1, 13, 21, 0.42);
+}
+
+.module-evidence-stack .engineering-chart,
+.module-evidence-stack .fusion-source-grid,
+.module-evidence-stack .model-gate-list,
+.module-evidence-stack .event-list,
+.module-evidence-stack .inspection-list,
+.module-evidence-stack .workorder-steps,
+.module-evidence-stack .workorder-section {
+  margin-top: 10px;
+}
+
 .ai-brief-card {
   display: grid;
   gap: 14px;
