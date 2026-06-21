@@ -782,6 +782,121 @@ button {
   display: block;
 }
 
+.event-timeline {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid rgba(91, 224, 246, 0.16);
+  background:
+    linear-gradient(rgba(91, 224, 246, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(91, 224, 246, 0.035) 1px, transparent 1px),
+    rgba(2, 16, 24, 0.72);
+  background-size: 18px 18px;
+}
+
+.event-timeline header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.event-timeline header span {
+  color: rgba(91, 224, 246, 0.74);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.event-timeline header strong {
+  color: rgba(242, 252, 255, 0.86);
+  font-size: 12px;
+  text-align: right;
+}
+
+.event-timeline ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.event-step {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 9px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(91, 224, 246, 0.12);
+  background: rgba(255, 255, 255, 0.038);
+  opacity: 0.72;
+}
+
+.event-step > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(91, 224, 246, 0.22);
+  color: rgba(91, 224, 246, 0.78);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.event-step strong {
+  display: block;
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.event-step p {
+  margin: 4px 0;
+  color: rgba(226, 246, 250, 0.72);
+  font-size: 11px;
+  line-height: 1.48;
+}
+
+.event-step small {
+  color: rgba(91, 224, 246, 0.62);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.event-step.done {
+  border-color: rgba(91, 224, 246, 0.28);
+  opacity: 0.92;
+}
+
+.event-step.done > span {
+  border-color: rgba(91, 224, 246, 0.5);
+  background: rgba(91, 224, 246, 0.12);
+}
+
+.event-step.active {
+  border-color: rgba(255, 68, 68, 0.58);
+  background: linear-gradient(90deg, rgba(255, 58, 58, 0.14), rgba(5, 24, 34, 0.72));
+  box-shadow: inset 3px 0 0 rgba(255, 68, 68, 0.88);
+  opacity: 1;
+}
+
+.event-step.active > span {
+  border-color: rgba(255, 68, 68, 0.76);
+  background: rgba(255, 68, 68, 0.16);
+  color: #ffe7e7;
+}
+
+.event-step.review {
+  border-color: rgba(246, 197, 104, 0.36);
+  background: rgba(246, 197, 104, 0.06);
+  opacity: 0.9;
+}
+
+.event-step.review > span {
+  border-color: rgba(246, 197, 104, 0.62);
+  color: #fff0c8;
+}
+
 .ai-brief-card {
   display: grid;
   gap: 14px;

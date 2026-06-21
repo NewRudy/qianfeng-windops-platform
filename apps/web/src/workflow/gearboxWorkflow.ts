@@ -31,6 +31,23 @@ export type WorkflowAction = {
   primary?: boolean;
 };
 
+export type EventTimelineStage =
+  | "ai-alert"
+  | "evidence-review"
+  | "bim-location"
+  | "workorder-draft"
+  | "human-confirm"
+  | "review-writeback";
+
+export type EventTimelineStep = {
+  description: string;
+  id: EventTimelineStage;
+  module: WorkflowModuleKey;
+  owner: string;
+  status: "active" | "done" | "pending" | "review";
+  title: string;
+};
+
 export type AiDiagnosisBrief = {
   broadcast: string;
   conclusion: string;
@@ -183,6 +200,7 @@ export type GearboxWorkflowCase = {
   component: string;
   componentRisks: ComponentRisk[];
   eventCode: string;
+  eventTimeline: EventTimelineStep[];
   moduleOrder: WorkflowModuleKey[];
   modules: Record<WorkflowModuleKey, WorkflowModule>;
   partNamePattern: RegExp;
@@ -383,6 +401,56 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       { component: "tower", module: "bolts", part: "tower", status: "载荷校核", title: "塔筒结构" },
     ],
     eventCode: input.eventCode,
+    eventTimeline: [
+      {
+        description: `${spokenTurbineName(input.turbineId)}触发齿轮箱一级预警，AI 已生成短播报并锁定当前事件。`,
+        id: "ai-alert",
+        module: "brief",
+        owner: "AI 值班员",
+        status: "done",
+        title: "预警触发",
+      },
+      {
+        description: `SCADA、CMS、油温与螺栓/结构监测进入同一证据包，核心证据越限 ${exceededCoreSignals}/3。`,
+        id: "evidence-review",
+        module: "fusion",
+        owner: "诊断工程师",
+        status: "active",
+        title: "证据复核",
+      },
+      {
+        description: "BIM 定位到齿轮箱与传动链，辅助现场人员理解疑似部件和反证部件。",
+        id: "bim-location",
+        module: "alerts",
+        owner: "可视化系统",
+        status: "pending",
+        title: "BIM 定位",
+      },
+      {
+        description: `按 ${input.maintenance.actionWindowHours} 生成现场复核工单草案，包含油液、内窥和 CMS 复测。`,
+        id: "workorder-draft",
+        module: "workorder",
+        owner: "集控值班长",
+        status: "pending",
+        title: "工单草案",
+      },
+      {
+        description: "停机、登塔和检修动作必须由现场工程师确认后执行，AI 不自动派单或自动停机。",
+        id: "human-confirm",
+        module: "workorder",
+        owner: "现场工程师",
+        status: "review",
+        title: "人工确认",
+      },
+      {
+        description: "复核完成后回写油液、内窥、复测频谱和样本标签，用于下一次模型校准。",
+        id: "review-writeback",
+        module: "workorder",
+        owner: "运维主管",
+        status: "pending",
+        title: "复盘回写",
+      },
+    ],
     moduleOrder: ["brief", "health", "fusion", "scada", "cms", "bolts", "alerts", "inspection", "maintenance", "workorder"],
     modules: {
       brief: {

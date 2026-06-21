@@ -5,6 +5,7 @@ import {
   Cartesian3,
   Cesium3DTileset,
   Color,
+  ColorBlendMode,
   ColorMaterialProperty,
   DirectionalLight,
   EllipsoidTerrainProvider,
@@ -99,6 +100,8 @@ export async function createWindFarmScene({
 
   let selectedTurbine = config.turbines[0];
   const riskEntities = new Map<string, Entity[]>();
+  const turbineModels = new Map<string, Model>();
+  let activeAlertTurbineId: string | undefined;
   if (!selectedTurbine) {
     throw new Error("Scene config must include at least one turbine.");
   }
@@ -107,10 +110,20 @@ export async function createWindFarmScene({
     addTurbineFoundation(viewer, localFrame, turbine);
     riskEntities.set(turbine.turbineId, addTurbineRiskMarker(viewer, localFrame, turbine));
 
-    void loadTurbineGltfModel(viewer, localFrame, turbine).catch((error: unknown) => {
-      console.error(`Failed to load ${turbine.turbineId} wind turbine model.`, error);
-    });
+    void loadTurbineGltfModel(viewer, localFrame, turbine)
+      .then((model) => {
+        turbineModels.set(turbine.turbineId, model);
+        updateTurbineModelAlertVisuals(turbineModels, activeAlertTurbineId);
+      })
+      .catch((error: unknown) => {
+        console.error(`Failed to load ${turbine.turbineId} wind turbine model.`, error);
+      });
   }
+
+  const flashAlertModel = () => {
+    updateTurbineModelAlertVisuals(turbineModels, activeAlertTurbineId);
+  };
+  viewer.scene.preRender.addEventListener(flashAlertModel);
 
   const ridgeTarget = pointFromOffset(localFrame, getRidgeCenterOffset(config.turbines));
 
@@ -122,11 +135,13 @@ export async function createWindFarmScene({
   };
 
   const showTurbineAlert = (turbineId: string) => {
+    activeAlertTurbineId = turbineId;
     riskEntities.forEach((entities, id) => {
       entities.forEach((entity) => {
         entity.show = id === turbineId;
       });
     });
+    updateTurbineModelAlertVisuals(turbineModels, activeAlertTurbineId);
   };
 
   const focusSelectedTurbine = () => {
@@ -175,6 +190,7 @@ export async function createWindFarmScene({
     showMountainOverview,
     showTurbineAlert,
     destroy: () => {
+      viewer.scene.preRender.removeEventListener(flashAlertModel);
       handler.destroy();
       viewer.destroy();
     },
@@ -293,8 +309,8 @@ function addTurbineRiskMarker(viewer: Viewer, localFrame: Matrix4, turbine: Turb
   const ground = pointFromOffset(localFrame, { ...groundOffset, up: groundOffset.up + 10 });
   const shortName = turbine.turbineId.match(/(\d+)$/)?.[1]?.replace(/^0+/, "") ?? turbine.turbineId;
   const pulseMaterial = new ColorMaterialProperty(new CallbackProperty(() => {
-    const alpha = 0.16 + ((Math.sin(Date.now() / 180) + 1) / 2) * 0.2;
-    return Color.fromCssColorString(`rgba(255, 148, 34, ${alpha.toFixed(3)})`);
+    const alpha = 0.14 + ((Math.sin(Date.now() / 160) + 1) / 2) * 0.26;
+    return Color.fromCssColorString(`rgba(255, 36, 36, ${alpha.toFixed(3)})`);
   }, false));
   const ring = viewer.entities.add({
     id: `${turbine.turbineId}-risk-ring`,
@@ -305,7 +321,7 @@ function addTurbineRiskMarker(viewer: Viewer, localFrame: Matrix4, turbine: Turb
       semiMinorAxis: 58,
       material: pulseMaterial,
       outline: true,
-      outlineColor: Color.fromCssColorString("rgba(255, 176, 32, 0.92)"),
+      outlineColor: Color.fromCssColorString("rgba(255, 68, 68, 0.95)"),
     },
   });
   const beacon = viewer.entities.add({
@@ -313,20 +329,20 @@ function addTurbineRiskMarker(viewer: Viewer, localFrame: Matrix4, turbine: Turb
     position: hub,
     show: false,
     point: {
-      color: Color.fromCssColorString("#ffb020"),
-      outlineColor: Color.fromCssColorString("#fff1c2"),
+      color: Color.fromCssColorString("#ff3030"),
+      outlineColor: Color.fromCssColorString("#ffe0e0"),
       outlineWidth: 2,
-      pixelSize: 16,
+      pixelSize: new CallbackProperty(() => 14 + ((Math.sin(Date.now() / 150) + 1) / 2) * 7, false),
     },
     label: {
       text: `${shortName}号机 一级预警`,
       fillColor: Color.WHITE,
       font: "700 18px sans-serif",
-      outlineColor: Color.fromCssColorString("#481800"),
+      outlineColor: Color.fromCssColorString("#4b0000"),
       outlineWidth: 3,
       pixelOffset: new Cartesian2(0, -34),
       showBackground: true,
-      backgroundColor: Color.fromCssColorString("rgba(55, 24, 4, 0.82)"),
+      backgroundColor: Color.fromCssColorString("rgba(62, 0, 0, 0.84)"),
     },
   });
 
@@ -337,7 +353,7 @@ async function loadTurbineGltfModel(
   viewer: Viewer,
   localFrame: Matrix4,
   turbineAsset: TurbineAsset,
-): Promise<void> {
+): Promise<Model> {
   const modelUrl = toViteFsUrl(turbineAsset.absolutePath);
   const response = await fetch(modelUrl, { method: "HEAD" });
   const contentType = response.headers.get("content-type") ?? "";
@@ -359,6 +375,26 @@ async function loadTurbineGltfModel(
   if (turbineAsset.hasRotorAnimation) {
     startRotorAnimationWhenReady(turbine);
   }
+
+  return turbine;
+}
+
+function updateTurbineModelAlertVisuals(turbineModels: Map<string, Model>, activeAlertTurbineId?: string): void {
+  const pulse = 0.34 + ((Math.sin(Date.now() / 150) + 1) / 2) * 0.46;
+  turbineModels.forEach((model, turbineId) => {
+    if (model.isDestroyed()) return;
+
+    const isAlerted = turbineId === activeAlertTurbineId;
+    model.colorBlendMode = ColorBlendMode.MIX;
+    model.colorBlendAmount = isAlerted ? pulse : 0;
+    model.color = isAlerted
+      ? Color.fromCssColorString(`rgba(255, 20, 20, ${Math.min(0.98, pulse + 0.2).toFixed(3)})`)
+      : Color.WHITE;
+    model.silhouetteColor = isAlerted
+      ? Color.fromCssColorString(`rgba(255, 48, 48, ${Math.min(1, pulse + 0.24).toFixed(3)})`)
+      : Color.TRANSPARENT;
+    model.silhouetteSize = isAlerted ? 1.6 + pulse * 3.2 : 0;
+  });
 }
 
 function startRotorAnimationWhenReady(turbine: Model): void {

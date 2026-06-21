@@ -10,6 +10,8 @@ import {
   type BoltChart,
   type ComponentRisk,
   type CmsChart,
+  type EventTimelineStage,
+  type EventTimelineStep,
   type FusionSignal,
   type GearboxWorkflowCase,
   type InspectionItem,
@@ -299,11 +301,35 @@ function renderAction(action?: WorkflowAction, extraAttribute = ""): string {
   return `<button class="module-action${primaryClass}" type="button" data-open-module="${html(action.module)}"${extraAttribute}>${html(action.label)}</button>`;
 }
 
+function renderEventTimeline(steps: EventTimelineStep[]): string {
+  return `
+    <section class="event-timeline" aria-label="值班事件闭环">
+      <header>
+        <span>值班事件闭环</span>
+        <strong>AI 预警 -> 证据复核 -> 工单复盘</strong>
+      </header>
+      <ol>
+        ${steps.map((step, index) => `
+          <li class="event-step ${html(step.status)}" data-event-stage="${html(step.id)}" data-event-order="${index}">
+            <span>${String(index + 1).padStart(2, "0")}</span>
+            <div>
+              <strong>${html(step.title)}</strong>
+              <p>${html(step.description)}</p>
+              <small>${html(step.owner)} / ${html(moduleText(step.module))}</small>
+            </div>
+          </li>
+        `).join("")}
+      </ol>
+    </section>
+  `;
+}
+
 function renderAiBrief(module: WorkflowModule): string {
   const brief = module.aiBrief;
   if (!brief) return "";
 
   return `
+    ${renderEventTimeline(activeWorkflowCase.eventTimeline)}
     <article class="ai-brief-card ${html(brief.riskLevel)}">
       <div>
         <span>AI 当前判断</span>
@@ -645,6 +671,15 @@ let warningActive = false;
 let modelDecomposed = false;
 let hasPlayedIntroBroadcast = false;
 
+const eventStageOrder: EventTimelineStage[] = [
+  "ai-alert",
+  "evidence-review",
+  "bim-location",
+  "workorder-draft",
+  "human-confirm",
+  "review-writeback",
+];
+
 function setBimStatus(status: string): void {
   if (bimStatus) bimStatus.textContent = status;
 }
@@ -652,6 +687,31 @@ function setBimStatus(status: string): void {
 function setActiveComponent(componentName: string): void {
   document.querySelectorAll<HTMLButtonElement>(".component").forEach((item) => {
     item.classList.toggle("active", item.dataset.component === componentName);
+  });
+}
+
+function setEventTimelineStage(stage: EventTimelineStage): void {
+  const activeIndex = eventStageOrder.indexOf(stage);
+  if (activeIndex < 0) return;
+
+  workflowModuleDrawer.querySelectorAll<HTMLElement>(".event-step").forEach((item) => {
+    const itemStage = item.dataset.eventStage as EventTimelineStage | undefined;
+    const itemIndex = itemStage ? eventStageOrder.indexOf(itemStage) : -1;
+    item.classList.remove("done", "active", "pending", "review");
+
+    if (itemIndex < 0) {
+      item.classList.add("pending");
+      return;
+    }
+    if (itemIndex < activeIndex) {
+      item.classList.add("done");
+      return;
+    }
+    if (itemStage === "human-confirm" && stage === "workorder-draft") {
+      item.classList.add("review");
+      return;
+    }
+    item.classList.add(itemIndex === activeIndex ? "active" : "pending");
   });
 }
 
@@ -675,6 +735,7 @@ function isGearboxPart(partName: string): boolean {
 
 function activateGearboxWorkflow(moduleName: WorkflowModuleKey = "alerts"): void {
   setActiveComponent("gearbox");
+  setEventTimelineStage("bim-location");
   openWorkflowModule(moduleName, activeWorkflowCase.statuses.locked);
 }
 
@@ -717,6 +778,7 @@ function triggerIntroAiAlert(turbine: TurbineAsset): void {
   hasPlayedIntroBroadcast = true;
   selectWorkflowCaseForTurbine(turbine.turbineId);
   dashboardShell.dataset.aiEvent = "active";
+  setEventTimelineStage("ai-alert");
   updateAiDutyCard();
   if (aiDutyStatus) aiDutyStatus.textContent = "巡航发现异常，AI 已自动生成值班提醒";
   speakAiDutyBrief(false);
@@ -741,6 +803,7 @@ function selectWorkflowCase(caseId: string): void {
   renderWorkflowSurfaces();
   setSelectedTurbineTitle(activeWorkflowCase.turbineId);
   updateAiDutyCard();
+  setEventTimelineStage("ai-alert");
   openWorkflowModule(activeModule, `已切换案例：${nextCase.title}`);
   setActiveComponent("gearbox");
 
@@ -1064,6 +1127,7 @@ async function requestAiDiagnosisReport(
   if (!brief) return;
 
   setAiReportText("AI 正在读取诊断包并生成报告...");
+  setEventTimelineStage("evidence-review");
   try {
     const response = await fetch("/api/agent/ask", {
       body: JSON.stringify({
@@ -1220,6 +1284,7 @@ function openGeneratedWorkOrder(status = activeWorkflowCase.statuses.ticketCreat
   if (state) state.textContent = ticket?.generatedState ?? "已生成";
   if (code) code.textContent = ticket?.finalCode ?? "WO-GX-20260621-02";
   if (button) button.disabled = false;
+  setEventTimelineStage("workorder-draft");
   openWorkflowModule("workorder", status);
 }
 
@@ -1229,6 +1294,7 @@ function bindAgentResultEvents(container: HTMLElement): void {
       const moduleName = getWorkflowModule(button.dataset.agentOpenModule);
       if (!moduleName) return;
       openWorkflowModule(moduleName, `AI 已打开${moduleText(moduleName)}证据`);
+      setEventTimelineStage(moduleName === "workorder" ? "workorder-draft" : "evidence-review");
       if (["scada", "cms", "bolts", "alerts", "workorder"].includes(moduleName)) {
         setActiveComponent(moduleName === "bolts" ? "blade-root" : "gearbox");
         void getBimViewer().focusPart(moduleName === "bolts" ? "blade" : "gearbox");
@@ -1243,6 +1309,7 @@ function bindAgentResultEvents(container: HTMLElement): void {
       if (part === "gearbox") {
         activateGearboxWorkflow("alerts");
       }
+      setEventTimelineStage("bim-location");
       void getBimViewer().focusPart(part);
     });
   });
@@ -1263,8 +1330,12 @@ function bindWorkflowSurfaceEvents(): void {
         if (part) {
           void getBimViewer()
             .focusPart(part)
-            .then(() => openWorkflowModule(nextModule, activeWorkflowCase.statuses.componentEntry));
+            .then(() => {
+              setEventTimelineStage("bim-location");
+              openWorkflowModule(nextModule, activeWorkflowCase.statuses.componentEntry);
+            });
         } else {
+          setEventTimelineStage("bim-location");
           openWorkflowModule(nextModule, activeWorkflowCase.statuses.componentEntry);
         }
         return;
@@ -1280,6 +1351,7 @@ function bindWorkflowSurfaceEvents(): void {
       const moduleName = getWorkflowModule(button.dataset.openModule);
       if (!moduleName) return;
       openWorkflowModule(moduleName);
+      setEventTimelineStage(moduleName === "workorder" ? "workorder-draft" : "evidence-review");
       if (["scada", "cms", "alerts", "inspection", "maintenance", "workorder"].includes(moduleName)) {
         setActiveComponent("gearbox");
         void getBimViewer().focusPart("gearbox");
@@ -1329,6 +1401,7 @@ function bindWorkflowSurfaceEvents(): void {
       button.textContent = ticket?.closedActionLabel ?? "现场复核已完成";
       button.disabled = true;
     }
+    setEventTimelineStage("review-writeback");
     setBimStatus(activeWorkflowCase.statuses.ticketClosed);
   });
 }
@@ -1346,7 +1419,10 @@ document.querySelectorAll<HTMLButtonElement>(".part-label[data-bim-part]").forEa
       void getBimViewer().focusPart(part).then(() => activateGearboxWorkflow("alerts"));
       return;
     }
-    if (part) void getBimViewer().focusPart(part);
+    if (part) {
+      setEventTimelineStage("bim-location");
+      void getBimViewer().focusPart(part);
+    }
   });
 });
 
@@ -1355,7 +1431,15 @@ document.querySelectorAll<HTMLButtonElement>(".module-tab").forEach((button) => 
     const moduleName = getWorkflowModule(button.dataset.module) ?? "health";
     const nextModule = dashboardShell.dataset.activeModule === moduleName ? "none" : moduleName;
 
+    if (nextModule === "workorder") {
+      openGeneratedWorkOrder();
+      return;
+    }
+
     setActiveModule(nextModule);
+    if (["fusion", "scada", "cms", "bolts", "alerts", "inspection", "maintenance"].includes(nextModule)) {
+      setEventTimelineStage(nextModule === "alerts" ? "bim-location" : "evidence-review");
+    }
   });
 });
 

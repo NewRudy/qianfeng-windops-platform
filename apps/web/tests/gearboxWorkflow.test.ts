@@ -36,6 +36,23 @@ describe("gearbox workflow case", () => {
     expect(brief.metrics).toContainEqual({ label: "证据来源", value: "SCADA / CMS / 螺栓 / 油温" });
   });
 
+  it("exposes a visible event timeline from AI warning to review writeback", () => {
+    const timeline = gearboxWorkflowCase.eventTimeline;
+
+    expect(timeline.map((step) => step.id)).toEqual([
+      "ai-alert",
+      "evidence-review",
+      "bim-location",
+      "workorder-draft",
+      "human-confirm",
+      "review-writeback",
+    ]);
+    expect(timeline[0]).toMatchObject({ module: "brief", status: "done" });
+    expect(timeline[1]).toMatchObject({ module: "fusion", status: "active" });
+    expect(timeline.find((step) => step.id === "human-confirm")?.description).toContain("不自动派单");
+    expect(timeline.find((step) => step.id === "review-writeback")?.description).toContain("模型校准");
+  });
+
   it("keeps voice broadcast short and scoped to the active warning turbine", () => {
     const broadcast = gearboxWorkflowCase.modules.brief.aiBrief?.broadcast ?? "";
 

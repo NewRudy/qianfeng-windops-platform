@@ -10,6 +10,10 @@ describe("wind turbine GLTF model loading", () => {
     );
 
     expect(source).toContain("Model.fromGltfAsync");
+    expect(source).toContain("ColorBlendMode.MIX");
+    expect(source).toContain("preRender.addEventListener");
+    expect(source).toContain("silhouetteColor");
+    expect(source).toContain("silhouetteSize");
     expect(source).toContain("readyEvent.addEventListener");
     expect(source).toContain("animateWhilePaused");
     expect(source).toContain("activeAnimations.addAll");
