@@ -1,3 +1,5 @@
+import { activeGearboxCaseInput, gearboxCaseCatalog } from "./gearboxCaseData";
+
 export type WorkflowModuleKey = "health" | "scada" | "cms" | "bolts" | "alerts" | "maintenance" | "workorder";
 
 export type WorkflowMetric = {
@@ -247,7 +249,7 @@ function getLowestBoltChannel(channels: BoltChannel[]): BoltChannel {
   return channels.reduce((lowest, channel) => (channel.preloadKn < lowest.preloadKn ? channel : lowest), channels[0]);
 }
 
-export function getGearboxCaseDiagnostics(input: GearboxCaseInput = gearboxCaseInputs): GearboxCaseDiagnostics {
+export function getGearboxCaseDiagnostics(input: GearboxCaseInput = activeGearboxCaseInput): GearboxCaseDiagnostics {
   const scadaChart = createScadaChart(input);
   const focusSample = input.scadaSamples[input.focusScadaSampleIndex] ?? input.scadaSamples[0];
   const focusShortfallPct = calculatePowerShortfallPct(focusSample);
@@ -282,44 +284,7 @@ export function getGearboxCaseDiagnostics(input: GearboxCaseInput = gearboxCaseI
   };
 }
 
-export const gearboxCaseInputs: GearboxCaseInput = {
-  caseDate: "20260621",
-  cmsBaselineAmplitude: 0.8,
-  cmsPeaks: [
-    { amplitude: 0.32, frequencyHz: 18, label: "1P 转频", status: "normal" },
-    { amplitude: 0.58, frequencyHz: 48, label: "轴承通过频率", status: "normal" },
-    { amplitude: 1.68, frequencyHz: 96, label: "齿轮啮合频率 GMF", status: "warning" },
-    { amplitude: 1.22, frequencyHz: 108, label: "GMF + 边带", status: "warning" },
-    { amplitude: 0.74, frequencyHz: 142, label: "结构耦合峰", status: "normal" },
-  ],
-  eventCode: "gearbox_bearing_wear",
-  focusScadaSampleIndex: 3,
-  maintenance: {
-    actionWindowHours: "48 - 72 h",
-    estimatedRemainingHours: 168,
-    parts: "高速轴轴承 / 油液包",
-    strategy: "利用明晚低风速窗口停机 2h，先做油液取样与内窥复核，若铁谱异常则升级检修。",
-    workMode: "限功率 80%",
-  },
-  peerOilTempC: 66.2,
-  scadaSamples: [
-    { expectedKw: 260, oilTempC: 66.8, powerKw: 255, timestamp: "08:00", windSpeed: 4.2 },
-    { expectedKw: 430, oilTempC: 68.7, powerKw: 414, timestamp: "09:00", windSpeed: 5.1 },
-    { expectedKw: 680, oilTempC: 70.1, powerKw: 648, timestamp: "10:00", windSpeed: 5.9 },
-    { expectedKw: 930, oilTempC: 74.6, powerKw: 812, timestamp: "11:00", windSpeed: 6.7 },
-    { expectedKw: 1120, oilTempC: 75.2, powerKw: 976, timestamp: "12:00", windSpeed: 7.4 },
-    { expectedKw: 1310, oilTempC: 76.1, powerKw: 1152, timestamp: "13:00", windSpeed: 8.0 },
-  ],
-  thresholds: {
-    boltRelaxationWarningPct: 8,
-    cmsSidebandRatio: 1.8,
-    oilTempDeltaC: 6,
-    scadaPowerShortfallPct: 10,
-  },
-  turbineId: "HS-WTG-02",
-};
-
-export function buildGearboxWorkflowCase(input: GearboxCaseInput = gearboxCaseInputs): GearboxWorkflowCase {
+export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearboxCaseInput): GearboxWorkflowCase {
   const diagnostics = getGearboxCaseDiagnostics(input);
   const scadaChart = createScadaChart(input);
   const cmsChart: CmsChart = {
@@ -474,5 +439,7 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = gearboxCaseIn
     turbineId: input.turbineId,
   };
 };
+
+export { activeGearboxCaseInput as gearboxCaseInputs, gearboxCaseCatalog };
 
 export const gearboxWorkflowCase = buildGearboxWorkflowCase();

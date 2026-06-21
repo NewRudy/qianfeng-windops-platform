@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildGearboxWorkflowCase,
+  gearboxCaseCatalog,
   gearboxCaseInputs,
   gearboxWorkflowCase,
   getGearboxCaseDiagnostics,
@@ -76,5 +77,28 @@ describe("gearbox workflow case", () => {
       label: "叶根平均预紧力",
       value: `${boltPreloadAverage.toFixed(1)} kN`,
     });
+  });
+
+  it("exposes a case catalog while keeping the active case as the dashboard default", () => {
+    const ids = gearboxCaseCatalog.map((entry) => entry.id);
+
+    expect(gearboxCaseCatalog).toHaveLength(2);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(gearboxCaseCatalog[0].input).toBe(gearboxCaseInputs);
+    expect(gearboxWorkflowCase.turbineId).toBe(gearboxCaseCatalog[0].input.turbineId);
+    expect(gearboxCaseCatalog.map((entry) => entry.severity)).toEqual(["orange", "red"]);
+  });
+
+  it("can build a distinct escalated case from the same diagnostic pipeline", () => {
+    const baseCase = buildGearboxWorkflowCase(gearboxCaseCatalog[0].input);
+    const severeCase = buildGearboxWorkflowCase(gearboxCaseCatalog[1].input);
+    const baseDiagnostics = getGearboxCaseDiagnostics(gearboxCaseCatalog[0].input);
+    const severeDiagnostics = getGearboxCaseDiagnostics(gearboxCaseCatalog[1].input);
+
+    expect(severeCase.turbineId).toBe("HS-WTG-03");
+    expect(severeCase.modules.workorder.ticket?.finalCode).toBe("WO-GX-20260621-02");
+    expect(severeCase.modules.maintenance.metrics).toContainEqual({ label: "建议运行方式", value: "限功率 70%" });
+    expect(severeDiagnostics.riskConfidencePct).toBeGreaterThan(baseDiagnostics.riskConfidencePct);
+    expect(severeDiagnostics.healthScore).toBeLessThan(baseDiagnostics.healthScore);
   });
 });
