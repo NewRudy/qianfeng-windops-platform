@@ -3,6 +3,7 @@ import {
   Cartesian3,
   Cesium3DTileset,
   Color,
+  CornerType,
   EllipsoidTerrainProvider,
   HeadingPitchRoll,
   HeadingPitchRange,
@@ -69,11 +70,7 @@ export async function createWindFarmScene({
   const mountain = await Cesium3DTileset.fromUrl(toViteFsUrl(config.mountain.absolutePath));
   viewer.scene.primitives.add(mountain);
 
-  const turbinePosition = Matrix4.multiplyByPoint(
-    localFrame,
-    new Cartesian3(config.turbine.offset.east, config.turbine.offset.north, config.turbine.offset.up),
-    new Cartesian3(),
-  );
+  const turbineHubPosition = pointFromOffset(localFrame, getHubOffset(config.turbine));
 
   addTurbineGeometry(viewer, localFrame, config.turbine);
   void loadTurbineBimModel(viewer, localFrame, config.turbine).catch((error: unknown) => {
@@ -82,7 +79,7 @@ export async function createWindFarmScene({
 
   viewer.entities.add({
     id: `${config.turbine.turbineId}-label`,
-    position: turbinePosition,
+    position: turbineHubPosition,
     label: {
       text: `${config.turbine.name} · 橙色预警`,
       fillColor: Color.fromCssColorString("#dff7ff"),
@@ -105,8 +102,8 @@ export async function createWindFarmScene({
   const focusTurbine = () => {
     onTurbineSelected?.(config.turbine);
     viewer.camera.lookAt(
-      turbinePosition,
-      new HeadingPitchRange(5.78, -0.28, 520),
+      turbineHubPosition,
+      new HeadingPitchRange(5.78, -0.18, 840),
     );
   };
 
@@ -167,6 +164,10 @@ async function loadTurbineBimModel(
 
 function addTurbineGeometry(viewer: Viewer, localFrame: Matrix4, turbine: TurbineAsset): void {
   const { towerHeight, towerRadius, nacelleLength, bladeRadius } = turbine.geometry;
+  const foundationCenter = pointFromOffset(localFrame, {
+    ...turbine.offset,
+    up: turbine.offset.up + 4,
+  });
   const towerCenter = pointFromOffset(localFrame, {
     ...turbine.offset,
     up: turbine.offset.up + towerHeight / 2,
@@ -176,16 +177,24 @@ function addTurbineGeometry(viewer: Viewer, localFrame: Matrix4, turbine: Turbin
     north: turbine.offset.north,
     up: turbine.offset.up + towerHeight + 10,
   });
-  const hubOffset = {
-    east: turbine.offset.east + nacelleLength + 7,
-    north: turbine.offset.north,
-    up: turbine.offset.up + towerHeight + 10,
-  };
+  const hubOffset = getHubOffset(turbine);
   const hub = pointFromOffset(localFrame, hubOffset);
   const orientation = Transforms.headingPitchRollQuaternion(
     towerCenter,
     new HeadingPitchRoll(0, 0, 0),
   );
+
+  viewer.entities.add({
+    id: `${turbine.turbineId}-foundation`,
+    position: foundationCenter,
+    orientation,
+    cylinder: {
+      length: 8,
+      topRadius: towerRadius * 2.1,
+      bottomRadius: towerRadius * 2.6,
+      material: Color.fromCssColorString("rgba(136, 148, 148, 0.92)"),
+    },
+  });
 
   viewer.entities.add({
     id: `${turbine.turbineId}-tower`,
@@ -195,7 +204,7 @@ function addTurbineGeometry(viewer: Viewer, localFrame: Matrix4, turbine: Turbin
       length: towerHeight,
       topRadius: towerRadius * 0.62,
       bottomRadius: towerRadius,
-      material: Color.fromCssColorString("rgba(230, 247, 255, 0.95)"),
+      material: Color.fromCssColorString("rgba(210, 221, 222, 0.96)"),
     },
   });
 
@@ -205,7 +214,7 @@ function addTurbineGeometry(viewer: Viewer, localFrame: Matrix4, turbine: Turbin
     orientation,
     box: {
       dimensions: new Cartesian3(nacelleLength, 16, 16),
-      material: Color.fromCssColorString("rgba(245, 252, 255, 0.96)"),
+      material: Color.fromCssColorString("rgba(224, 231, 231, 0.98)"),
     },
   });
 
@@ -214,7 +223,7 @@ function addTurbineGeometry(viewer: Viewer, localFrame: Matrix4, turbine: Turbin
     position: hub,
     ellipsoid: {
       radii: new Cartesian3(8, 8, 8),
-      material: Color.fromCssColorString("#ffffff"),
+      material: Color.fromCssColorString("rgba(232, 237, 236, 0.98)"),
     },
   });
 
@@ -227,13 +236,32 @@ function addTurbineGeometry(viewer: Viewer, localFrame: Matrix4, turbine: Turbin
   bladeEnds.forEach((bladeEnd, index) => {
     viewer.entities.add({
       id: `${turbine.turbineId}-blade-${index + 1}`,
-      polyline: {
+      polylineVolume: {
         positions: [hub, pointFromOffset(localFrame, bladeEnd)],
-        width: 5,
-        material: Color.fromCssColorString("rgba(235, 250, 255, 0.98)"),
+        shape: createBladeCrossSection(),
+        cornerType: CornerType.MITERED,
+        material: Color.fromCssColorString("rgba(218, 230, 232, 0.96)"),
       },
     });
   });
+}
+
+function createBladeCrossSection(): Cartesian2[] {
+  return [
+    new Cartesian2(-3.6, -0.72),
+    new Cartesian2(1.5, -0.86),
+    new Cartesian2(3.2, 0),
+    new Cartesian2(1.5, 0.86),
+    new Cartesian2(-3.6, 0.72),
+  ];
+}
+
+function getHubOffset(turbine: TurbineAsset): LocalOffset {
+  return {
+    east: turbine.offset.east + turbine.geometry.nacelleLength + 7,
+    north: turbine.offset.north,
+    up: turbine.offset.up + turbine.geometry.towerHeight + 10,
+  };
 }
 
 function pointFromOffset(localFrame: Matrix4, offset: LocalOffset): Cartesian3 {
