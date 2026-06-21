@@ -116,20 +116,15 @@ button {
 
 .hero-title {
   position: absolute;
-  top: clamp(14px, 2.6vh, 24px);
+  top: clamp(18px, 3vh, 30px);
   left: 50%;
   z-index: 3;
   width: min(460px, calc(100vw - 48px));
-  padding: 8px 18px 9px;
-  border-top: 1px solid rgba(113, 238, 255, 0.58);
-  border-bottom: 1px solid rgba(113, 238, 255, 0.32);
-  background:
-    linear-gradient(90deg, transparent, rgba(9, 35, 46, 0.56) 16%, rgba(5, 22, 31, 0.52) 84%, transparent),
-    linear-gradient(180deg, rgba(91, 224, 246, 0.12), transparent 68%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 0 38px rgba(53, 213, 244, 0.16);
-  clip-path: polygon(7% 0, 93% 0, 100% 34%, 100% 100%, 0 100%, 0 34%);
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  clip-path: none;
   translate: -50% 0;
   text-align: center;
   pointer-events: none;
@@ -141,28 +136,13 @@ button {
 
 .hero-title::before,
 .hero-title::after {
-  position: absolute;
-  top: 7px;
-  width: 38px;
-  height: 12px;
-  border-top: 2px solid rgba(91, 230, 255, 0.8);
-  background: none;
-  content: "";
-}
-
-.hero-title::before {
-  left: 12px;
-  border-left: 2px solid rgba(91, 230, 255, 0.52);
-}
-
-.hero-title::after {
-  right: 12px;
-  border-right: 2px solid rgba(91, 230, 255, 0.52);
+  display: none;
+  content: none;
 }
 
 .hero-title p {
   margin: 0 0 3px;
-  color: #83ecff;
+  color: rgba(131, 236, 255, 0.72);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0;
@@ -172,26 +152,25 @@ button {
 .hero-title h1 {
   margin: 0;
   color: #ffffff;
-  font-size: clamp(24px, 3.1vw, 40px);
+  font-size: clamp(24px, 2.8vw, 36px);
   line-height: 1;
   text-shadow:
-    0 0 16px rgba(93, 230, 255, 0.62),
-    0 8px 34px rgba(0, 0, 0, 0.62);
+    0 0 14px rgba(93, 230, 255, 0.48),
+    0 8px 28px rgba(0, 0, 0, 0.72);
 }
 
 .hero-title strong {
   display: inline-block;
   margin-top: 5px;
-  padding: 3px 10px 4px;
-  border: 1px solid rgba(127, 235, 255, 0.24);
-  background: rgba(1, 16, 23, 0.28);
-  color: rgba(238, 251, 255, 0.9);
-  font-size: clamp(10px, 0.88vw, 12px);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: rgba(204, 244, 255, 0.86);
+  font-size: clamp(9px, 0.78vw, 11px);
   line-height: 1.35;
-  backdrop-filter: blur(10px);
 }
 
-.shell[data-mode="diagnosis"] .hero-title {
+.shell[data-mode="bim"] .hero-title {
   opacity: 0;
   pointer-events: none;
   transform: translateY(-14px);
@@ -202,231 +181,388 @@ button {
     visibility 0s linear 220ms;
 }
 
-.diagnosis-dock {
+.bim-screen {
   position: absolute;
-  top: 24px;
-  right: 24px;
-  z-index: 5;
-  width: min(440px, calc(100vw - 48px));
-  max-height: calc(100vh - 112px);
-  overflow: auto;
-  padding: 18px;
-  border: 1px solid rgba(94, 224, 247, 0.28);
+  inset: 0;
+  z-index: 6;
+  overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(6, 27, 36, 0.9), rgba(4, 13, 20, 0.82)),
-    rgba(4, 13, 20, 0.86);
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
-  backdrop-filter: blur(18px);
+    radial-gradient(circle at 50% 46%, rgba(30, 151, 186, 0.18), transparent 33%),
+    linear-gradient(rgba(61, 193, 236, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(61, 193, 236, 0.055) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(3, 17, 29, 0.97), rgba(0, 6, 12, 0.98));
+  background-size: auto, 24px 24px, 24px 24px, auto;
   opacity: 0;
   pointer-events: none;
-  transform: translateX(32px);
   visibility: hidden;
   transition:
     opacity 220ms ease,
-    transform 260ms ease,
-    visibility 0s linear 260ms;
+    visibility 0s linear 220ms;
 }
 
-.shell[data-mode="diagnosis"] .diagnosis-dock {
+.shell[data-mode="bim"] .bim-screen {
   opacity: 1;
   pointer-events: auto;
-  transform: translateX(0);
   visibility: visible;
   transition-delay: 0s;
 }
 
-.dock-close {
+.bim-header {
   position: absolute;
   top: 12px;
-  right: 12px;
+  right: 16px;
+  left: 16px;
+  z-index: 3;
   display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid rgba(133, 239, 255, 0.24);
-  background: rgba(8, 33, 43, 0.68);
-  color: #dff9ff;
+  grid-template-columns: 1fr auto auto;
+  gap: 18px;
+  align-items: center;
+  height: 54px;
+  border-bottom: 1px solid rgba(92, 223, 247, 0.2);
+}
+
+.bim-header span,
+.module-panel p,
+.module-panel dt,
+.component span {
+  color: rgba(217, 244, 250, 0.68);
+  font-size: 12px;
+}
+
+.bim-header h2 {
+  margin: 2px 0 0;
+  color: #f6fdff;
   font-size: 22px;
-  line-height: 1;
+  line-height: 1.1;
+  text-shadow: 0 0 18px rgba(88, 226, 255, 0.45);
 }
 
-.dock-kicker {
-  color: #f1b958;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.diagnosis-dock h2 {
-  margin: 8px 40px 6px 0;
-  color: #ffffff;
-  font-size: 42px;
-  line-height: 1;
-}
-
-.diagnosis-dock p {
-  margin: 0 0 14px;
-  color: rgba(232, 248, 251, 0.78);
-  font-size: 14px;
-  line-height: 1.65;
-}
-
-.health-band {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
-  margin: 14px 0;
-}
-
-.health-band div,
-.evidence-panel div,
-.component,
-.workflow-panel li {
-  border: 1px solid rgba(116, 229, 248, 0.14);
-  background: rgba(255, 255, 255, 0.055);
-}
-
-.health-band div {
-  display: grid;
-  gap: 6px;
-  min-height: 68px;
-  padding: 10px;
-}
-
-.health-band span,
-.component span,
-.evidence-panel span {
-  color: rgba(220, 242, 246, 0.66);
-  font-size: 12px;
-}
-
-.health-band strong {
-  color: #ffffff;
+.bim-header strong {
+  color: #6aeaff;
   font-size: 20px;
 }
 
-.bim-breakdown {
-  display: grid;
-  grid-template-columns: 150px 1fr;
-  gap: 12px;
-  align-items: stretch;
-  margin: 14px 0;
+.bim-back {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgba(126, 233, 255, 0.34);
+  background: rgba(2, 18, 25, 0.64);
+  color: #dff9ff;
+  font-weight: 800;
 }
 
-.bim-visual {
-  position: relative;
-  min-height: 212px;
-  border: 1px solid rgba(116, 229, 248, 0.14);
+.bim-stage {
+  position: absolute;
+  inset: 78px 342px 76px 214px;
+  min-width: 0;
+}
+
+.blueprint-grid {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(80, 206, 236, 0.12);
   background:
-    linear-gradient(rgba(92, 217, 241, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(92, 217, 241, 0.08) 1px, transparent 1px),
-    rgba(2, 16, 22, 0.54);
-  background-size: 18px 18px;
-  overflow: hidden;
+    radial-gradient(circle at 42% 45%, rgba(78, 224, 255, 0.12), transparent 24%),
+    linear-gradient(rgba(90, 217, 241, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(90, 217, 241, 0.07) 1px, transparent 1px);
+  background-size: auto, 20px 20px, 20px 20px;
+  mask-image: radial-gradient(circle at 48% 48%, black 55%, transparent 86%);
 }
 
-.bim-visual i {
+.turbine-blueprint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(720px, 64vw);
+  height: min(520px, 62vh);
+  translate: -50% -50%;
+  transform: rotate(-4deg);
+}
+
+.turbine-blueprint i {
   position: absolute;
   display: block;
-  background: rgba(104, 231, 255, 0.82);
-  box-shadow: 0 0 18px rgba(104, 231, 255, 0.34);
 }
 
-.hub {
-  top: 80px;
-  left: 59px;
-  width: 28px;
-  height: 28px;
+.wire {
+  border: 2px solid rgba(87, 221, 255, 0.72);
+  box-shadow:
+    0 0 16px rgba(87, 221, 255, 0.28),
+    inset 0 0 12px rgba(87, 221, 255, 0.12);
+}
+
+.solid {
+  border: 1px solid rgba(246, 210, 128, 0.52);
+  background: linear-gradient(90deg, rgba(234, 232, 210, 0.68), rgba(123, 184, 197, 0.32));
+  box-shadow: 0 0 18px rgba(246, 198, 88, 0.18);
+}
+
+.hub-ring {
+  top: 178px;
+  left: 150px;
+  width: 116px;
+  height: 116px;
   border-radius: 50%;
 }
 
-.nacelle {
-  top: 83px;
-  left: 80px;
-  width: 52px;
-  height: 17px;
-  background: rgba(255, 255, 255, 0.82) !important;
-}
-
-.tower {
-  top: 103px;
-  left: 70px;
-  width: 7px;
-  height: 94px;
-  background: linear-gradient(180deg, #f3fbff, rgba(111, 231, 255, 0.5)) !important;
-}
-
-.blade {
-  top: 90px;
-  left: 70px;
-  width: 4px;
-  height: 78px;
+.blade-wire {
+  top: 228px;
+  left: 202px;
+  width: 8px;
+  height: 238px;
   transform-origin: 50% 0;
+  border-radius: 999px;
 }
 
-.blade-a {
-  rotate: -92deg;
+.blade-wire-a {
+  rotate: -96deg;
 }
 
-.blade-b {
-  rotate: 28deg;
+.blade-wire-b {
+  rotate: 24deg;
 }
 
-.blade-c {
-  rotate: 148deg;
+.blade-wire-c {
+  rotate: 144deg;
 }
 
-.component-stack {
+.nacelle-wire {
+  top: 194px;
+  left: 246px;
+  width: 360px;
+  height: 86px;
+  border-radius: 42px 22px 24px 42px;
+}
+
+.tail-frame {
+  top: 172px;
+  left: 556px;
+  width: 160px;
+  height: 128px;
+  transform: skewX(-16deg);
+}
+
+.gearbox-core {
+  top: 217px;
+  left: 290px;
+  width: 74px;
+  height: 42px;
+  border-radius: 20px;
+}
+
+.generator-core {
+  top: 212px;
+  left: 384px;
+  width: 98px;
+  height: 50px;
+  border-radius: 28px;
+}
+
+.yaw-system {
+  top: 278px;
+  left: 226px;
+  width: 62px;
+  height: 30px;
+  border-radius: 18px;
+}
+
+.tower-core {
+  top: 298px;
+  left: 228px;
+  width: 22px;
+  height: 210px;
+  transform: skewX(-3deg);
+}
+
+.split-line {
+  width: 1px;
+  height: 188px;
+  border-color: rgba(83, 226, 255, 0.42);
+  border-width: 0 1px 0 0;
+}
+
+.split-line-a {
+  top: 282px;
+  left: 314px;
+}
+
+.split-line-b {
+  top: 272px;
+  left: 478px;
+}
+
+.part-label {
+  position: absolute;
+  z-index: 2;
+  padding: 4px 8px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  text-shadow: 0 0 12px rgba(73, 223, 255, 0.8);
+}
+
+.label-blade {
+  top: 30%;
+  left: 21%;
+}
+
+.label-gearbox {
+  top: 53%;
+  left: 42%;
+}
+
+.label-generator {
+  top: 47%;
+  left: 56%;
+}
+
+.label-yaw {
+  top: 39%;
+  left: 58%;
+}
+
+.label-tower {
+  bottom: 18%;
+  left: 24%;
+}
+
+.component-strip {
+  position: absolute;
+  top: 92px;
+  left: 16px;
+  z-index: 3;
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  width: 178px;
+}
+
+.component,
+.module-panel,
+.module-tab {
+  border: 1px solid rgba(116, 229, 248, 0.18);
+  background: rgba(3, 18, 29, 0.72);
 }
 
 .component {
   display: grid;
-  grid-template-columns: 1fr;
   gap: 4px;
-  min-height: 47px;
-  padding: 9px 11px;
+  min-height: 56px;
+  padding: 10px 12px;
   text-align: left;
 }
 
 .component strong {
-  color: #f5c46a;
+  color: #f6c568;
   font-size: 13px;
 }
 
 .component.active {
-  border-color: rgba(91, 224, 246, 0.72);
-  background: rgba(30, 168, 190, 0.26);
+  border-color: rgba(91, 224, 246, 0.78);
+  background: rgba(18, 90, 110, 0.7);
 }
 
-.evidence-panel,
-.workflow-panel {
-  margin-top: 14px;
+.module-drawer {
+  position: absolute;
+  top: 92px;
+  right: 16px;
+  z-index: 3;
+  width: 312px;
 }
 
-.evidence-panel h3,
-.workflow-panel h3 {
-  margin: 0 0 8px;
+.module-panel {
+  display: none;
+  min-height: 360px;
+  padding: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(16px);
+}
+
+.shell[data-active-module="health"] .module-health,
+.shell[data-active-module="scada"] .module-scada,
+.shell[data-active-module="cms"] .module-cms,
+.shell[data-active-module="bolts"] .module-bolts,
+.shell[data-active-module="alerts"] .module-alerts,
+.shell[data-active-module="maintenance"] .module-maintenance,
+.shell[data-active-module="workorder"] .module-workorder {
+  display: block;
+}
+
+.module-panel h3 {
+  margin: 0 0 14px;
   color: #ffffff;
-  font-size: 15px;
+  font-size: 18px;
 }
 
-.evidence-panel div {
+.score-ring {
+  display: grid;
+  place-items: center;
+  width: 118px;
+  height: 118px;
+  margin: 6px auto 18px;
+  border: 8px solid rgba(249, 178, 55, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 0 24px rgba(249, 178, 55, 0.22);
+}
+
+.score-ring strong {
+  color: #ffffff;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.score-ring span {
+  margin-top: -22px;
+  color: rgba(235, 246, 250, 0.74);
+  font-size: 11px;
+}
+
+.module-panel dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.module-panel dl div,
+.event-list li,
+.workflow-list li {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
-  min-height: 36px;
+  min-height: 38px;
   padding: 0 10px;
-  margin-top: 7px;
+  background: rgba(255, 255, 255, 0.055);
 }
 
-.evidence-panel strong {
+.module-panel dd {
+  margin: 0;
   color: #ffffff;
-  font-size: 14px;
+  font-weight: 900;
 }
 
-.workflow-panel ol {
+.signal-chart {
+  display: flex;
+  gap: 6px;
+  align-items: end;
+  height: 150px;
+  padding: 12px;
+  margin-bottom: 14px;
+  background:
+    linear-gradient(rgba(52, 203, 92, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(52, 203, 92, 0.08) 1px, transparent 1px),
+    rgba(2, 13, 20, 0.64);
+  background-size: 18px 18px;
+}
+
+.signal-chart i {
+  flex: 1;
+  min-height: 16px;
+  background: linear-gradient(180deg, #62ff58, #1d8a3d);
+  box-shadow: 0 0 12px rgba(90, 255, 104, 0.32);
+}
+
+.event-list,
+.workflow-list {
   display: grid;
   gap: 8px;
   margin: 0;
@@ -434,57 +570,41 @@ button {
   list-style: none;
 }
 
-.workflow-panel li {
-  min-height: 38px;
-  padding: 9px 10px;
-  color: rgba(236, 249, 252, 0.8);
+.event-list li,
+.workflow-list li {
+  grid-template-columns: auto 1fr;
+  color: rgba(235, 249, 252, 0.82);
   font-size: 13px;
 }
 
-.workflow-panel span {
-  margin-right: 8px;
-  color: #f5c46a;
-  font-weight: 800;
+.event-list span,
+.workflow-list span {
+  color: #f6c568;
+  font-weight: 900;
 }
 
-.mission-nav {
+.bim-toolbar {
   position: absolute;
-  right: 24px;
-  bottom: 24px;
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
   z-index: 4;
   display: flex;
   gap: 8px;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(16px);
-  visibility: hidden;
-  transition:
-    opacity 220ms ease,
-    transform 260ms ease,
-    visibility 0s linear 260ms;
+  justify-content: center;
+  overflow-x: auto;
 }
 
-.shell[data-mode="diagnosis"] .mission-nav {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-  visibility: visible;
-  transition-delay: 0s;
-}
-
-.mission {
-  min-width: 94px;
-  height: 38px;
+.module-tab {
+  min-width: 92px;
+  height: 36px;
   padding: 0 12px;
-  border: 1px solid rgba(126, 233, 255, 0.22);
-  background: rgba(2, 18, 25, 0.66);
-  color: rgba(235, 250, 253, 0.78);
-  font-weight: 800;
-  backdrop-filter: blur(12px);
+  color: rgba(235, 250, 253, 0.76);
+  font-weight: 900;
 }
 
-.mission.active {
-  border-color: rgba(91, 224, 246, 0.72);
+.module-tab.active {
+  border-color: rgba(91, 224, 246, 0.8);
   background: #5be0f6;
   color: #041116;
 }
@@ -499,26 +619,50 @@ button {
 
 @media (max-width: 900px) {
   .hero-title h1 {
-    font-size: 28px;
+    font-size: 26px;
   }
 
-  .diagnosis-dock {
+  .bim-header {
+    grid-template-columns: 1fr auto;
+    height: auto;
+    align-items: start;
+    gap: 10px;
+  }
+
+  .bim-header strong {
+    display: none;
+  }
+
+  .bim-stage {
+    inset: 84px 12px 210px;
+  }
+
+  .component-strip {
     top: auto;
     right: 12px;
-    bottom: 78px;
+    bottom: 72px;
     left: 12px;
     width: auto;
-    max-height: 66vh;
+    grid-template-columns: repeat(4, minmax(128px, 1fr));
+    overflow-x: auto;
   }
 
-  .bim-breakdown {
-    grid-template-columns: 1fr;
-  }
-
-  .mission-nav {
+  .module-drawer {
+    top: auto;
     right: 12px;
-    bottom: 12px;
+    bottom: 122px;
     left: 12px;
+    width: auto;
+  }
+
+  .module-panel {
+    min-height: auto;
+    max-height: 34vh;
+    overflow: auto;
+  }
+
+  .bim-toolbar {
+    justify-content: flex-start;
     overflow-x: auto;
   }
 }
