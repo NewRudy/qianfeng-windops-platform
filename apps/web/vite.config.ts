@@ -3,6 +3,7 @@ import cesium from "vite-plugin-cesium";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { createAiDiagnosisMiddleware } from "./server/aiDiagnosisProxy";
+import { createWindOpsAgentMiddleware } from "./server/windOpsAgent";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(currentDir, "../..");
@@ -20,6 +21,16 @@ function aiDiagnosisProxyPlugin(env: Record<string, string>): Plugin {
     configureServer(server) {
       server.middlewares.use(
         createAiDiagnosisMiddleware({
+          apiKey: env.WINDOPS_AI_API_KEY,
+          baseUrl: env.WINDOPS_AI_BASE_URL,
+          maxTokens: env.WINDOPS_AI_MAX_TOKENS,
+          model: env.WINDOPS_AI_MODEL,
+          provider: env.WINDOPS_AI_PROVIDER,
+          timeoutSeconds: env.WINDOPS_AI_TIMEOUT_SECONDS,
+        }),
+      );
+      server.middlewares.use(
+        createWindOpsAgentMiddleware({
           apiKey: env.WINDOPS_AI_API_KEY,
           baseUrl: env.WINDOPS_AI_BASE_URL,
           maxTokens: env.WINDOPS_AI_MAX_TOKENS,

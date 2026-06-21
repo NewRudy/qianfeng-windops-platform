@@ -957,6 +957,256 @@ button {
   font-size: 16px;
 }
 
+.ai-domain-report header em {
+  color: rgba(202, 236, 241, 0.62);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.4;
+}
+
+.agent-report {
+  gap: 10px;
+}
+
+.agent-answer-card,
+.agent-workorder-card,
+.agent-tool-trace,
+.agent-report-sections article {
+  padding: 10px;
+  border: 1px solid rgba(91, 224, 246, 0.14);
+  background: rgba(1, 14, 22, 0.72);
+}
+
+.agent-answer-card {
+  display: grid;
+  gap: 6px;
+  border-color: rgba(246, 197, 104, 0.3);
+  background: linear-gradient(135deg, rgba(246, 197, 104, 0.12), rgba(1, 14, 22, 0.76));
+}
+
+.agent-answer-card p {
+  margin: 0;
+  color: rgba(244, 252, 255, 0.9);
+  font-size: 13px;
+  line-height: 1.62;
+  white-space: pre-line;
+}
+
+.agent-evidence-grid,
+.agent-link-grid,
+.agent-report-sections {
+  display: grid;
+  gap: 8px;
+}
+
+.agent-evidence-card,
+.agent-link-grid button,
+.agent-workorder-card button {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  min-height: 0;
+  padding: 10px;
+  border: 1px solid rgba(91, 224, 246, 0.16);
+  background: rgba(2, 18, 28, 0.78);
+  color: #e8fbff;
+  text-align: left;
+}
+
+.agent-evidence-card:hover,
+.agent-link-grid button:hover,
+.agent-workorder-card button:hover {
+  border-color: rgba(91, 224, 246, 0.56);
+  background: rgba(5, 33, 47, 0.92);
+}
+
+.agent-evidence-card.alarm {
+  border-color: rgba(255, 124, 58, 0.46);
+  box-shadow: inset 3px 0 0 rgba(255, 124, 58, 0.86);
+}
+
+.agent-evidence-card.watch,
+.agent-link-grid button.watch {
+  border-color: rgba(246, 197, 104, 0.36);
+}
+
+.agent-evidence-card span,
+.agent-link-grid span,
+.agent-workorder-card span,
+.agent-tool-trace span {
+  color: rgba(91, 224, 246, 0.78);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.agent-evidence-card strong,
+.agent-link-grid strong {
+  color: #ffffff;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.agent-evidence-card p,
+.agent-link-grid small,
+.agent-tool-trace small {
+  margin: 0;
+  color: rgba(216, 239, 243, 0.66);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.agent-evidence-card div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.agent-evidence-card i {
+  display: block;
+  height: 7px;
+  background: linear-gradient(90deg, #2be5ff, #f6c568, #ff7c3a);
+}
+
+.agent-evidence-card div::before {
+  content: "";
+  grid-column: 1;
+  grid-row: 1;
+  height: 7px;
+  background: rgba(91, 224, 246, 0.12);
+}
+
+.agent-evidence-card div i {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.agent-evidence-card b {
+  color: rgba(244, 252, 255, 0.86);
+  font-size: 11px;
+}
+
+.agent-link-grid h4,
+.agent-tool-trace h4,
+.agent-report-sections h4 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.agent-report-sections article {
+  display: grid;
+  gap: 6px;
+}
+
+.agent-report-sections p {
+  margin: 0;
+  color: rgba(222, 246, 249, 0.78);
+  font-size: 12px;
+  line-height: 1.56;
+  white-space: pre-line;
+}
+
+.agent-workorder-card {
+  display: grid;
+  gap: 10px;
+  border-color: rgba(246, 197, 104, 0.24);
+}
+
+.agent-workorder-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 0 8px;
+}
+
+.agent-workorder-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 0;
+}
+
+.agent-workorder-card dt {
+  color: rgba(91, 224, 246, 0.66);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.agent-workorder-card dd {
+  margin: 0;
+  color: rgba(241, 253, 255, 0.88);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.agent-workorder-card ol,
+.agent-tool-trace ol {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-workorder-card li {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.agent-workorder-card li span {
+  color: #f6c568;
+}
+
+.agent-workorder-card li strong,
+.agent-workorder-card li small {
+  grid-column: 2;
+}
+
+.agent-workorder-card li strong {
+  color: rgba(244, 252, 255, 0.9);
+  font-size: 12px;
+}
+
+.agent-workorder-card li small {
+  color: rgba(216, 239, 243, 0.62);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.agent-workorder-card button {
+  justify-items: center;
+  border-color: rgba(246, 197, 104, 0.5);
+  background: rgba(84, 46, 15, 0.78);
+  color: #fff4dd;
+  font-weight: 900;
+  text-align: center;
+}
+
+.agent-tool-trace {
+  display: grid;
+  gap: 8px;
+}
+
+.agent-tool-trace li {
+  display: grid;
+  gap: 3px;
+  padding-left: 10px;
+  border-left: 2px solid rgba(91, 224, 246, 0.45);
+}
+
+.agent-tool-trace li.review {
+  border-left-color: rgba(246, 197, 104, 0.8);
+}
+
+.agent-tool-trace strong {
+  color: rgba(244, 252, 255, 0.82);
+  font-size: 11px;
+  line-height: 1.42;
+}
+
 .ai-report-summary,
 .workorder-meta {
   display: grid;
