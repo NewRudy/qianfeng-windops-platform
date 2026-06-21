@@ -30,6 +30,32 @@ if (!root) {
 
 let activeCaseId = gearboxCaseCatalog[0]?.id ?? "";
 let activeWorkflowCase: GearboxWorkflowCase = gearboxWorkflowCase;
+let activeSpeechRecognition: SpeechRecognitionLike | undefined;
+
+type SpeechRecognitionEventLike = {
+  results: {
+    [index: number]: {
+      [index: number]: {
+        transcript?: string;
+      };
+    };
+    length: number;
+  };
+};
+
+type SpeechRecognitionLike = {
+  abort: () => void;
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  start: () => void;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 
 function html(value: string | number): string {
   return String(value)
@@ -297,8 +323,11 @@ function renderAiBrief(module: WorkflowModule): string {
     </div>
     <section class="ai-generated-report" aria-live="polite">
       <header>
-        <span>MiMo AI Report</span>
-        <button type="button" data-ai-generate-report>生成AI报告</button>
+        <span>AI 值班报告</span>
+        <div class="ai-report-actions">
+          <button type="button" data-ai-voice-question>语音问AI</button>
+          <button type="button" data-ai-generate-report>生成AI报告</button>
+        </div>
       </header>
       <p id="ai-generated-report-text">后端代理已准备接收诊断包。点击生成后，模型不可用时会自动返回规则兜底报告。</p>
     </section>
@@ -701,34 +730,63 @@ function getDutyTurbine(): TurbineAsset {
   );
 }
 
-function speakAiDutyBrief(userInitiated = true): void {
-  const brief = activeWorkflowCase.modules.brief.aiBrief;
-  if (!brief) return;
+type SpeechStatusHandlers = {
+  onEnd?: () => void;
+  onError?: () => void;
+  onStart?: () => void;
+  onUnsupported?: () => void;
+};
 
+type AiDiagnosisResponse = {
+  answer?: string;
+  source?: string;
+};
+
+function shortTurbineName(turbineId: string): string {
+  const numericId = turbineId.match(/(\d+)$/)?.[1];
+  return numericId ? `${Number(numericId)}号机` : turbineId;
+}
+
+function speakText(text: string, handlers: SpeechStatusHandlers, rate = 1.25): boolean {
   if (!("speechSynthesis" in window)) {
-    if (aiDutyStatus) aiDutyStatus.textContent = "当前浏览器不支持语音播报，已保留文字诊断包";
-    return;
+    handlers.onUnsupported?.();
+    return false;
   }
 
-  const utterance = new SpeechSynthesisUtterance(brief.broadcast);
+  const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "zh-CN";
-  utterance.rate = 1.25;
+  utterance.rate = rate;
   utterance.pitch = 0.96;
-  utterance.onstart = () => {
-    if (aiDutyStatus) aiDutyStatus.textContent = "AI 正在播报当前风机风险";
-  };
-  utterance.onend = () => {
-    if (aiDutyStatus) aiDutyStatus.textContent = "播报完成，可进入诊断包查看证据链";
-  };
-  utterance.onerror = () => {
-    if (aiDutyStatus) {
-      aiDutyStatus.textContent = userInitiated ? "浏览器语音未启动，诊断包文字已同步显示" : "AI 已生成播报，可点击语音播报";
-    }
-  };
+  utterance.onstart = handlers.onStart ?? null;
+  utterance.onend = handlers.onEnd ?? null;
+  utterance.onerror = handlers.onError ?? null;
 
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
   window.speechSynthesis.resume();
+  return true;
+}
+
+function speakAiDutyBrief(userInitiated = true): void {
+  const brief = activeWorkflowCase.modules.brief.aiBrief;
+  if (!brief) return;
+
+  speakText(brief.broadcast, {
+    onEnd: () => {
+      if (aiDutyStatus) aiDutyStatus.textContent = "播报完成，可进入诊断包查看证据链";
+    },
+    onError: () => {
+      if (aiDutyStatus) {
+        aiDutyStatus.textContent = userInitiated ? "浏览器语音未启动，诊断包文字已同步显示" : "AI 已生成播报，可点击语音播报";
+      }
+    },
+    onStart: () => {
+      if (aiDutyStatus) aiDutyStatus.textContent = "AI 正在播报当前风机风险";
+    },
+    onUnsupported: () => {
+      if (aiDutyStatus) aiDutyStatus.textContent = "当前浏览器不支持语音播报，已保留文字诊断包";
+    },
+  });
 }
 
 function setAiReportText(text: string): void {
@@ -736,7 +794,31 @@ function setAiReportText(text: string): void {
   if (report) report.textContent = text;
 }
 
-async function requestAiDiagnosisReport(question = "生成当前风险诊断摘要"): Promise<void> {
+function buildAiVoiceAnswerSummary(): string {
+  const brief = activeWorkflowCase.modules.brief.aiBrief;
+  if (!brief) return "AI 答复：当前诊断包未就绪。";
+
+  const finding = brief.primaryFinding.includes("齿轮箱") ? "齿轮箱 P1 预警" : brief.primaryFinding;
+  const action = brief.recommendedAction
+    .replace(/\s+-\s+/g, "到")
+    .replace(/内安排/g, "内")
+    .replace(/[。；]+$/g, "");
+
+  return `AI 答复：${shortTurbineName(activeWorkflowCase.turbineId)}${finding}。${action}，复核前按限载策略运行。`;
+}
+
+function speakAiAnswerSummary(): void {
+  speakText(buildAiVoiceAnswerSummary(), {
+    onError: () => setBimStatus("AI 已生成文字答复，浏览器语音未启动"),
+    onStart: () => setBimStatus("AI 正在播报处置结论"),
+    onUnsupported: () => setBimStatus("当前浏览器不支持语音播报，已保留文字答复"),
+  }, 1.28);
+}
+
+async function requestAiDiagnosisReport(
+  question = "生成当前风险诊断摘要",
+  options: { speak?: boolean } = {},
+): Promise<AiDiagnosisResponse | undefined> {
   const brief = activeWorkflowCase.modules.brief.aiBrief;
   if (!brief) return;
 
@@ -757,11 +839,75 @@ async function requestAiDiagnosisReport(question = "生成当前风险诊断摘�
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
-    const result = await response.json() as { answer?: string; source?: string };
+    const result = await response.json() as AiDiagnosisResponse;
     const sourceLabel = result.source === "llm" ? "MiMo 模型" : "规则兜底";
     setAiReportText(`${sourceLabel}：${result.answer || "未返回有效报告"}`);
+    if (options.speak) speakAiAnswerSummary();
+    return result;
   } catch {
-    setAiReportText(`规则兜底：${brief.conclusion} 建议动作：${brief.recommendedAction}`);
+    const fallback = `规则兜底：${brief.conclusion} 建议动作：${brief.recommendedAction}`;
+    setAiReportText(fallback);
+    if (options.speak) speakAiAnswerSummary();
+    return { answer: fallback, source: "fallback" };
+  }
+}
+
+function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | undefined {
+  const speechWindow = window as unknown as {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  };
+  return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+}
+
+function startVoiceAiQuestion(): void {
+  const fallbackQuestion = activeWorkflowCase.modules.brief.aiBrief?.operatorQuestions[0] ?? "为什么判定为齿轮箱风险？";
+  const Recognition = getSpeechRecognitionConstructor();
+
+  if (!Recognition) {
+    setAiReportText(`当前浏览器暂不支持语音识别，已改用快捷追问：${fallbackQuestion}`);
+    setBimStatus("AI 语音识别不可用，已使用快捷追问继续诊断");
+    void requestAiDiagnosisReport(fallbackQuestion, { speak: true });
+    return;
+  }
+
+  activeSpeechRecognition?.abort();
+  const recognition = new Recognition();
+  let handled = false;
+
+  const submitQuestion = (question: string) => {
+    if (handled) return;
+    handled = true;
+    activeSpeechRecognition = undefined;
+    setAiReportText(`已听到：${question}\nAI 正在生成回答...`);
+    void requestAiDiagnosisReport(question, { speak: true });
+  };
+
+  recognition.lang = "zh-CN";
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  recognition.onresult = (event) => {
+    submitQuestion(event.results[0]?.[0]?.transcript?.trim() || fallbackQuestion);
+  };
+  recognition.onerror = () => {
+    submitQuestion(fallbackQuestion);
+  };
+  recognition.onend = () => {
+    if (!handled) {
+      submitQuestion(fallbackQuestion);
+    }
+  };
+
+  activeSpeechRecognition = recognition;
+  setAiReportText("正在听取语音追问，可以问：为什么报警？下一步怎么处理？");
+  setBimStatus("AI 正在听取运维追问");
+  try {
+    recognition.start();
+  } catch {
+    activeSpeechRecognition = undefined;
+    setAiReportText(`语音识别未能启动，已改用快捷追问：${fallbackQuestion}`);
+    void requestAiDiagnosisReport(fallbackQuestion, { speak: true });
   }
 }
 
@@ -851,6 +997,10 @@ function bindWorkflowSurfaceEvents(): void {
 
   workflowModuleDrawer.querySelector<HTMLButtonElement>("[data-ai-generate-report]")?.addEventListener("click", () => {
     void requestAiDiagnosisReport();
+  });
+
+  workflowModuleDrawer.querySelector<HTMLButtonElement>("[data-ai-voice-question]")?.addEventListener("click", () => {
+    startVoiceAiQuestion();
   });
 
   workflowModuleDrawer.querySelector<HTMLButtonElement>("[data-create-workorder]")?.addEventListener("click", () => {
