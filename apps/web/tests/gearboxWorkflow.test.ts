@@ -33,6 +33,15 @@ describe("gearbox workflow case", () => {
     expect(aiBrief?.primaryFinding).toContain("齿轮箱");
     expect(aiBrief?.evidence).toHaveLength(4);
     expect(aiBrief?.operatorQuestions.join(" ")).toContain("为什么");
+    expect(aiBrief?.primaryAction).toMatchObject({ label: "运行融合判据", module: "fusion" });
+    expect(aiBrief?.decisionSteps.map((step) => step.title)).toEqual([
+      "接入并对齐数据",
+      "运行模型判据",
+      "给出值班结论",
+      "转成人工动作",
+    ]);
+    expect(aiBrief?.decisionSteps.map((step) => `${step.input} ${step.model} ${step.result}`).join(" ")).toContain("OpenOA");
+    expect(aiBrief?.decisionSteps.at(-1)?.detail).toContain("工程师确认");
     expect(brief.metrics).toContainEqual({ label: "证据来源", value: "SCADA / CMS / 螺栓 / 油温" });
   });
 

@@ -51,8 +51,18 @@ export type EventTimelineStep = {
 export type AiDiagnosisBrief = {
   broadcast: string;
   conclusion: string;
+  decisionSteps: Array<{
+    detail: string;
+    id: string;
+    input: string;
+    model: string;
+    module: WorkflowModuleKey;
+    result: string;
+    title: string;
+  }>;
   evidence: string[];
   operatorQuestions: string[];
+  primaryAction: WorkflowAction;
   primaryFinding: string;
   recommendedAction: string;
   riskLevel: "watch" | "orange" | "red";
@@ -458,6 +468,44 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
         aiBrief: {
           broadcast: `黔风智维提醒：${spokenTurbineName(input.turbineId)}齿轮箱出现一级预警，请进入诊断包查看证据链。`,
           conclusion: `${input.turbineId} 当前不是孤立阈值报警，而是运行残差、振动频谱和热异常共同指向齿轮箱高速轴轴承早期磨损。系统建议按预测维护流程生成巡检工单，复核前执行 ${input.maintenance.workMode}。`,
+          decisionSteps: [
+            {
+              detail: "只把同一时间窗内可互相解释的数据放进本次事件，避免把不同时间的零散告警拼成假结论。",
+              id: "data-ingest",
+              input: `SCADA ${input.scadaSamples.length} 个 10 min 窗口、CMS 60 s 高频包、螺栓 ${boltChart.channels.length} 路、油温对标`,
+              model: "数据质量门 + 时间窗对齐",
+              module: "fusion",
+              result: "形成同一事件证据包",
+              title: "接入并对齐数据",
+            },
+            {
+              detail: "SCADA 先发现性能残差，CMS 再定位传动链特征，油温增强摩擦/润滑异常判断，螺栓作为结构反证。",
+              id: "model-run",
+              input: "功率残差、GMF 侧频、油温残差、叶根预紧力",
+              model: "OpenOA 基线 + GMF 包络谱 + 热平衡残差 + 结构排查",
+              module: "fusion",
+              result: `核心证据越限 ${exceededCoreSignals}/3`,
+              title: "运行模型判据",
+            },
+            {
+              detail: "只有当运行异常和部件机理证据同向时，才升级为预测维护事件；结构监测未把主故障转移到叶根。",
+              id: "decision",
+              input: `置信度 ${diagnostics.riskConfidencePct}%、健康评分 ${diagnostics.healthScore}`,
+              model: "证据融合门控",
+              module: "alerts",
+              result: "齿轮箱 P1 预警闭环",
+              title: "给出值班结论",
+            },
+            {
+              detail: "AI 只生成工单草案和复核建议；限功率、停机、登塔和检修仍由值长与现场工程师确认。",
+              id: "human-action",
+              input: `${input.maintenance.actionWindowHours}、${input.maintenance.workMode}、备件 ${input.maintenance.parts}`,
+              model: "预测维护规则 + 人工确认边界",
+              module: "workorder",
+              result: "生成复核工单草案",
+              title: "转成人工动作",
+            },
+          ],
           evidence: [
             `SCADA 最大功率缺口 ${formatSignedPct(diagnostics.maxPowerShortfallPct)}，异常窗口 ${diagnostics.scadaAbnormalSamples}/${input.scadaSamples.length}`,
             `CMS 齿轮啮合侧频达到 ${formatFixed(diagnostics.cmsSidebandRatio)}x 基线`,
@@ -469,6 +517,7 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
             "关键证据来自哪些传感器？",
             "下一步工单应该怎么安排？",
           ],
+          primaryAction: { label: "运行融合判据", module: "fusion", primary: true },
           primaryFinding: "齿轮箱高速轴轴承早期磨损风险",
           recommendedAction: `进入证据链并生成 ${input.maintenance.actionWindowHours} 现场复核工单`,
           riskLevel: exceededCoreSignals >= 3 ? "red" : "orange",

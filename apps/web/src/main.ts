@@ -327,29 +327,60 @@ function renderEventTimeline(steps: EventTimelineStep[]): string {
 function renderAiBrief(module: WorkflowModule): string {
   const brief = module.aiBrief;
   if (!brief) return "";
+  const primaryAction = brief.primaryAction;
 
   return `
     ${renderEventTimeline(activeWorkflowCase.eventTimeline)}
-    <article class="ai-brief-card ${html(brief.riskLevel)}">
-      <div>
-        <span>AI 当前判断</span>
-        <strong>${html(brief.primaryFinding)}</strong>
+    <section class="ai-duty-assistant ${html(brief.riskLevel)}">
+      <header>
+        <div>
+          <span>AI 值班助手</span>
+          <strong>下一步：${html(primaryAction.label)}</strong>
+        </div>
+        <small id="ai-agent-status">后端智能检测中</small>
+      </header>
+      <article class="ai-duty-decision">
+        <span>当前判断</span>
+        <h4>${html(brief.primaryFinding)}</h4>
+        <p>${html(brief.conclusion)}</p>
+      </article>
+      <div class="ai-next-actions">
+        <button class="primary" type="button" data-open-module="${html(primaryAction.module)}">${html(primaryAction.label)}</button>
+        <button type="button" data-ai-generate-report>让 AI 解释这次预警</button>
       </div>
-      <p>${html(brief.conclusion)}</p>
-      <ol>
-        ${brief.evidence.map((item) => `<li>${html(item)}</li>`).join("")}
+      <ol class="ai-decision-chain" aria-label="AI 决策链">
+        ${brief.decisionSteps.map((step, index) => `
+          <li>
+            <span>${String(index + 1).padStart(2, "0")}</span>
+            <div>
+              <strong>${html(step.title)}</strong>
+              <dl>
+                <div><dt>输入</dt><dd>${html(step.input)}</dd></div>
+                <div><dt>模型</dt><dd>${html(step.model)}</dd></div>
+                <div><dt>结果</dt><dd>${html(step.result)}</dd></div>
+              </dl>
+              <details>
+                <summary>查看工程细节</summary>
+                <p>${html(step.detail)}</p>
+                <button type="button" data-open-module="${html(step.module)}">打开${html(moduleText(step.module))}</button>
+              </details>
+            </div>
+          </li>
+        `).join("")}
       </ol>
-      <footer>
-        <small>建议动作</small>
-        <b>${html(brief.recommendedAction)}</b>
-      </footer>
-    </article>
+      <details class="ai-evidence-details">
+        <summary>展开本次证据明细</summary>
+        <ol>
+          ${brief.evidence.map((item) => `<li>${html(item)}</li>`).join("")}
+        </ol>
+      </details>
+    </section>
     <div class="ai-question-chips" aria-label="常用追问">
       ${brief.operatorQuestions.map((question) => `<button type="button" data-ai-question="${html(question)}">${html(question)}</button>`).join("")}
     </div>
     <section class="ai-generated-report" aria-live="polite">
       <header>
-        <span>AI 值班报告</span>
+        <span>AI 对话与报告</span>
         <div class="ai-report-actions">
           <button type="button" data-ai-voice-question>语音问AI</button>
           <button type="button" data-ai-generate-report>生成AI报告</button>
@@ -359,7 +390,7 @@ function renderAiBrief(module: WorkflowModule): string {
         <input id="ai-question-input" type="text" placeholder="例如：为什么不是螺栓问题？下一步怎么处理？" />
         <button type="button" data-ai-send-question>发送问题</button>
       </div>
-      <div id="ai-generated-report-text" class="ai-report-body">后端 AI 值班员已准备读取当前事件、多源证据、模型判据、BIM 部件和工单草案。点击生成后会返回可追溯诊断面板。</div>
+      <div id="ai-generated-report-text" class="ai-report-body">你可以直接追问当前事件。AI 会先读取结构化证据包，再调用后端模型生成可追溯答复；停机、登塔、检修仍必须人工确认。</div>
     </section>
   `;
 }
@@ -790,6 +821,7 @@ function renderWorkflowSurfaces(): void {
     .map((moduleKey) => renderModulePanel(moduleKey, activeWorkflowCase.modules[moduleKey], activeWorkflowCase))
     .join("");
   bindWorkflowSurfaceEvents();
+  void refreshAgentStatus();
 }
 
 function selectWorkflowCase(caseId: string): void {
@@ -961,6 +993,28 @@ function setAiReportHtml(markup: string): void {
   if (report) {
     report.innerHTML = markup;
     bindAgentResultEvents(report);
+  }
+}
+
+function setAgentStatus(text: string, mode: "checking" | "configured" | "fallback" = "checking"): void {
+  workflowModuleDrawer.querySelectorAll<HTMLElement>("#ai-agent-status").forEach((item) => {
+    item.textContent = text;
+    item.dataset.mode = mode;
+  });
+}
+
+async function refreshAgentStatus(): Promise<void> {
+  setAgentStatus("后端智能检测中", "checking");
+  try {
+    const response = await fetch("/api/agent/status");
+    const status = await response.json() as { configured?: boolean; model?: string };
+    if (status.configured) {
+      setAgentStatus(`已接入 ${status.model ?? "大模型"}`, "configured");
+      return;
+    }
+    setAgentStatus("本地规则兜底", "fallback");
+  } catch {
+    setAgentStatus("后端未连接", "fallback");
   }
 }
 
@@ -1367,8 +1421,10 @@ function bindWorkflowSurfaceEvents(): void {
     });
   });
 
-  workflowModuleDrawer.querySelector<HTMLButtonElement>("[data-ai-generate-report]")?.addEventListener("click", () => {
-    void requestAiDiagnosisReport();
+  workflowModuleDrawer.querySelectorAll<HTMLButtonElement>("[data-ai-generate-report]").forEach((button) => {
+    button.addEventListener("click", () => {
+      void requestAiDiagnosisReport();
+    });
   });
 
   workflowModuleDrawer.querySelector<HTMLButtonElement>("[data-ai-voice-question]")?.addEventListener("click", () => {
@@ -1407,6 +1463,7 @@ function bindWorkflowSurfaceEvents(): void {
 }
 
 bindWorkflowSurfaceEvents();
+void refreshAgentStatus();
 
 workflowCaseSelector.addEventListener("change", () => {
   selectWorkflowCase(workflowCaseSelector.value);
