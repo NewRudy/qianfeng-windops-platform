@@ -35,6 +35,12 @@ describe("first slice scene config", () => {
     expect(ridgeSpread).toBeGreaterThan(900);
   });
 
+  it("marks the active diagnosis turbine as a warning target for the AI duty flow", () => {
+    const activeTurbine = firstSliceSceneConfig.turbines.find((turbine) => turbine.turbineId === "HS-WTG-02");
+
+    expect(activeTurbine?.riskLevel).toBe("warning");
+  });
+
   it("converts absolute asset paths into Vite dev-server file URLs", () => {
     expect(toViteFsUrl("/Users/rudy/Downloads/laoyeling_mountain/tileset.json")).toBe(
       "/@fs/Users/rudy/Downloads/laoyeling_mountain/tileset.json",

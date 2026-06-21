@@ -181,6 +181,98 @@ button {
     visibility 0s linear 220ms;
 }
 
+.ai-duty-card {
+  position: absolute;
+  right: 28px;
+  bottom: 28px;
+  z-index: 4;
+  width: min(500px, calc(100vw - 56px));
+  padding: 16px 18px;
+  border: 1px solid rgba(91, 224, 246, 0.24);
+  background:
+    linear-gradient(135deg, rgba(3, 21, 31, 0.84), rgba(2, 8, 14, 0.72)),
+    radial-gradient(circle at 18% 0%, rgba(91, 224, 246, 0.16), transparent 34%);
+  box-shadow:
+    inset 0 0 28px rgba(91, 224, 246, 0.08),
+    0 22px 70px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(16px);
+  transition:
+    opacity 180ms ease,
+    transform 220ms ease,
+    visibility 0s linear 0s;
+}
+
+.shell[data-mode="bim"] .ai-duty-card {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(16px);
+  visibility: hidden;
+  transition:
+    opacity 160ms ease,
+    transform 180ms ease,
+    visibility 0s linear 180ms;
+}
+
+.ai-duty-card > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.ai-duty-card span {
+  color: rgba(91, 224, 246, 0.78);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ai-duty-card strong {
+  color: #ffffff;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.ai-duty-card p {
+  margin: 10px 0 14px;
+  color: rgba(224, 246, 250, 0.74);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ai-duty-card footer {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.ai-duty-card small {
+  color: rgba(246, 197, 104, 0.84);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.ai-duty-card button,
+.ai-question-chips button {
+  min-height: 34px;
+  border: 1px solid rgba(91, 224, 246, 0.28);
+  background: rgba(6, 35, 48, 0.8);
+  color: rgba(236, 253, 255, 0.86);
+  font-weight: 900;
+}
+
+.ai-duty-card button:hover,
+.ai-question-chips button:hover {
+  border-color: rgba(91, 224, 246, 0.84);
+  background: rgba(19, 87, 108, 0.84);
+}
+
+.ai-duty-card button:last-child {
+  border-color: rgba(246, 197, 104, 0.54);
+  background: linear-gradient(180deg, rgba(145, 74, 19, 0.8), rgba(52, 25, 8, 0.86));
+  color: #fff5df;
+}
+
 .bim-screen {
   position: absolute;
   inset: 0;
@@ -635,6 +727,7 @@ button {
 }
 
 .shell[data-active-module="health"] .module-health,
+.shell[data-active-module="brief"] .module-brief,
 .shell[data-active-module="fusion"] .module-fusion,
 .shell[data-active-module="scada"] .module-scada,
 .shell[data-active-module="cms"] .module-cms,
@@ -644,6 +737,91 @@ button {
 .shell[data-active-module="maintenance"] .module-maintenance,
 .shell[data-active-module="workorder"] .module-workorder {
   display: block;
+}
+
+.ai-brief-card {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 15px;
+  border: 1px solid rgba(91, 224, 246, 0.18);
+  background:
+    linear-gradient(135deg, rgba(6, 36, 48, 0.88), rgba(2, 11, 18, 0.78)),
+    radial-gradient(circle at 0% 0%, rgba(91, 224, 246, 0.14), transparent 32%);
+}
+
+.ai-brief-card.orange,
+.ai-brief-card.red {
+  border-color: rgba(246, 197, 104, 0.42);
+}
+
+.ai-brief-card.red {
+  box-shadow: inset 0 0 32px rgba(255, 84, 73, 0.08);
+}
+
+.ai-brief-card span,
+.ai-brief-card small {
+  color: rgba(91, 224, 246, 0.76);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ai-brief-card strong {
+  display: block;
+  margin-top: 4px;
+  color: #ffffff;
+  font-size: 19px;
+  line-height: 1.3;
+}
+
+.ai-brief-card p {
+  margin: 0;
+  color: rgba(226, 246, 250, 0.78);
+  font-size: 13px;
+  line-height: 1.58;
+}
+
+.ai-brief-card ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-brief-card li {
+  padding: 9px 10px;
+  border-left: 3px solid rgba(246, 197, 104, 0.78);
+  background: rgba(255, 255, 255, 0.052);
+  color: rgba(236, 253, 255, 0.82);
+  font-size: 12px;
+  line-height: 1.48;
+}
+
+.ai-brief-card footer {
+  display: grid;
+  gap: 4px;
+}
+
+.ai-brief-card b {
+  color: #fff3d8;
+  font-size: 14px;
+  line-height: 1.42;
+}
+
+.ai-question-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.ai-question-chips button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
 }
 
 .module-panel h3 {

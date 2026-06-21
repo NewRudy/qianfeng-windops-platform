@@ -1,6 +1,7 @@
 import { activeGearboxCaseInput, gearboxCaseCatalog } from "./gearboxCaseData";
 
 export type WorkflowModuleKey =
+  | "brief"
   | "health"
   | "fusion"
   | "scada"
@@ -28,6 +29,16 @@ export type WorkflowAction = {
   label: string;
   module: WorkflowModuleKey;
   primary?: boolean;
+};
+
+export type AiDiagnosisBrief = {
+  broadcast: string;
+  conclusion: string;
+  evidence: string[];
+  operatorQuestions: string[];
+  primaryFinding: string;
+  recommendedAction: string;
+  riskLevel: "watch" | "orange" | "red";
 };
 
 export type FusionSignal = {
@@ -117,6 +128,7 @@ export type BoltChart = {
 
 export type WorkflowModule = {
   action?: WorkflowAction;
+  aiBrief?: AiDiagnosisBrief;
   body?: string;
   boltChart?: BoltChart;
   cmsChart?: CmsChart;
@@ -237,6 +249,11 @@ function workOrderSuffix(turbineId: string): string {
   return turbineId.match(/(\d+)$/)?.[1]?.padStart(2, "0") ?? "00";
 }
 
+function spokenTurbineName(turbineId: string): string {
+  const numericId = turbineId.match(/(\d+)$/)?.[1];
+  return numericId ? `${Number(numericId)}号机` : turbineId;
+}
+
 function calculatePowerShortfallPct(sample: GearboxScadaSample): number {
   if (sample.expectedKw <= 0) return 0;
   return round(((sample.expectedKw - sample.powerKw) / sample.expectedKw) * 100);
@@ -353,8 +370,38 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       { component: "tower", module: "bolts", part: "tower", status: "载荷校核", title: "塔筒结构" },
     ],
     eventCode: input.eventCode,
-    moduleOrder: ["health", "fusion", "scada", "cms", "bolts", "alerts", "inspection", "maintenance", "workorder"],
+    moduleOrder: ["brief", "health", "fusion", "scada", "cms", "bolts", "alerts", "inspection", "maintenance", "workorder"],
     modules: {
+      brief: {
+        action: { label: "展开证据链", module: "fusion", primary: true },
+        aiBrief: {
+          broadcast: `黔风智维提示：${spokenTurbineName(input.turbineId)}出现齿轮箱 P1 预警。功率残差、啮合侧频和油温同步异常，建议进入诊断包，并在 ${input.maintenance.actionWindowHours} 内安排复核。`,
+          conclusion: `${input.turbineId} 当前不是孤立阈值报警，而是运行残差、振动频谱和热异常共同指向齿轮箱高速轴轴承早期磨损。系统建议按预测维护流程生成巡检工单，复核前执行 ${input.maintenance.workMode}。`,
+          evidence: [
+            `SCADA 最大功率缺口 ${formatSignedPct(diagnostics.maxPowerShortfallPct)}，异常窗口 ${diagnostics.scadaAbnormalSamples}/${input.scadaSamples.length}`,
+            `CMS 齿轮啮合侧频达到 ${formatFixed(diagnostics.cmsSidebandRatio)}x 基线`,
+            `油温较同场同机型偏高 ${formatFixed(diagnostics.oilTempDeltaC)} ℃`,
+            `螺栓/结构监测发现 ${diagnostics.boltWarningChannels} 路关注项，用于排除叶根结构主故障并跟踪山地阵风载荷`,
+          ],
+          operatorQuestions: [
+            "为什么判定为齿轮箱风险？",
+            "关键证据来自哪些传感器？",
+            "下一步工单应该怎么安排？",
+          ],
+          primaryFinding: "齿轮箱高速轴轴承早期磨损风险",
+          recommendedAction: `进入证据链并生成 ${input.maintenance.actionWindowHours} 现场复核工单`,
+          riskLevel: exceededCoreSignals >= 3 ? "red" : "orange",
+        },
+        body: "AI 将多源监测结果整理成值班可读的诊断包：先给结论，再列证据、反证和下一步动作。大模型后续只基于该结构化证据生成专业报告，不直接替代安全决策。",
+        kicker: "AI Duty Officer",
+        metrics: [
+          { label: "AI 结论", value: "P1 预测维护" },
+          { label: "疑似部件", value: "齿轮箱高速轴轴承" },
+          { label: "证据来源", value: "SCADA / CMS / 螺栓 / 油温" },
+          { label: "置信度", value: `${diagnostics.riskConfidencePct}%` },
+        ],
+        title: `${input.turbineId} AI 诊断包`,
+      },
       health: {
         action: { label: "查看融合判据", module: "fusion" },
         hero: {

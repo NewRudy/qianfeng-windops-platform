@@ -69,8 +69,8 @@ export const firstSliceSceneConfig: SceneConfig = {
       '3D Tiles 1.1 wrapper generated from "Laoyeling Mountain" by Li Yanquan, licensed under CC-BY-4.0.',
   },
   turbines: [
-    createRidgeTurbine("HS-WTG-01", "warning", { east: -500, north: -330, up: 136 }, 94),
-    createRidgeTurbine("HS-WTG-02", "normal", { east: -20, north: -210, up: 137 }, 94),
+    createRidgeTurbine("HS-WTG-01", "normal", { east: -500, north: -330, up: 136 }, 94),
+    createRidgeTurbine("HS-WTG-02", "warning", { east: -20, north: -210, up: 137 }, 94),
     createRidgeTurbine("HS-WTG-03", "warning", { east: 460, north: -90, up: 134 }, 94),
   ],
 };

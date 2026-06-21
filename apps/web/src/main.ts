@@ -273,6 +273,31 @@ function renderAction(action?: WorkflowAction, extraAttribute = ""): string {
   return `<button class="module-action${primaryClass}" type="button" data-open-module="${html(action.module)}"${extraAttribute}>${html(action.label)}</button>`;
 }
 
+function renderAiBrief(module: WorkflowModule): string {
+  const brief = module.aiBrief;
+  if (!brief) return "";
+
+  return `
+    <article class="ai-brief-card ${html(brief.riskLevel)}">
+      <div>
+        <span>AI 当前判断</span>
+        <strong>${html(brief.primaryFinding)}</strong>
+      </div>
+      <p>${html(brief.conclusion)}</p>
+      <ol>
+        ${brief.evidence.map((item) => `<li>${html(item)}</li>`).join("")}
+      </ol>
+      <footer>
+        <small>建议动作</small>
+        <b>${html(brief.recommendedAction)}</b>
+      </footer>
+    </article>
+    <div class="ai-question-chips" aria-label="常用追问">
+      ${brief.operatorQuestions.map((question) => `<button type="button" data-ai-question="${html(question)}">${html(question)}</button>`).join("")}
+    </div>
+  `;
+}
+
 function renderCaseOptions(): string {
   return gearboxCaseCatalog
     .map((entry) => {
@@ -292,6 +317,19 @@ function renderComponentButton(item: ComponentRisk): string {
 }
 
 function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule, workflowCase: GearboxWorkflowCase): string {
+  if (moduleKey === "brief") {
+    return `
+      <section class="module-panel module-brief">
+        <div class="module-kicker">${html(module.kicker)}</div>
+        <h3>${html(module.title)}</h3>
+        ${renderAiBrief(module)}
+        <dl>${renderMetrics(module.metrics)}</dl>
+        <p>${html(module.body ?? "")}</p>
+        ${renderAction(module.action)}
+      </section>
+    `;
+  }
+
   if (moduleKey === "health" && module.hero) {
     return `
       <section class="module-panel module-health">
@@ -436,6 +474,19 @@ root.innerHTML = `
         <strong>多气候山地风电机组智驭预警及故障诊断平台</strong>
       </header>
 
+      <section class="ai-duty-card" aria-label="AI 值班播报" aria-live="polite">
+        <div>
+          <span>AI 值班事件</span>
+          <strong id="ai-duty-title">${html(activeWorkflowCase.modules.brief.aiBrief?.primaryFinding ?? "等待诊断事件")}</strong>
+        </div>
+        <p id="ai-duty-text">${html(activeWorkflowCase.modules.brief.aiBrief?.conclusion ?? "")}</p>
+        <footer>
+          <small id="ai-duty-status">已生成播报，等待风场巡航完成</small>
+          <button id="ai-duty-speak" type="button">语音播报</button>
+          <button id="ai-duty-open" type="button">进入诊断包</button>
+        </footer>
+      </section>
+
       <section class="bim-screen" aria-label="单机组 BIM 智驭诊断大屏">
         <header class="bim-header">
           <div>
@@ -479,6 +530,7 @@ root.innerHTML = `
         </aside>
 
         <nav class="bim-toolbar" aria-label="业务流程">
+          <button class="module-tab" type="button" data-module="brief">AI诊断包</button>
           <button class="module-tab" type="button" data-module="health">健康评分</button>
           <button class="module-tab" type="button" data-module="fusion">融合判据</button>
           <button class="module-tab" type="button" data-module="scada">SCADA</button>
@@ -501,6 +553,9 @@ const bimStatus = document.querySelector<HTMLElement>("#bim-status");
 const componentStrip = document.querySelector<HTMLElement>(".component-strip");
 const moduleDrawer = document.querySelector<HTMLElement>(".module-drawer");
 const caseSelector = document.querySelector<HTMLSelectElement>("#case-selector");
+const aiDutyTitle = document.querySelector<HTMLElement>("#ai-duty-title");
+const aiDutyText = document.querySelector<HTMLElement>("#ai-duty-text");
+const aiDutyStatus = document.querySelector<HTMLElement>("#ai-duty-status");
 
 if (!shell || !sceneRoot || !bimModelRoot || !componentStrip || !moduleDrawer || !caseSelector) {
   throw new Error("Missing dashboard shell, Cesium root, BIM root, or workflow controls");
@@ -514,6 +569,7 @@ const workflowCaseSelector = caseSelector;
 let bimViewer: BimTurbineViewer | undefined;
 let warningActive = false;
 let modelDecomposed = false;
+let hasPlayedIntroBroadcast = false;
 
 function setBimStatus(status: string): void {
   if (bimStatus) bimStatus.textContent = status;
@@ -575,6 +631,13 @@ function setSelectedTurbineTitle(turbineId: string): void {
   if (title) title.textContent = turbineId;
 }
 
+function updateAiDutyCard(): void {
+  const brief = activeWorkflowCase.modules.brief.aiBrief;
+  if (aiDutyTitle) aiDutyTitle.textContent = brief?.primaryFinding ?? "等待诊断事件";
+  if (aiDutyText) aiDutyText.textContent = brief?.conclusion ?? "";
+  if (aiDutyStatus) aiDutyStatus.textContent = "AI 已生成诊断播报，可语音复述或进入诊断包";
+}
+
 function renderWorkflowSurfaces(): void {
   workflowComponentStrip.innerHTML = activeWorkflowCase.componentRisks.map(renderComponentButton).join("");
   workflowModuleDrawer.innerHTML = activeWorkflowCase.moduleOrder
@@ -587,12 +650,13 @@ function selectWorkflowCase(caseId: string): void {
   const nextCase = gearboxCaseCatalog.find((entry) => entry.id === caseId);
   if (!nextCase) return;
 
-  const activeModule = getWorkflowModule(dashboardShell.dataset.activeModule ?? "", "health") ?? "health";
+  const activeModule = getWorkflowModule(dashboardShell.dataset.activeModule ?? "", "brief") ?? "brief";
   activeCaseId = nextCase.id;
   workflowCaseSelector.value = activeCaseId;
   activeWorkflowCase = buildGearboxWorkflowCase(nextCase.input);
   renderWorkflowSurfaces();
   setSelectedTurbineTitle(activeWorkflowCase.turbineId);
+  updateAiDutyCard();
   openWorkflowModule(activeModule, `已切换案例：${nextCase.title}`);
   setActiveComponent("gearbox");
 
@@ -601,9 +665,17 @@ function selectWorkflowCase(caseId: string): void {
   }
 }
 
-function openDiagnosis(turbine: TurbineAsset): void {
+function selectWorkflowCaseForTurbine(turbineId: string): void {
+  const nextCase = gearboxCaseCatalog.find((entry) => entry.input.turbineId === turbineId);
+  if (nextCase && nextCase.id !== activeCaseId) {
+    selectWorkflowCase(nextCase.id);
+  }
+}
+
+function openDiagnosis(turbine: TurbineAsset, moduleName: WorkflowModuleKey = "brief"): void {
+  selectWorkflowCaseForTurbine(turbine.turbineId);
   dashboardShell.dataset.mode = "bim";
-  setActiveModule("none");
+  setActiveModule(moduleName);
   window.requestAnimationFrame(() => {
     void getBimViewer().initialize();
   });
@@ -613,6 +685,43 @@ function openDiagnosis(turbine: TurbineAsset): void {
   } else {
     setSelectedTurbineTitle(activeWorkflowCase.turbineId);
   }
+}
+
+function getDutyTurbine(): TurbineAsset {
+  return (
+    firstSliceSceneConfig.turbines.find((turbine) => turbine.turbineId === activeWorkflowCase.turbineId) ??
+    firstSliceSceneConfig.turbines[0]
+  );
+}
+
+function speakAiDutyBrief(userInitiated = true): void {
+  const brief = activeWorkflowCase.modules.brief.aiBrief;
+  if (!brief) return;
+
+  if (!("speechSynthesis" in window)) {
+    if (aiDutyStatus) aiDutyStatus.textContent = "当前浏览器不支持语音播报，已保留文字诊断包";
+    return;
+  }
+
+  const utterance = new SpeechSynthesisUtterance(brief.broadcast);
+  utterance.lang = "zh-CN";
+  utterance.rate = 1.12;
+  utterance.pitch = 0.96;
+  utterance.onstart = () => {
+    if (aiDutyStatus) aiDutyStatus.textContent = "AI 正在播报当前风机风险";
+  };
+  utterance.onend = () => {
+    if (aiDutyStatus) aiDutyStatus.textContent = "播报完成，可进入诊断包查看证据链";
+  };
+  utterance.onerror = () => {
+    if (aiDutyStatus) {
+      aiDutyStatus.textContent = userInitiated ? "浏览器语音未启动，诊断包文字已同步显示" : "AI 已生成播报，可点击语音播报";
+    }
+  };
+
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+  window.speechSynthesis.resume();
 }
 
 function closeDiagnosis(): void {
@@ -644,6 +753,16 @@ void createWindFarmScene({
     closeDiagnosis();
     scene.showMountainOverview();
   });
+
+  document.querySelector<HTMLButtonElement>("#ai-duty-open")?.addEventListener("click", () => {
+    scene.focusTurbine(activeWorkflowCase.turbineId);
+  });
+
+  window.setTimeout(() => {
+    if (hasPlayedIntroBroadcast || dashboardShell.dataset.mode === "bim") return;
+    hasPlayedIntroBroadcast = true;
+    speakAiDutyBrief(false);
+  }, 5200);
 });
 
 function bindWorkflowSurfaceEvents(): void {
@@ -678,6 +797,13 @@ function bindWorkflowSurfaceEvents(): void {
         setActiveComponent("gearbox");
         void getBimViewer().focusPart("gearbox");
       }
+    });
+  });
+
+  workflowModuleDrawer.querySelectorAll<HTMLButtonElement>("[data-ai-question]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const question = button.dataset.aiQuestion ?? "查看证据链";
+      setBimStatus(`AI 已收到追问：${question}；下一步将接入语音问答服务`);
     });
   });
 
@@ -731,6 +857,11 @@ document.querySelectorAll<HTMLButtonElement>(".module-tab").forEach((button) => 
 
     setActiveModule(nextModule);
   });
+});
+
+document.querySelector<HTMLButtonElement>("#ai-duty-speak")?.addEventListener("click", () => {
+  hasPlayedIntroBroadcast = true;
+  speakAiDutyBrief(true);
 });
 
 document.querySelector<HTMLButtonElement>("#bim-toggle-decompose")?.addEventListener("click", (event) => {

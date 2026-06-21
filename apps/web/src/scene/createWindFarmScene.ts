@@ -23,7 +23,7 @@ import type { LocalOffset, SceneConfig, TurbineAsset } from "./sceneConfig";
 import { toViteFsUrl } from "./sceneConfig";
 
 export interface WindFarmScene {
-  focusTurbine: () => void;
+  focusTurbine: (turbineId?: string) => void;
   showMountainOverview: () => void;
   destroy: () => void;
 }
@@ -113,7 +113,7 @@ export async function createWindFarmScene({
     });
   };
 
-  const focusTurbine = () => {
+  const focusSelectedTurbine = () => {
     onTurbineSelected?.(selectedTurbine);
     viewer.camera.lookAt(
       pointFromOffset(localFrame, getHubOffset(selectedTurbine)),
@@ -122,11 +122,15 @@ export async function createWindFarmScene({
     viewer.camera.lookAtTransform(Matrix4.IDENTITY);
   };
 
-  const selectTurbine = (turbineId: string) => {
+  const focusTurbine = (turbineId?: string) => {
+    if (!turbineId) {
+      focusSelectedTurbine();
+      return;
+    }
     const turbine = config.turbines.find((candidate) => candidate.turbineId === turbineId);
     if (!turbine) return;
     selectedTurbine = turbine;
-    focusTurbine();
+    focusSelectedTurbine();
   };
 
   playIntroFlight(viewer, origin, ridgeTarget);
@@ -140,7 +144,7 @@ export async function createWindFarmScene({
       ? pickedId.turbineId
       : turbineIdFromEntityId(pickedEntityId) ?? turbineNearScreenPoint(viewer, localFrame, config, movement.position);
     if (pickedTurbineId) {
-      selectTurbine(pickedTurbineId);
+      focusTurbine(pickedTurbineId);
     }
   }, ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
