@@ -15,6 +15,10 @@ type BimTurbineViewerOptions = {
   onStatus?: (status: string) => void;
 };
 
+type ModelLayerOptions = {
+  selectable: boolean;
+};
+
 type ObjectTransition = {
   duration: number;
   from: THREE.Vector3;
@@ -179,7 +183,7 @@ export class BimTurbineViewer {
     });
 
     this.transitionObjects(targetPositions, 760);
-    this.setStatus("模型拆解中：按构件层级展开设备、传动链与骨架");
+    this.setStatus("模型拆解中：内部设备构件已按传动链、冷却与控制链路展开");
   }
 
   async compose(): Promise<void> {
@@ -307,8 +311,8 @@ export class BimTurbineViewer {
 
       const sourceGroup = new THREE.Group();
       sourceGroup.name = "first_version_aligned_layers";
-      const skeletonModel = this.prepareModelLayer(skeleton.scene, "first_version_skeleton");
-      const equipmentModel = this.prepareModelLayer(equipment.scene, "first_version_equipment");
+      const skeletonModel = this.prepareModelLayer(skeleton.scene, "first_version_skeleton", { selectable: false });
+      const equipmentModel = this.prepareModelLayer(equipment.scene, "first_version_equipment", { selectable: true });
       this.playAnimations(skeletonModel, skeleton.animations);
       this.playAnimations(equipmentModel, equipment.animations);
       skeletonModel.traverse((child) => {
@@ -333,7 +337,7 @@ export class BimTurbineViewer {
     } catch (error) {
       console.warn("[WindOps BIM] failed to load detailed BIM model, using fallback", error);
       const fallback = buildFallbackTurbine();
-      this.prepareModelLayer(fallback, "first_version_equipment");
+      this.prepareModelLayer(fallback, "first_version_equipment", { selectable: true });
       group.add(this.fitModelToStage(fallback, 4.2));
       this.setStatus("BIM 模型加载失败，已启用安全备用模型");
     } finally {
@@ -346,7 +350,7 @@ export class BimTurbineViewer {
     this.prepareExplodeTargets(group);
   }
 
-  private prepareModelLayer(model: THREE.Object3D, name: string): THREE.Object3D {
+  private prepareModelLayer(model: THREE.Object3D, name: string, options: ModelLayerOptions): THREE.Object3D {
     model.name = name;
     model.traverse((child) => {
       const mesh = child as BimMesh;
@@ -358,7 +362,9 @@ export class BimTurbineViewer {
       mesh.material = Array.isArray(mesh.material)
         ? mesh.material.map((material) => material.clone())
         : mesh.material.clone();
-      this.selectableMeshes.push(mesh);
+      mesh.userData.layerName = name;
+      mesh.userData.selectable = options.selectable;
+      if (options.selectable) this.selectableMeshes.push(mesh);
       setMeshOpacity(mesh, name === "first_version_skeleton" ? 0.34 : 0.92);
     });
 
@@ -401,9 +407,14 @@ export class BimTurbineViewer {
     const candidates = new Map<string, THREE.Object3D>();
 
     root.traverse((object) => {
-      if (object === root || object.type === "Mesh") return;
+      if (object === root) return;
+      const mesh = object as BimMesh;
       const name = object.name || "";
-      if (!/(blade|pitch|hub|rotor|shaft|gear|generator|cool|cabinet|yaw|tower|foundation|叶|变桨|转子|主轴|齿轮|发电|冷|柜|偏航|塔筒|基础|骨架|skeleton|wire)/i.test(name)) return;
+      const isSelectableEquipment = mesh.isMesh && mesh.userData.selectable === true;
+      const isFallbackGroup = /fallback/i.test(name);
+
+      if (!isSelectableEquipment && !isFallbackGroup) return;
+      if (!/(blade|pitch|hub|rotor|shaft|gear|generator|cool|cabinet|yaw|tower|foundation|叶|变桨|转子|主轴|齿轮|发电|油冷|风冷|冷|柜|偏航|塔筒|基础)/i.test(name)) return;
       candidates.set(name || object.uuid, object);
     });
 
@@ -535,14 +546,15 @@ export class BimTurbineViewer {
 
   private componentExplodeOffset(object: THREE.Object3D, index: number): THREE.Vector3 {
     const name = object.name;
-    if (/变桨|扇叶|blade|pitch/i.test(name)) return new THREE.Vector3(-0.42, 0.1, 0.18);
-    if (/转子|主轴|rotor|shaft/i.test(name)) return new THREE.Vector3(-0.28, 0.04, 0.08);
-    if (/齿轮|gear/i.test(name)) return new THREE.Vector3(-0.02, 0.05, 0.2);
-    if (/发电|generator/i.test(name)) return new THREE.Vector3(0.24, 0.05, 0.08);
-    if (/风冷|油冷|cool/i.test(name)) return new THREE.Vector3(0.18, 0.2, 0.14);
-    if (/控制|柜|cabinet/i.test(name)) return new THREE.Vector3(0.32, 0.16, 0.18);
-    if (/偏航|yaw/i.test(name)) return new THREE.Vector3(0.04, -0.1, -0.16);
-    if (/线框|骨架|skeleton|wire|材质/i.test(name)) return new THREE.Vector3(0.02, 0.06, -0.24);
+    if (/油冷|oil/i.test(name)) return new THREE.Vector3(0.08, 0.58, 0.22);
+    if (/风冷|cool/i.test(name)) return new THREE.Vector3(0.26, 0.36, 0.24);
+    if (/控制|柜|cabinet/i.test(name)) return new THREE.Vector3(0.48, 0.26, 0.22);
+    if (/变桨|扇叶|blade|pitch/i.test(name)) return new THREE.Vector3(-0.72, 0.18, 0.34);
+    if (/转子|rotor/i.test(name)) return new THREE.Vector3(-0.52, 0.1, 0.22);
+    if (/主轴|shaft/i.test(name)) return new THREE.Vector3(-0.3, 0.08, 0.18);
+    if (/齿轮|gear/i.test(name)) return new THREE.Vector3(-0.04, 0.1, 0.42);
+    if (/发电|generator/i.test(name)) return new THREE.Vector3(0.36, 0.1, 0.16);
+    if (/偏航|yaw/i.test(name)) return new THREE.Vector3(0.02, -0.24, -0.28);
 
     const fallbackX = index % 2 === 0 ? 0.16 : -0.16;
     const fallbackZ = index % 3 === 0 ? 0.18 : -0.18;
