@@ -21,6 +21,8 @@ export interface TilesetAsset {
 export interface TurbineAsset extends ModelAsset {
   turbineId: string;
   riskLevel: "normal" | "warning" | "critical";
+  headingDegrees: number;
+  hasRotorAnimation: boolean;
   geometry: {
     towerHeight: number;
     towerRadius: number;
@@ -36,7 +38,7 @@ export interface SceneConfig {
     height: number;
   };
   mountain: TilesetAsset;
-  turbine: TurbineAsset;
+  turbines: TurbineAsset[];
 }
 
 export function toViteFsUrl(absolutePath: string): string {
@@ -63,24 +65,35 @@ export const firstSliceSceneConfig: SceneConfig = {
     credit:
       '3D Tiles 1.1 wrapper generated from "Laoyeling Mountain" by Li Yanquan, licensed under CC-BY-4.0.',
   },
-  turbine: {
-    name: "HS-WTG-01",
-    turbineId: "HS-WTG-01",
-    absolutePath:
-      "/Volumes/RUDY/105. 风机科研项目/MF-TurbineMonitor/public/models/equipment.glb",
-    scale: 11,
-    offset: {
-      east: 260,
-      north: -120,
-      up: 220,
-    },
-    geometry: {
-      towerHeight: 180,
-      towerRadius: 5,
-      nacelleLength: 54,
-      bladeRadius: 72,
-    },
-    credit: "First-version turbine GLB from MF-TurbineMonitor public models.",
-    riskLevel: "warning",
-  },
+  turbines: [
+    createRidgeTurbine("HS-WTG-01", "warning", { east: 20, north: -360, up: 324 }, -18),
+    createRidgeTurbine("HS-WTG-02", "normal", { east: 320, north: -125, up: 326 }, -8),
+    createRidgeTurbine("HS-WTG-03", "warning", { east: 585, north: 70, up: 320 }, 4),
+  ],
 };
+
+function createRidgeTurbine(
+  turbineId: string,
+  riskLevel: TurbineAsset["riskLevel"],
+  offset: LocalOffset,
+  headingDegrees: number,
+): TurbineAsset {
+  return {
+    name: turbineId,
+    turbineId,
+    absolutePath: "/Users/rudy/Downloads/wind_turbine/scene.gltf",
+    scale: 4.0,
+    offset,
+    headingDegrees,
+    hasRotorAnimation: true,
+    geometry: {
+      towerHeight: 188,
+      towerRadius: 5,
+      nacelleLength: 64,
+      bladeRadius: 74,
+    },
+    credit:
+      'This work is based on "Wind Turbine" by Sket_h, licensed under CC-BY-4.0.',
+    riskLevel,
+  };
+}

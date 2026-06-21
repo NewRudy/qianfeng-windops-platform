@@ -29,11 +29,11 @@ root.innerHTML = `
       <aside class="status-panel">
         <p class="panel-kicker">当前选中</p>
         <h2 id="selected-title">HS-WTG-01</h2>
-        <p id="selected-copy">双击山体上的风机，进入该风机 BIM 细节视角。</p>
+        <p id="selected-copy">山脊线已布置 3 台风机。双击任一风机，进入该风机 BIM 细节视角。</p>
         <dl>
           <div>
             <dt>风险等级</dt>
-            <dd>橙色预警</dd>
+            <dd id="selected-risk">橙色预警</dd>
           </div>
           <div>
             <dt>疑似部件</dt>
@@ -44,7 +44,7 @@ root.innerHTML = `
             <dd>老爷岭公开 3D Tiles，运维事件为透明模拟</dd>
           </div>
         </dl>
-        <button id="focus-turbine" type="button">聚焦风机</button>
+        <button id="focus-turbine" type="button">聚焦当前风机</button>
         <button id="reset-camera" type="button" class="ghost">返回山地</button>
       </aside>
 
@@ -75,9 +75,18 @@ void createWindFarmScene({
   onTurbineSelected: (turbine) => {
     const title = document.querySelector("#selected-title");
     const copy = document.querySelector("#selected-copy");
+    const risk = document.querySelector("#selected-risk");
     if (title) title.textContent = turbine.name;
+    if (risk) {
+      risk.textContent =
+        turbine.riskLevel === "critical"
+          ? "红色告警"
+          : turbine.riskLevel === "warning"
+            ? "橙色预警"
+            : "运行正常";
+    }
     if (copy) {
-      copy.textContent = "已进入 BIM 细节视角：下一步将把部件树、传感器证据和工单绑定到这里。";
+      copy.textContent = `已进入 ${turbine.name} BIM 细节视角：下一步将把部件树、传感器证据和工单绑定到这里。`;
     }
   },
 }).then((scene) => {

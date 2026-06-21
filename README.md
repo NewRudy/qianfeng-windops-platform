@@ -56,9 +56,10 @@ http://127.0.0.1:1146/
 
 - 山体：`/Users/rudy/Downloads/laoyeling_mountain/scene.gltf`
 - 山体 3D Tiles 输出：`data/external/tilesets/laoyeling-mountain/tileset.json`
-- 风机首版 GLB：`/Volumes/RUDY/105. 风机科研项目/MF-TurbineMonitor/public/models/equipment.glb`
+- 首页风机模型：`/Users/rudy/Downloads/wind_turbine/scene.gltf`
 
 老爷岭模型来自 Sketchfab，作者李延权，许可证为 CC-BY-4.0。界面必须保留来源和数据边界。
+首页风机模型来自 Sketchfab，作者 Sket_h，许可证为 CC-BY-4.0，包含一个叶轮旋转动画。该模型作为 GIS 首页的可视化风机资产，构件级 BIM 详情后续仍需要 xeokit/XKT 或可查询部件树资产承载。
 
 注意：当前 `npm run assets:laoyeling` 生成的是单瓦片 3D Tiles 1.1 包装，作用是统一 GIS+BIM 运行时数据入口；它还不是真正多级 LOD 的倾斜摄影切片。后续接入 OSGB、真实倾斜摄影或点云时，仍需要专业切片工具生成多瓦片、多层级 3D Tiles。
 

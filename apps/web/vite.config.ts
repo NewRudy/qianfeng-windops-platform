@@ -9,6 +9,7 @@ const cesiumBuildRoot = resolve(repoRoot, "node_modules/cesium/Build");
 
 const externalAssetRoots = [
   "/Users/rudy/Downloads/laoyeling_mountain",
+  "/Users/rudy/Downloads/wind_turbine",
   "/Volumes/RUDY/105. 风机科研项目/MF-TurbineMonitor/public/models",
   "/Volumes/RUDY/105. 风机科研项目/MF-TurbineMonitor/docs/models",
 ];

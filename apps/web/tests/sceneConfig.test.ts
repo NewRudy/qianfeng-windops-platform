@@ -10,13 +10,19 @@ describe("first slice scene config", () => {
     expect(firstSliceSceneConfig.mountain.credit).toContain("CC-BY-4.0");
   });
 
-  it("anchors one turbine model from the first-version U disk BIM assets", () => {
-    expect(firstSliceSceneConfig.turbine.turbineId).toBe("HS-WTG-01");
-    expect(firstSliceSceneConfig.turbine.absolutePath).toContain(
-      "MF-TurbineMonitor/public/models/equipment.glb",
-    );
-    expect(firstSliceSceneConfig.turbine.offset.up).toBeGreaterThan(0);
-    expect(firstSliceSceneConfig.turbine.geometry.towerHeight).toBeGreaterThan(100);
+  it("places three animated turbine models along the mountain ridge", () => {
+    expect(firstSliceSceneConfig.turbines).toHaveLength(3);
+    expect(firstSliceSceneConfig.turbines.map((turbine) => turbine.turbineId)).toEqual([
+      "HS-WTG-01",
+      "HS-WTG-02",
+      "HS-WTG-03",
+    ]);
+    for (const turbine of firstSliceSceneConfig.turbines) {
+      expect(turbine.absolutePath).toBe("/Users/rudy/Downloads/wind_turbine/scene.gltf");
+      expect(turbine.hasRotorAnimation).toBe(true);
+      expect(turbine.offset.up).toBeGreaterThan(300);
+      expect(turbine.geometry.towerHeight).toBeGreaterThan(100);
+    }
   });
 
   it("converts absolute asset paths into Vite dev-server file URLs", () => {
@@ -24,7 +30,7 @@ describe("first slice scene config", () => {
       "/@fs/Users/rudy/Downloads/laoyeling_mountain/tileset.json",
     );
     expect(
-      toViteFsUrl("/Volumes/RUDY/105. 风机科研项目/MF-TurbineMonitor/public/models/equipment.glb"),
-    ).toContain("105.%20%E9%A3%8E%E6%9C%BA%E7%A7%91%E7%A0%94%E9%A1%B9%E7%9B%AE");
+      toViteFsUrl("/Users/rudy/Downloads/wind_turbine/scene.gltf"),
+    ).toBe("/@fs/Users/rudy/Downloads/wind_turbine/scene.gltf");
   });
 });
