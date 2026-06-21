@@ -33,6 +33,13 @@ describe("gearbox workflow case", () => {
     expect(aiBrief?.primaryFinding).toContain("齿轮箱");
     expect(aiBrief?.evidence).toHaveLength(4);
     expect(aiBrief?.operatorQuestions.join(" ")).toContain("为什么");
+    expect(aiBrief?.operatorFocus).toMatchObject({
+      decision: expect.stringContaining("多源证据"),
+      humanCheck: expect.stringContaining("非限电"),
+      primaryQuestion: "先看融合判据",
+      recommendedModule: "fusion",
+      why: expect.stringContaining("同一事件窗口"),
+    });
     expect(aiBrief?.primaryAction).toMatchObject({ label: "运行融合判据", module: "fusion" });
     expect(aiBrief?.decisionSteps.map((step) => step.title)).toEqual([
       "接入并对齐数据",

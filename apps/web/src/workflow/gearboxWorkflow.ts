@@ -61,6 +61,13 @@ export type AiDiagnosisBrief = {
     title: string;
   }>;
   evidence: string[];
+  operatorFocus: {
+    decision: string;
+    humanCheck: string;
+    primaryQuestion: string;
+    recommendedModule: WorkflowModuleKey;
+    why: string;
+  };
   operatorQuestions: string[];
   primaryAction: WorkflowAction;
   primaryFinding: string;
@@ -535,6 +542,13 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
             `油温较同场同机型偏高 ${formatFixed(diagnostics.oilTempDeltaC)} ℃`,
             `螺栓/结构监测发现 ${diagnostics.boltWarningChannels} 路关注项，用于排除叶根结构主故障并跟踪山地阵风载荷`,
           ],
+          operatorFocus: {
+            decision: "先复核多源证据是否同向",
+            humanCheck: "值班员确认非限电、非人为降载、非通信异常后，才进入告警研判和工单草案。",
+            primaryQuestion: "先看融合判据",
+            recommendedModule: "fusion",
+            why: "AI 值班员先把 SCADA、CMS、油温和螺栓/结构证据放到同一事件窗口，避免用户只看一张曲线就误判。",
+          },
           operatorQuestions: [
             "为什么判定为齿轮箱风险？",
             "关键证据来自哪些传感器？",

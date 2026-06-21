@@ -569,6 +569,7 @@ function renderAiBrief(module: WorkflowModule): string {
   const brief = module.aiBrief;
   if (!brief) return "";
   const primaryAction = brief.primaryAction;
+  const dutyFocus = brief.operatorFocus;
 
   return `
     ${renderEventTimeline(activeWorkflowCase.eventTimeline)}
@@ -585,6 +586,27 @@ function renderAiBrief(module: WorkflowModule): string {
         <h4>${html(brief.primaryFinding)}</h4>
         <p>${html(brief.conclusion)}</p>
       </article>
+      <section class="agent-duty-focus ai-duty-default-focus">
+        <header>
+          <span>值班焦点</span>
+          <strong>先处理这一步</strong>
+        </header>
+        <div>
+          <article>
+            <span>当前判断</span>
+            <strong>${html(dutyFocus.decision)}</strong>
+          </article>
+          <article>
+            <span>为什么看这里</span>
+            <p>${html(dutyFocus.why)}</p>
+          </article>
+          <article>
+            <span>人工边界</span>
+            <p>${html(dutyFocus.humanCheck)}</p>
+          </article>
+        </div>
+        <button type="button" data-open-module="${html(dutyFocus.recommendedModule)}">${html(dutyFocus.primaryQuestion)}</button>
+      </section>
       <div class="ai-next-actions">
         <button class="primary" type="button" data-open-module="${html(primaryAction.module)}">${html(primaryAction.label)}</button>
         <button type="button" data-ai-generate-report>让 AI 解释这次预警</button>
