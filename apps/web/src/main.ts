@@ -641,27 +641,17 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
     <section class="module-panel module-workorder">
       <div class="module-kicker">${html(module.kicker)}</div>
       <h3>${html(module.title)}</h3>
-      ${renderDecisionCard(module.decision)}
+      ${renderOperationReviewCard(module.decision)}
       <div class="workorder-ticket">
         <span id="workorder-state">${html(ticket?.initialState ?? "待生成")}</span>
         <strong id="workorder-code">${html(ticket?.draftCode ?? "WO-待创建")}</strong>
       </div>
-      <dl class="workorder-meta">
-        <div><dt>优先级</dt><dd>${html(ticket?.priority ?? "P1 高优先级")}</dd></div>
-        <div><dt>责任班组</dt><dd>${html(ticket?.assignee ?? "传动链专业班组")}</dd></div>
+      <dl class="workorder-execution-card">
         <div><dt>设备对象</dt><dd>${html(ticket?.asset ?? activeWorkflowCase.turbineId)}</dd></div>
         <div><dt>作业窗口</dt><dd>${html(ticket?.dueWindow ?? "48-72 h")}</dd></div>
-        <div><dt>位置</dt><dd>${html(ticket?.location ?? "山地风场")}</dd></div>
         <div><dt>作业前提</dt><dd>${html(ticket?.precondition ?? "限功率运行")}</dd></div>
+        <div><dt>回写责任</dt><dd>${html((ticket?.writebackItems ?? []).map((item) => item.label).join(" / "))}</dd></div>
       </dl>
-      <section class="workorder-section">
-        <span>安全要求</span>
-        <p>${html(ticket?.safetyRequirement ?? "按风场登塔和停机规程执行。")}</p>
-      </section>
-      <section class="workorder-section">
-        <span>工器具 / 备件</span>
-        <p>${html((ticket?.materials ?? []).join(" / "))}</p>
-      </section>
       <section class="workorder-confirmation">
         <header>
           <span>人工确认门</span>
@@ -681,7 +671,20 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
         <button class="module-action primary" type="button" data-dispatch-workorder disabled>${html(ticket?.dispatchActionLabel ?? "确认派发工单")}</button>
       </section>
       <details class="module-evidence-stack">
-        <summary>展开工单步骤与验收标准</summary>
+        <summary>展开安全要求、工器具、步骤与验收标准</summary>
+        <dl class="workorder-meta">
+          <div><dt>优先级</dt><dd>${html(ticket?.priority ?? "P1 高优先级")}</dd></div>
+          <div><dt>责任班组</dt><dd>${html(ticket?.assignee ?? "传动链专业班组")}</dd></div>
+          <div><dt>位置</dt><dd>${html(ticket?.location ?? "山地风场")}</dd></div>
+        </dl>
+        <section class="workorder-section">
+          <span>安全要求</span>
+          <p>${html(ticket?.safetyRequirement ?? "按风场登塔和停机规程执行。")}</p>
+        </section>
+        <section class="workorder-section">
+          <span>工器具 / 备件</span>
+          <p>${html((ticket?.materials ?? []).join(" / "))}</p>
+        </section>
         <ol class="workorder-steps">
           ${(ticket?.steps ?? []).map((step, index) => `
             <li>
@@ -699,13 +702,13 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
             ${(ticket?.acceptanceCriteria ?? []).map((item) => `<li>${html(item)}</li>`).join("")}
           </ul>
         </section>
+        <section class="workorder-writeback">
+          <span>复盘回写</span>
+          <ul>
+            ${(ticket?.writebackItems ?? []).map((item) => `<li data-writeback-item><b>${html(item.label)}</b><small>${html(item.value)}</small></li>`).join("")}
+          </ul>
+        </section>
       </details>
-      <section class="workorder-writeback">
-        <span>复盘回写</span>
-        <ul>
-          ${(ticket?.writebackItems ?? []).map((item) => `<li data-writeback-item><b>${html(item.label)}</b><small>${html(item.value)}</small></li>`).join("")}
-        </ul>
-      </section>
       <button class="module-action" type="button" data-close-workorder disabled>${html(ticket?.closeActionLabel ?? "标记完成")}</button>
     </section>
   `;

@@ -1313,8 +1313,10 @@ button {
 .module-evidence-stack .model-gate-list,
 .module-evidence-stack .event-list,
 .module-evidence-stack .inspection-list,
+.module-evidence-stack .workorder-meta,
 .module-evidence-stack .workorder-steps,
-.module-evidence-stack .workorder-section {
+.module-evidence-stack .workorder-section,
+.module-evidence-stack .workorder-writeback {
   margin-top: 10px;
 }
 
@@ -2432,6 +2434,37 @@ button {
 
 .workorder-meta {
   margin: 0 0 12px;
+}
+
+.workorder-execution-card {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid rgba(91, 224, 246, 0.16);
+  background:
+    linear-gradient(180deg, rgba(4, 27, 39, 0.76), rgba(2, 14, 22, 0.7)),
+    radial-gradient(circle at 100% 0, rgba(91, 224, 246, 0.1), transparent 34%);
+}
+
+.workorder-execution-card div {
+  display: grid;
+  grid-template-columns: 66px 1fr;
+  gap: 9px;
+  align-items: start;
+}
+
+.workorder-execution-card dt {
+  color: rgba(91, 224, 246, 0.76);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.workorder-execution-card dd {
+  margin: 0;
+  color: rgba(236, 251, 255, 0.82);
+  font-size: 12px;
+  line-height: 1.46;
 }
 
 .workorder-section {

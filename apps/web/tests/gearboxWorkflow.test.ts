@@ -191,11 +191,15 @@ describe("gearbox workflow case", () => {
     expect(ticket?.priority).toBe("P1 高优先级");
     expect(ticket?.assignee).toBe("传动链专业班组");
     expect(ticket?.asset).toContain("齿轮箱高速轴轴承");
+    expect(ticket?.dueWindow).toContain("低风速窗口");
+    expect(ticket?.precondition).toContain("限功率");
+    expect(ticket?.safetyRequirement).toContain("双人确认");
     expect(ticket?.materials.join(" ")).toContain("内窥镜");
     expect(ticket?.steps).toHaveLength(4);
     expect(ticket?.steps.map((step) => step.action).join(" ")).toContain("油液取样");
     expect(ticket?.steps[0].owner).toBe("集控值班长");
     expect(ticket?.acceptanceCriteria.join(" ")).toContain("油液");
+    expect(ticket?.writebackItems).toHaveLength(4);
     expect(gearboxWorkflowCase.statuses.ticketClosed).toContain("回写");
   });
 
