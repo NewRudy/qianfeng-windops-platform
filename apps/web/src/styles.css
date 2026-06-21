@@ -303,7 +303,7 @@ button {
 }
 
 .shell[data-mode="bim"]:not([data-active-module="none"]) .bim-stage {
-  inset: 82px 424px 84px 26px;
+  inset: 80px 512px 84px 24px;
 }
 
 .blueprint-grid {
@@ -619,14 +619,14 @@ button {
   top: 86px;
   right: 16px;
   z-index: 3;
-  width: min(390px, calc(100vw - 42px));
+  width: min(470px, calc(100vw - 42px));
 }
 
 .module-panel {
   display: none;
-  min-height: 420px;
+  min-height: 450px;
   max-height: calc(100vh - 172px);
-  padding: 18px;
+  padding: 20px;
   overflow: auto;
   box-shadow:
     inset 0 0 26px rgba(62, 219, 255, 0.08),
@@ -648,7 +648,7 @@ button {
 .module-panel h3 {
   margin: 0 0 14px;
   color: #ffffff;
-  font-size: 21px;
+  font-size: 23px;
   line-height: 1.25;
 }
 
@@ -684,6 +684,8 @@ button {
 .alarm-card p,
 .module-panel > p {
   margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.56;
 }
 
 .score-ring {
@@ -730,7 +732,7 @@ button {
 .module-panel dd {
   margin: 0;
   color: #ffffff;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 900;
 }
 
@@ -866,7 +868,7 @@ button {
 
 .engineering-chart figcaption strong {
   color: #ffffff;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .engineering-chart svg {
@@ -892,7 +894,7 @@ button {
 .axis-title,
 .tick-label {
   fill: rgba(221, 249, 252, 0.68);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
 }
 
@@ -927,7 +929,7 @@ button {
   gap: 8px;
   margin-top: 6px;
   color: rgba(222, 249, 252, 0.72);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .chart-legend span {
@@ -1185,6 +1187,10 @@ button {
   }
 
   .bim-stage {
+    inset: 84px 12px 210px;
+  }
+
+  .shell[data-mode="bim"]:not([data-active-module="none"]) .bim-stage {
     inset: 84px 12px 210px;
   }
 
