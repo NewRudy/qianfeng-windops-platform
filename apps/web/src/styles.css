@@ -1162,6 +1162,79 @@ button {
   color: #fff0c8;
 }
 
+.evidence-review-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(91, 224, 246, 0.22);
+  background:
+    linear-gradient(180deg, rgba(4, 29, 42, 0.86), rgba(2, 14, 22, 0.82)),
+    radial-gradient(circle at 0 0, rgba(91, 224, 246, 0.1), transparent 34%);
+  box-shadow: inset 3px 0 0 rgba(91, 224, 246, 0.58);
+}
+
+.evidence-review-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.evidence-review-card header span,
+.evidence-review-card footer span {
+  color: rgba(91, 224, 246, 0.78);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.evidence-review-card header strong {
+  color: #ffffff;
+  font-size: 15px;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.evidence-review-card dl {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.evidence-review-card dl div {
+  display: grid;
+  grid-template-columns: 50px 1fr;
+  gap: 9px;
+  align-items: start;
+}
+
+.evidence-review-card dt {
+  color: rgba(246, 197, 104, 0.84);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.evidence-review-card dd,
+.evidence-review-card footer p,
+.module-evidence-note {
+  margin: 0;
+  color: rgba(228, 248, 251, 0.78);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.evidence-review-card footer {
+  display: grid;
+  gap: 5px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(91, 224, 246, 0.12);
+}
+
+.module-evidence-note {
+  padding: 9px;
+  border: 1px solid rgba(91, 224, 246, 0.1);
+  background: rgba(255, 255, 255, 0.035);
+}
+
 .module-evidence-stack {
   margin-top: 12px;
   padding: 10px;

@@ -325,6 +325,33 @@ function renderDecisionCard(decision?: WorkflowDecision): string {
   `;
 }
 
+function renderModuleEvidenceNote(body?: string): string {
+  if (!body) return "";
+  return `<p class="module-evidence-note">${html(body)}</p>`;
+}
+
+function renderEvidenceReviewCard(decision?: WorkflowDecision): string {
+  if (!decision) return "";
+
+  return `
+    <article class="evidence-review-card">
+      <header>
+        <span>证据复核</span>
+        <strong>${html(decision.operation)}</strong>
+      </header>
+      <dl>
+        <div><dt>看什么</dt><dd>${html(decision.input)}</dd></div>
+        <div><dt>判据</dt><dd>${html(decision.model)}</dd></div>
+        <div><dt>结论</dt><dd>${html(decision.result)}</dd></div>
+      </dl>
+      <footer>
+        <span>人工确认</span>
+        <p>${html(decision.confirm)}</p>
+      </footer>
+    </article>
+  `;
+}
+
 function renderEventTimeline(steps: EventTimelineStep[]): string {
   return `
     <section class="event-timeline" aria-label="值班事件闭环">
@@ -474,11 +501,11 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-scada">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        ${renderDecisionCard(module.decision)}
+        ${renderEvidenceReviewCard(module.decision)}
         <dl>${renderMetrics(module.metrics)}</dl>
-        <p>${html(module.body ?? "")}</p>
         <details class="module-evidence-stack">
-          <summary>展开 SCADA 图表证据</summary>
+          <summary>展开 SCADA 图表与工程解释</summary>
+          ${renderModuleEvidenceNote(module.body)}
           ${renderScadaChart(module.scadaChart)}
         </details>
         ${renderAction(module.action)}
@@ -491,11 +518,11 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-fusion">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        ${renderDecisionCard(module.decision)}
+        ${renderEvidenceReviewCard(module.decision)}
         <dl>${renderMetrics(module.metrics)}</dl>
-        <p>${html(module.body ?? "")}</p>
         <details class="module-evidence-stack">
           <summary>展开多源证据与模型门控</summary>
+          ${renderModuleEvidenceNote(module.body)}
           <div class="fusion-source-grid">${renderFusionSignals(module.fusionSignals)}</div>
           <ol class="model-gate-list">${renderModelGates(module.modelGates)}</ol>
         </details>
@@ -509,11 +536,11 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-cms">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        ${renderDecisionCard(module.decision)}
+        ${renderEvidenceReviewCard(module.decision)}
         <dl>${renderMetrics(module.metrics)}</dl>
-        <p>${html(module.body ?? "")}</p>
         <details class="module-evidence-stack">
-          <summary>展开 CMS 频谱证据</summary>
+          <summary>展开 CMS 频谱与工程解释</summary>
+          ${renderModuleEvidenceNote(module.body)}
           ${renderCmsChart(module.cmsChart)}
         </details>
         ${renderAction(module.action)}
@@ -526,11 +553,11 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-bolts">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        ${renderDecisionCard(module.decision)}
+        ${renderEvidenceReviewCard(module.decision)}
         <dl>${renderMetrics(module.metrics)}</dl>
-        <p>${html(module.body ?? "")}</p>
         <details class="module-evidence-stack">
-          <summary>展开螺栓/结构证据</summary>
+          <summary>展开螺栓/结构证据与工程解释</summary>
+          ${renderModuleEvidenceNote(module.body)}
           ${renderBoltChart(module.boltChart)}
         </details>
         ${renderAction(module.action)}
