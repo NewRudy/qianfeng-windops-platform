@@ -819,14 +819,14 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       },
       maintenance: {
         action: { label: "生成运维工单", module: "workorder", primary: true },
-        body: `策略：${input.maintenance.strategy}`,
+        body: `策略：${input.maintenance.strategy}。该策略只承接隐患排查保留下来的齿轮箱主风险：复核前执行 ${input.maintenance.workMode}，${input.maintenance.actionWindowHours} 内优先寻找低风速窗口；若油液、内窥或 CMS 复测异常，则升级为计划检修，否则降级为跟踪观察。`,
         decision: {
           confirm: "集控值班长确认低风速窗口、备件和安全许可后，才生成可执行工单。",
-          evidence: `预计剩余可运行 ${input.maintenance.estimatedRemainingHours} h，建议 ${input.maintenance.actionWindowHours} 内复核，复核前执行 ${input.maintenance.workMode}。`,
-          input: "风险等级、剩余可运行时间、低风速窗口、备件和班组资源",
-          model: "预测维护策略规则 + 风险窗口排序",
+          evidence: `隐患排查已锁定齿轮箱高速轴轴承，预计剩余可运行 ${input.maintenance.estimatedRemainingHours} h；建议 ${input.maintenance.actionWindowHours} 内复核，复核前执行 ${input.maintenance.workMode}。`,
+          input: "隐患排查结果、剩余可运行时间、低风速窗口、备件和班组资源",
+          model: "预测维护策略规则 + 风险窗口排序 + 人工派工门控",
           operation: "计算处置策略",
-          result: input.maintenance.strategy,
+          result: `${input.maintenance.strategy}；满足窗口、许可、资源、回写责任后生成工单草案`,
         },
         kicker: "Action Plan / Predictive Maintenance",
         metrics: [

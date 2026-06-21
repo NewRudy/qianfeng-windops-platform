@@ -376,6 +376,39 @@ function renderInspectionOutcomeBoard(items: InspectionItem[] = []): string {
   `;
 }
 
+function renderMaintenanceReadinessCard(ticket?: WorkflowModule["ticket"], inspectionItems: InspectionItem[] = []): string {
+  if (!ticket) return "";
+
+  const confirmedCount = inspectionItems.filter((item) => item.status === "confirmed").length;
+  const excludedCount = inspectionItems.filter((item) => item.status === "excluded").length;
+  const pendingCount = inspectionItems.filter((item) => item.status === "pending").length;
+
+  return `
+    <section class="maintenance-readiness-card" aria-label="预测维护生成工单前确认">
+      <header>
+        <span>工单前策略</span>
+        <strong>由排查结果生成可执行条件</strong>
+      </header>
+      <dl>
+        <div><dt>维护对象</dt><dd>${html(ticket.asset)}</dd></div>
+        <div><dt>作业窗口</dt><dd>${html(ticket.dueWindow)}</dd></div>
+        <div><dt>运行边界</dt><dd>${html(ticket.precondition)}</dd></div>
+        <div><dt>备件工器具</dt><dd>${html(ticket.materials.join(" / "))}</dd></div>
+      </dl>
+      <p>排查结果：${confirmedCount} 项确认、${excludedCount} 项排除、${pendingCount} 项待复核；只有窗口、许可、资源、回写责任都确认后，才进入工单草案。</p>
+      <div class="maintenance-confirm-grid">
+        ${ticket.confirmationChecks.map((item) => `
+          <article>
+            <span>${html(item.owner)}</span>
+            <strong>${html(item.label)}</strong>
+            <small>${html(item.detail)}</small>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
 function renderBimLocalizationCard(risks: ComponentRisk[] = []): string {
   const primaryRisk = risks.find((risk) => risk.component === "gearbox") ?? risks[0];
   const counterRisks = risks.filter((risk) => risk.component !== primaryRisk?.component);
@@ -743,6 +776,7 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
         <h3>${html(module.title)}</h3>
         ${renderOperationReviewCard(module.decision)}
         <dl>${renderMetrics(module.metrics)}</dl>
+        ${renderMaintenanceReadinessCard(workflowCase.modules.workorder.ticket, workflowCase.modules.inspection.inspectionItems)}
         <details class="module-evidence-stack">
           <summary>展开维护策略说明</summary>
           ${renderModuleEvidenceNote(module.body)}

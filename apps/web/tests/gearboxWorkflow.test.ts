@@ -184,6 +184,11 @@ describe("gearbox workflow case", () => {
     const ticket = gearboxWorkflowCase.modules.workorder.ticket;
 
     expect(gearboxWorkflowCase.modules.maintenance.decision?.operation).toBe("计算处置策略");
+    expect(gearboxWorkflowCase.modules.maintenance.body).toContain("只承接隐患排查保留下来的齿轮箱主风险");
+    expect(gearboxWorkflowCase.modules.maintenance.body).toContain("降级为跟踪观察");
+    expect(gearboxWorkflowCase.modules.maintenance.decision?.input).toContain("隐患排查结果");
+    expect(gearboxWorkflowCase.modules.maintenance.decision?.model).toContain("人工派工门控");
+    expect(gearboxWorkflowCase.modules.maintenance.decision?.result).toContain("满足窗口、许可、资源、回写责任后生成工单草案");
     expect(gearboxWorkflowCase.modules.workorder.decision?.operation).toBe("生成复核工单草案");
     expect(gearboxWorkflowCase.modules.workorder.decision?.confirm).toContain("确认后才执行");
     expect(ticket?.confirmationChecks.map((item) => item.label)).toEqual([

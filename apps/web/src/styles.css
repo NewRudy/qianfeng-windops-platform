@@ -2514,6 +2514,100 @@ button {
   line-height: 1.42;
 }
 
+.maintenance-readiness-card {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 11px;
+  border: 1px solid rgba(91, 224, 246, 0.15);
+  background:
+    linear-gradient(135deg, rgba(5, 27, 42, 0.82), rgba(2, 12, 20, 0.74)),
+    radial-gradient(circle at 100% 0, rgba(246, 197, 104, 0.12), transparent 36%);
+}
+
+.maintenance-readiness-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.maintenance-readiness-card header span,
+.maintenance-confirm-grid span {
+  color: rgba(91, 224, 246, 0.78);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.maintenance-readiness-card header strong {
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.maintenance-readiness-card dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  margin: 0;
+}
+
+.maintenance-readiness-card dl div {
+  min-height: 70px;
+  padding: 9px;
+  border: 1px solid rgba(91, 224, 246, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.maintenance-readiness-card dt {
+  color: rgba(220, 242, 247, 0.58);
+  font-size: 11px;
+}
+
+.maintenance-readiness-card dd {
+  margin: 5px 0 0;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.32;
+}
+
+.maintenance-readiness-card > p {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 3px solid rgba(246, 197, 104, 0.82);
+  background: rgba(246, 197, 104, 0.06);
+  color: rgba(235, 247, 250, 0.78);
+  font-size: 12px;
+  line-height: 1.46;
+}
+
+.maintenance-confirm-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.maintenance-confirm-grid article {
+  min-height: 98px;
+  padding: 9px;
+  border: 1px solid rgba(91, 224, 246, 0.12);
+  background: rgba(4, 20, 32, 0.72);
+}
+
+.maintenance-confirm-grid strong {
+  display: block;
+  margin-top: 6px;
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.maintenance-confirm-grid small {
+  display: block;
+  margin-top: 5px;
+  color: rgba(220, 242, 247, 0.64);
+  font-size: 11px;
+  line-height: 1.38;
+}
+
 .engineering-chart {
   margin: 0 0 14px;
   padding: 12px;
