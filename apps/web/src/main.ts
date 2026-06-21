@@ -409,6 +409,28 @@ function renderMaintenanceReadinessCard(ticket?: WorkflowModule["ticket"], inspe
   `;
 }
 
+function renderWorkOrderWritebackSummary(ticket?: WorkflowModule["ticket"]): string {
+  if (!ticket) return "";
+
+  return `
+    <section class="workorder-writeback-summary" aria-label="复盘回写状态">
+      <header>
+        <span>复盘回写</span>
+        <strong data-writeback-summary-state>待现场完成后回写</strong>
+      </header>
+      <div>
+        ${ticket.writebackItems.map((item) => `
+          <article data-writeback-summary-item="pending">
+            <span>${html(item.label)}</span>
+            <strong>${html(item.value)}</strong>
+          </article>
+        `).join("")}
+      </div>
+      <p data-writeback-summary-note>回写完成后，事件会进入复盘样本，AI 诊断记录才允许闭环。</p>
+    </section>
+  `;
+}
+
 function renderBimLocalizationCard(risks: ComponentRisk[] = []): string {
   const primaryRisk = risks.find((risk) => risk.component === "gearbox") ?? risks[0];
   const counterRisks = risks.filter((risk) => risk.component !== primaryRisk?.component);
@@ -802,6 +824,7 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
         <div><dt>作业前提</dt><dd>${html(ticket?.precondition ?? "限功率运行")}</dd></div>
         <div><dt>回写责任</dt><dd>${html((ticket?.writebackItems ?? []).map((item) => item.label).join(" / "))}</dd></div>
       </dl>
+      ${renderWorkOrderWritebackSummary(ticket)}
       <section class="workorder-confirmation">
         <header>
           <span>人工确认门</span>
@@ -1738,6 +1761,33 @@ function dispatchWorkOrder(): void {
   setBimStatus("工单已通过人工确认并派发，等待现场复核回写");
 }
 
+function updateWorkOrderWritebackSummary(): void {
+  const ticket = activeWorkflowCase.modules.workorder.ticket;
+  const summaryState = document.querySelector<HTMLElement>("[data-writeback-summary-state]");
+  const summaryNote = document.querySelector<HTMLElement>("[data-writeback-summary-note]");
+  const completedValues = [
+    "铁谱/颗粒度报告已上传",
+    "高速轴轴承与齿面照片已归档",
+    "复测频谱已形成对比结论",
+    "已写入 AI 诊断样本",
+  ];
+
+  if (summaryState) summaryState.textContent = ticket?.closedState ?? "现场复核完成";
+  if (summaryNote) summaryNote.textContent = activeWorkflowCase.statuses.ticketClosed;
+
+  document.querySelectorAll<HTMLElement>("[data-writeback-summary-item]").forEach((item, index) => {
+    item.dataset.writebackSummaryItem = "done";
+    const statusText = item.querySelector("strong");
+    if (statusText) statusText.textContent = completedValues[index] ?? "已回写";
+  });
+
+  document.querySelectorAll<HTMLElement>("[data-writeback-item]").forEach((item, index) => {
+    item.dataset.status = "done";
+    const statusText = item.querySelector("small");
+    if (statusText) statusText.textContent = completedValues[index] ?? statusText.textContent?.replace(/^待/, "已") ?? "已回写";
+  });
+}
+
 function bindAgentResultEvents(container: HTMLElement): void {
   container.querySelectorAll<HTMLButtonElement>("[data-agent-open-module]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1870,13 +1920,7 @@ function bindWorkflowSurfaceEvents(): void {
       button.textContent = ticket?.closedActionLabel ?? "现场复核已完成";
       button.disabled = true;
     }
-    document.querySelectorAll<HTMLElement>("[data-writeback-item]").forEach((item) => {
-      item.dataset.status = "done";
-      const statusText = item.querySelector("small");
-      if (statusText && statusText.textContent?.startsWith("待")) {
-        statusText.textContent = statusText.textContent.replace(/^待/, "已");
-      }
-    });
+    updateWorkOrderWritebackSummary();
     setEventTimelineStage("review-writeback");
     setBimStatus(activeWorkflowCase.statuses.ticketClosed);
   });

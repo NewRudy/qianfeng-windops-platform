@@ -2866,6 +2866,73 @@ button {
   margin-bottom: 12px;
 }
 
+.workorder-writeback-summary {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid rgba(91, 224, 246, 0.15);
+  background:
+    linear-gradient(135deg, rgba(4, 28, 39, 0.76), rgba(2, 13, 22, 0.7)),
+    radial-gradient(circle at 0 0, rgba(86, 240, 111, 0.1), transparent 34%);
+}
+
+.workorder-writeback-summary header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.workorder-writeback-summary header span {
+  color: rgba(91, 224, 246, 0.78);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.workorder-writeback-summary header strong {
+  color: #fff0c8;
+  font-size: 13px;
+}
+
+.workorder-writeback-summary > div {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.workorder-writeback-summary article {
+  min-height: 76px;
+  padding: 9px;
+  border: 1px solid rgba(91, 224, 246, 0.1);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.workorder-writeback-summary article[data-writeback-summary-item="done"] {
+  border-color: rgba(86, 240, 111, 0.32);
+  background: rgba(86, 240, 111, 0.06);
+}
+
+.workorder-writeback-summary article span {
+  color: rgba(220, 242, 247, 0.62);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.workorder-writeback-summary article strong {
+  display: block;
+  margin-top: 6px;
+  color: #ffffff;
+  font-size: 12px;
+  line-height: 1.34;
+}
+
+.workorder-writeback-summary p {
+  margin: 0;
+  color: rgba(220, 242, 247, 0.68);
+  font-size: 11px;
+  line-height: 1.42;
+}
+
 .workorder-confirmation,
 .workorder-writeback {
   display: grid;

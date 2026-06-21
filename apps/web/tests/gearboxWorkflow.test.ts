@@ -206,6 +206,10 @@ describe("gearbox workflow case", () => {
       "CMS 复测频谱",
       "AI 样本标签",
     ]);
+    expect(ticket?.writebackItems.map((item) => item.value).join(" ")).toContain("待现场上传");
+    expect(ticket?.writebackItems.map((item) => item.value).join(" ")).toContain("待写入复盘样本");
+    expect(ticket?.closedState).toBe("现场复核完成");
+    expect(ticket?.closedActionLabel).toBe("现场复核已完成");
     expect(ticket?.finalCode).toBe("WO-GX-20260621-02");
     expect(ticket?.priority).toBe("P1 高优先级");
     expect(ticket?.assignee).toBe("传动链专业班组");
@@ -219,7 +223,8 @@ describe("gearbox workflow case", () => {
     expect(ticket?.steps[0].owner).toBe("集控值班长");
     expect(ticket?.acceptanceCriteria.join(" ")).toContain("油液");
     expect(ticket?.writebackItems).toHaveLength(4);
-    expect(gearboxWorkflowCase.statuses.ticketClosed).toContain("回写");
+    expect(gearboxWorkflowCase.statuses.ticketClosed).toContain("回写完成");
+    expect(gearboxWorkflowCase.statuses.ticketClosed).toContain("复盘样本");
   });
 
   it("derives dashboard values from the diagnostic input data", () => {
