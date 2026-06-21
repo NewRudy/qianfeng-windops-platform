@@ -123,6 +123,25 @@ describe("gearbox workflow case", () => {
     expect(inspectionText).toContain("油液取样");
   });
 
+  it("keeps alarm, inspection, and maintenance as operator decisions with human gates", () => {
+    const decisionModules = [
+      gearboxWorkflowCase.modules.alerts,
+      gearboxWorkflowCase.modules.inspection,
+      gearboxWorkflowCase.modules.maintenance,
+    ];
+
+    decisionModules.forEach((module) => {
+      expect(module.decision?.operation).toBeTruthy();
+      expect(module.decision?.evidence).toMatch(/SCADA|CMS|齿轮箱|剩余可运行/);
+      expect(module.decision?.model).toMatch(/规则|故障树|策略/);
+      expect(module.decision?.result).toBeTruthy();
+      expect(module.decision?.confirm).toMatch(/确认|才/);
+    });
+    expect(gearboxWorkflowCase.modules.alerts.action?.module).toBe("inspection");
+    expect(gearboxWorkflowCase.modules.inspection.action?.module).toBe("maintenance");
+    expect(gearboxWorkflowCase.modules.maintenance.action?.module).toBe("workorder");
+  });
+
   it("defines professional chart axes for SCADA, CMS, and bolt monitoring", () => {
     const scadaChart = gearboxWorkflowCase.modules.scada.scadaChart;
     const cmsChart = gearboxWorkflowCase.modules.cms.cmsChart;

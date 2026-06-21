@@ -1229,6 +1229,72 @@ button {
   border-top: 1px solid rgba(91, 224, 246, 0.12);
 }
 
+.operation-review-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(246, 197, 104, 0.22);
+  background:
+    linear-gradient(180deg, rgba(43, 28, 7, 0.54), rgba(2, 14, 22, 0.84)),
+    radial-gradient(circle at 0 0, rgba(246, 197, 104, 0.12), transparent 32%);
+  box-shadow: inset 3px 0 0 rgba(246, 197, 104, 0.56);
+}
+
+.operation-review-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.operation-review-card header span,
+.operation-review-card footer span {
+  color: rgba(246, 197, 104, 0.82);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.operation-review-card header strong {
+  color: #fff8e6;
+  font-size: 15px;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.operation-review-card dl {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.operation-review-card dl div {
+  display: grid;
+  grid-template-columns: 50px 1fr;
+  gap: 9px;
+  align-items: start;
+}
+
+.operation-review-card dt {
+  color: rgba(91, 224, 246, 0.78);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.operation-review-card dd,
+.operation-review-card footer p {
+  margin: 0;
+  color: rgba(232, 248, 251, 0.8);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.operation-review-card footer {
+  display: grid;
+  gap: 5px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(246, 197, 104, 0.13);
+}
+
 .module-evidence-note {
   padding: 9px;
   border: 1px solid rgba(91, 224, 246, 0.1);

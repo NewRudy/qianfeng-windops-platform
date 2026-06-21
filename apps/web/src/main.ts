@@ -352,6 +352,28 @@ function renderEvidenceReviewCard(decision?: WorkflowDecision): string {
   `;
 }
 
+function renderOperationReviewCard(decision?: WorkflowDecision, context?: string): string {
+  if (!decision) return "";
+
+  return `
+    <article class="operation-review-card">
+      <header>
+        <span>${context ? html(context) : "操作复核"}</span>
+        <strong>${html(decision.operation)}</strong>
+      </header>
+      <dl>
+        <div><dt>为什么</dt><dd>${html(decision.evidence)}</dd></div>
+        <div><dt>判据</dt><dd>${html(decision.model)}</dd></div>
+        <div><dt>结论</dt><dd>${html(decision.result)}</dd></div>
+      </dl>
+      <footer>
+        <span>人工确认</span>
+        <p>${html(decision.confirm)}</p>
+      </footer>
+    </article>
+  `;
+}
+
 function renderEventTimeline(steps: EventTimelineStep[]): string {
   return `
     <section class="event-timeline" aria-label="值班事件闭环">
@@ -570,14 +592,10 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-alerts">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        ${renderDecisionCard(module.decision)}
-        <article class="alarm-card">
-          <span>ORANGE</span>
-          <strong>${html(workflowCase.turbineId)} ${html(workflowCase.eventCode)}</strong>
-          <p>${html(module.body ?? "")}</p>
-        </article>
+        ${renderOperationReviewCard(module.decision, `${workflowCase.turbineId} ${workflowCase.eventCode}`)}
         <details class="module-evidence-stack">
-          <summary>展开告警证据链</summary>
+          <summary>展开告警证据链与事件说明</summary>
+          ${renderModuleEvidenceNote(module.body)}
           <ul class="event-list">${renderEvidenceRows(module.evidenceRows)}</ul>
         </details>
         ${renderAction(module.action)}
@@ -590,11 +608,11 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-inspection">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        ${renderDecisionCard(module.decision)}
+        ${renderOperationReviewCard(module.decision)}
         <dl>${renderMetrics(module.metrics)}</dl>
-        <p>${html(module.body ?? "")}</p>
         <details class="module-evidence-stack">
-          <summary>展开排查清单</summary>
+          <summary>展开排查原则与清单</summary>
+          ${renderModuleEvidenceNote(module.body)}
           <ol class="inspection-list">${renderInspectionItems(module.inspectionItems)}</ol>
         </details>
         ${renderAction(module.action)}
@@ -607,9 +625,12 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-maintenance">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        ${renderDecisionCard(module.decision)}
+        ${renderOperationReviewCard(module.decision)}
         <dl>${renderMetrics(module.metrics)}</dl>
-        <p>${html(module.body ?? "")}</p>
+        <details class="module-evidence-stack">
+          <summary>展开维护策略说明</summary>
+          ${renderModuleEvidenceNote(module.body)}
+        </details>
         ${renderAction(module.action, " data-create-workorder")}
       </section>
     `;
