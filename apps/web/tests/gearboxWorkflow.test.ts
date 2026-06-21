@@ -117,7 +117,7 @@ describe("gearbox workflow case", () => {
     const alerts = gearboxWorkflowCase.modules.alerts;
     const inspection = gearboxWorkflowCase.modules.inspection;
     const statuses = inspection.inspectionItems?.map((item) => item.status);
-    const inspectionText = inspection.inspectionItems?.map((item) => `${item.step} ${item.result} ${item.basis}`).join(" ");
+    const inspectionText = inspection.inspectionItems?.map((item) => `${item.step} ${item.result} ${item.basis} ${item.decisionEffect}`).join(" ");
 
     expect(alerts.action?.module).toBe("inspection");
     expect(alerts.body).toContain("BIM 中定位齿轮箱主疑似部件");
@@ -131,6 +131,10 @@ describe("gearbox workflow case", () => {
     expect(inspectionText).toContain("齿轮箱高速轴轴承");
     expect(inspectionText).toContain("叶根结构主故障");
     expect(inspectionText).toContain("油液取样");
+    expect(inspectionText).toContain("后续工单不再泛化为整机巡检");
+    expect(inspectionText).toContain("预测维护升级为低风速窗口计划检修");
+    expect(inspection.decision?.result).toContain("排除无关工单");
+    expect(inspection.decision?.result).toContain("决定升级条件");
   });
 
   it("keeps alarm, inspection, and maintenance as operator decisions with human gates", () => {

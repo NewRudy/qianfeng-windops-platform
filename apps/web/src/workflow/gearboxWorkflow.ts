@@ -97,6 +97,7 @@ export type WorkflowDecision = {
 
 export type InspectionItem = {
   basis: string;
+  decisionEffect: string;
   owner: string;
   result: string;
   status: "confirmed" | "excluded" | "pending";
@@ -765,18 +766,19 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       },
       inspection: {
         action: { label: "形成维护策略", module: "maintenance", primary: true },
-        body: "排查原则：先锁定传动链主风险，再排除叶根/塔筒结构主风险；现场复核只保留能改变处置策略的动作。",
+        body: "排查原则：先锁定传动链主风险，再排除叶根/塔筒结构主风险；现场复核只保留能改变处置策略、工单范围或运行限制的动作。",
         decision: {
           confirm: "现场班组确认复核动作可执行后，才转为预测维护策略，不把所有告警都派成检修单。",
-          evidence: "主风险已锁定齿轮箱高速轴轴承；叶根结构主故障被排除；油液、内窥、CMS 复测会改变后续处置。",
+          evidence: "主风险已锁定齿轮箱高速轴轴承；叶根结构主故障被排除；油液、内窥、CMS 复测会决定是否升级计划检修。",
           input: "告警证据、BIM 定位、结构反证、现场可执行窗口",
           model: "故障树排查 + 能改变决策的最小检查项",
           operation: "生成隐患排查路径",
-          result: "保留 4 项排查动作，剔除无关巡检项",
+          result: "保留 4 项排查动作：1 项锁定维护对象、1 项排除无关工单、2 项决定升级条件",
         },
         inspectionItems: [
           {
             basis: `SCADA 最大功率缺口 ${formatSignedPct(diagnostics.maxPowerShortfallPct)}，CMS 侧频 ${formatFixed(diagnostics.cmsSidebandRatio)}x 基线`,
+            decisionEffect: "维护对象锁定为齿轮箱高速轴轴承，后续工单不再泛化为整机巡检。",
             owner: "诊断工程师",
             result: "齿轮箱高速轴轴承早期磨损作为主隐患",
             status: "confirmed",
@@ -784,6 +786,7 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
           },
           {
             basis: `最低螺栓通道 ${diagnostics.boltLowestChannel.id}，松弛 ${formatFixed(diagnostics.boltLowestChannel.relaxationPct)}%`,
+            decisionEffect: "叶根/塔筒不生成独立检修单，只作为山地阵风载荷放大因素继续跟踪。",
             owner: "结构工程师",
             result: "作为载荷放大因素跟踪，暂不升级为叶根结构主故障",
             status: "excluded",
@@ -791,6 +794,7 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
           },
           {
             basis: `油温同场偏高 ${formatFixed(diagnostics.oilTempDeltaC)} ℃，建议 ${input.maintenance.actionWindowHours} 内复核`,
+            decisionEffect: "若铁谱或内窥异常，预测维护升级为低风速窗口计划检修。",
             owner: "现场班组",
             result: "停机窗口执行油液取样、铁谱和内窥复核",
             status: "pending",
@@ -798,6 +802,7 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
           },
           {
             basis: `预计剩余可运行 ${input.maintenance.estimatedRemainingHours} h，当前策略 ${input.maintenance.workMode}`,
+            decisionEffect: "复核前维持限功率策略；若复测回落，工单降级为跟踪观察。",
             owner: "值长/调度",
             result: "复核前按建议限功率运行，若铁谱异常则升级计划检修",
             status: "pending",

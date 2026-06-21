@@ -319,20 +319,61 @@ function renderModelGates(gates: ModelGate[] = []): string {
 }
 
 function renderInspectionItems(items: InspectionItem[] = []): string {
+  const statusLabels: Record<InspectionItem["status"], string> = {
+    confirmed: "已确认",
+    excluded: "已排除",
+    pending: "待复核",
+  };
+
   return items
     .map(
       (item) => `
         <li class="${html(item.status)}">
-          <span>${html(item.step)}</span>
+          <span>
+            <b>${html(statusLabels[item.status])}</b>
+            ${html(item.step)}
+          </span>
           <div>
             <strong>${html(item.result)}</strong>
             <p>${html(item.basis)}</p>
+            <small>影响：${html(item.decisionEffect)}</small>
           </div>
           <em>${html(item.owner)}</em>
         </li>
       `,
     )
     .join("");
+}
+
+function renderInspectionOutcomeBoard(items: InspectionItem[] = []): string {
+  if (items.length === 0) return "";
+
+  const confirmed = items.filter((item) => item.status === "confirmed");
+  const excluded = items.filter((item) => item.status === "excluded");
+  const pending = items.filter((item) => item.status === "pending");
+
+  const summarize = (matchedItems: InspectionItem[], fallback: string) =>
+    matchedItems.map((item) => item.decisionEffect).join("；") || fallback;
+
+  return `
+    <section class="inspection-outcome-board" aria-label="隐患排查结果对维护策略的影响">
+      <article class="confirmed">
+        <span>确认 ${confirmed.length}</span>
+        <strong>锁定维护对象</strong>
+        <p>${html(summarize(confirmed, "等待确认主疑似部件。"))}</p>
+      </article>
+      <article class="excluded">
+        <span>排除 ${excluded.length}</span>
+        <strong>收窄工单范围</strong>
+        <p>${html(summarize(excluded, "暂无可排除项。"))}</p>
+      </article>
+      <article class="pending">
+        <span>待复核 ${pending.length}</span>
+        <strong>决定升级条件</strong>
+        <p>${html(summarize(pending, "等待现场复核窗口。"))}</p>
+      </article>
+    </section>
+  `;
 }
 
 function renderBimLocalizationCard(risks: ComponentRisk[] = []): string {
@@ -684,6 +725,7 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
         <h3>${html(module.title)}</h3>
         ${renderOperationReviewCard(module.decision)}
         <dl>${renderMetrics(module.metrics)}</dl>
+        ${renderInspectionOutcomeBoard(module.inspectionItems)}
         <details class="module-evidence-stack">
           <summary>展开排查原则与清单</summary>
           ${renderModuleEvidenceNote(module.body)}

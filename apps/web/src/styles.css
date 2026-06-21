@@ -2420,9 +2420,20 @@ button {
 }
 
 .inspection-list span {
+  display: grid;
+  gap: 5px;
   color: rgba(91, 224, 246, 0.74);
   font-size: 11px;
   font-weight: 900;
+}
+
+.inspection-list span b {
+  width: max-content;
+  padding: 3px 7px;
+  border: 1px solid rgba(91, 224, 246, 0.18);
+  background: rgba(91, 224, 246, 0.08);
+  color: #ffffff;
+  font-size: 10px;
 }
 
 .inspection-list strong {
@@ -2438,12 +2449,69 @@ button {
   line-height: 1.44;
 }
 
+.inspection-list small {
+  display: block;
+  margin-top: 6px;
+  color: rgba(246, 197, 104, 0.82);
+  font-size: 11px;
+  line-height: 1.42;
+}
+
 .inspection-list em {
   color: #f6c568;
   font-size: 12px;
   font-style: normal;
   font-weight: 900;
   white-space: nowrap;
+}
+
+.inspection-outcome-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  margin: 12px 0 0;
+}
+
+.inspection-outcome-board article {
+  min-height: 104px;
+  padding: 10px;
+  border: 1px solid rgba(91, 224, 246, 0.13);
+  border-top: 3px solid rgba(91, 224, 246, 0.52);
+  background:
+    linear-gradient(180deg, rgba(6, 33, 48, 0.74), rgba(3, 13, 22, 0.74)),
+    radial-gradient(circle at 0 0, rgba(91, 224, 246, 0.11), transparent 38%);
+}
+
+.inspection-outcome-board article.confirmed {
+  border-top-color: #56f06f;
+}
+
+.inspection-outcome-board article.excluded {
+  border-top-color: rgba(160, 232, 244, 0.7);
+}
+
+.inspection-outcome-board article.pending {
+  border-top-color: #f6c568;
+}
+
+.inspection-outcome-board span {
+  color: rgba(91, 224, 246, 0.76);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.inspection-outcome-board strong {
+  display: block;
+  margin-top: 7px;
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.inspection-outcome-board p {
+  margin: 6px 0 0;
+  color: rgba(220, 242, 247, 0.7);
+  font-size: 11px;
+  line-height: 1.42;
 }
 
 .engineering-chart {
