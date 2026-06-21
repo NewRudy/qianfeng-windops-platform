@@ -84,16 +84,29 @@ describe("WindOps diagnostic agent", () => {
     expect(result.intent).toBe("workorder");
     expect(result.operatorFocus.recommendedModule).toBe("workorder");
     expect(result.workOrderDraft?.status).toBe("草案待确认");
+    expect(result.answerText).toContain("低风速作业窗口");
+    expect(result.answerText).toContain("AI 不负责停机");
+    expect(result.workOrderDraft?.confirmationChecks.map((check) => check.label)).toEqual([
+      "低风速作业窗口",
+      "安全许可与运行方式",
+      "备件与工器具",
+      "复盘回写责任",
+    ]);
+    expect(result.workOrderDraft?.writebackItems.map((item) => item.label)).toContain("AI 样本标签");
+    expect(result.reportSections.at(-1)?.body).toContain("派发前确认");
+    expect(result.reportSections.at(-1)?.body).toContain("验收标准");
   });
 
   it("guards model wording from claiming automatic dispatch or execution", () => {
     const guarded = enforceAgentAnswerBoundaries(
-      "下一步：已自动生成一份现场复核工单草案，并正式派发，立即执行。",
+      "下一步：已自动生成一份现场复核工单草案，并正式派发，自动停机、自动登塔后立即执行。",
       "explain_alarm",
     );
 
     expect(guarded).not.toContain("自动生成");
     expect(guarded).not.toContain("正式派发");
+    expect(guarded).not.toContain("自动停机");
+    expect(guarded).not.toContain("自动登塔");
     expect(guarded).not.toContain("立即执行");
     expect(guarded).toContain("值长确认");
     expect(guarded).toContain("人工确认");
@@ -133,5 +146,8 @@ describe("WindOps diagnostic agent", () => {
     expect(prompt).toContain("HS-WTG-02");
     expect(prompt).toContain("SCADA");
     expect(prompt).toContain("待人工确认");
+    expect(prompt).toContain("工单确认门");
+    expect(prompt).toContain("复盘回写责任");
+    expect(prompt).toContain("工单验收标准");
   });
 });

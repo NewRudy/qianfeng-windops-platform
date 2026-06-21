@@ -60,6 +60,12 @@ export type AgentWorkOrderDraft = {
   asset: string;
   assignee: string;
   code: string;
+  confirmationChecks: Array<{
+    detail: string;
+    id: string;
+    label: string;
+    owner: string;
+  }>;
   dueWindow: string;
   priority: string;
   safetyRequirement: string;
@@ -68,6 +74,10 @@ export type AgentWorkOrderDraft = {
     action: string;
     owner: string;
     output: string;
+  }>;
+  writebackItems: Array<{
+    label: string;
+    value: string;
   }>;
 };
 
@@ -253,11 +263,13 @@ export function buildAgentWorkOrderDraft(workflowCase: GearboxWorkflowCase): Age
     asset: ticket.asset,
     assignee: ticket.assignee,
     code: ticket.finalCode,
+    confirmationChecks: ticket.confirmationChecks,
     dueWindow: ticket.dueWindow,
     priority: ticket.priority,
     safetyRequirement: ticket.safetyRequirement,
     status: "草案待确认",
     steps: ticket.steps,
+    writebackItems: ticket.writebackItems,
   };
 }
 
@@ -335,12 +347,14 @@ export function buildFallbackAgentAnswer(intent: AgentIntent, workflowCase: Gear
     return [
       `建议先按 ${maintenance.metrics?.find((item) => item.label === "建议运行方式")?.value ?? "限功率"} 运行，等待低风速窗口复核。`,
       maintenance.body ?? "复核动作包含油液取样、内窥检查和 CMS 复测。",
+      "值长确认低风速窗口、安全许可和现场资源后，处置策略才可转工单；AI 不负责停机、登塔或检修。",
     ].join("\n");
   }
   if (intent === "workorder") {
     return [
       `工单草案建议由 ${ticket?.assignee ?? "传动链专业班组"} 执行，优先级 ${ticket?.priority ?? "P1"}。`,
       `作业窗口 ${ticket?.dueWindow ?? "48-72 h"}，完成油液、内窥、CMS 复测后再关闭告警。`,
+      "这只是草案；低风速作业窗口、安全许可与运行方式、备件工器具、复盘回写责任四项确认后才允许派发，AI 不负责停机、登塔或执行。",
     ].join("\n");
   }
   if (intent === "report") {
@@ -358,6 +372,9 @@ export function buildFallbackAgentAnswer(intent: AgentIntent, workflowCase: Gear
 export function buildAgentReportSections(intent: AgentIntent, workflowCase: GearboxWorkflowCase, answerText: string): AgentReportSection[] {
   const brief = workflowCase.modules.brief.aiBrief;
   const maintenance = workflowCase.modules.maintenance;
+  const ticket = workflowCase.modules.workorder.ticket;
+  const confirmationSummary = ticket?.confirmationChecks.map((item) => `${item.label}（${item.owner}）`).join("；");
+  const acceptanceSummary = ticket?.acceptanceCriteria.join("；");
   return [
     {
       title: "当前判断",
@@ -373,7 +390,10 @@ export function buildAgentReportSections(intent: AgentIntent, workflowCase: Gear
     },
     {
       title: intent === "workorder" ? "工单草案" : "处置建议",
-      body: maintenance.body ?? brief?.recommendedAction ?? "进入预测维护流程并等待人工确认。",
+      body:
+        intent === "workorder"
+          ? `派发前确认：${confirmationSummary ?? "低风速窗口、安全许可、资源和回写责任"}。验收标准：${acceptanceSummary ?? "现场复核材料上传并完成模型样本回写"}。`
+          : maintenance.body ?? brief?.recommendedAction ?? "进入预测维护流程并等待人工确认。",
     },
   ];
 }
@@ -381,12 +401,15 @@ export function buildAgentReportSections(intent: AgentIntent, workflowCase: Gear
 export function buildAgentPrompt(intent: AgentIntent, question: string, workflowCase: GearboxWorkflowCase): string {
   const brief = workflowCase.modules.brief.aiBrief;
   const evidence = buildAgentEvidenceCards(workflowCase);
+  const ticket = workflowCase.modules.workorder.ticket;
+  const confirmationChecks = ticket?.confirmationChecks.map((item) => `${item.label}/${item.owner}:${item.detail}`).join("；");
+  const acceptanceCriteria = ticket?.acceptanceCriteria.join("；");
   return [
     "你是黔风智维平台的风电运维 AI 值班诊断员。",
     "请只基于下列工具输出回答，不编造真实接入、自动停机、准确率或企业客户。",
-    "回答要像现场工程师能用的结论：先判断，再给证据，再给下一步。最多 5 句。",
-    "如果用户问工单，只能生成草案，必须说明待人工确认。",
-    "除非用户明确问工单或处置策略，不要说已经生成工单；严禁说自动生成、自动派发、立即执行。",
+    "回答要像现场工程师能用的结论：先判断，再给证据，再给下一步人工动作。最多 5 句。",
+    "如果用户问工单，只能生成草案，必须说明待人工确认，并列出派发前确认门。",
+    "除非用户明确问工单或处置策略，不要说已经生成工单；严禁说自动生成、自动派发、自动派单、自动停机、自动登塔、立即执行。",
     "",
     `用户问题：${question || "解释当前预警"}`,
     `意图：${intent}`,
@@ -394,6 +417,8 @@ export function buildAgentPrompt(intent: AgentIntent, question: string, workflow
     `诊断结论：${brief?.conclusion ?? ""}`,
     `建议动作：${brief?.recommendedAction ?? ""}`,
     `证据卡：${evidence.map((item) => `${item.source}:${item.value}:${item.interpretation}`).join("；")}`,
+    `工单确认门：${confirmationChecks ?? "低风速窗口、安全许可、备件工器具、复盘回写责任"}`,
+    `工单验收标准：${acceptanceCriteria ?? "现场复核材料上传并完成样本回写"}`,
   ].join("\n");
 }
 
@@ -401,6 +426,11 @@ export function enforceAgentAnswerBoundaries(answerText: string, intent: AgentIn
   let guarded = answerText
     .replace(/自动生成/g, "生成草案")
     .replace(/自动派发/g, "人工确认后派发")
+    .replace(/自动派单/g, "人工确认后派单")
+    .replace(/自动停机/g, "人工确认后停机")
+    .replace(/自动登塔/g, "人工确认后登塔")
+    .replace(/自动检修/g, "人工确认后检修")
+    .replace(/自动执行/g, "人工确认后执行")
     .replace(/正式派发/g, "人工确认后派发")
     .replace(/立即执行/g, "人工确认后执行");
 

@@ -1059,6 +1059,12 @@ type AiDiagnosisResponse = {
     asset: string;
     assignee: string;
     code: string;
+    confirmationChecks: Array<{
+      detail: string;
+      id: string;
+      label: string;
+      owner: string;
+    }>;
     dueWindow: string;
     priority: string;
     safetyRequirement: string;
@@ -1067,6 +1073,10 @@ type AiDiagnosisResponse = {
       action: string;
       owner: string;
       output: string;
+    }>;
+    writebackItems: Array<{
+      label: string;
+      value: string;
     }>;
   };
 };
@@ -1284,11 +1294,34 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
             <div><dt>对象</dt><dd>${html(result.workOrderDraft.asset)}</dd></div>
             <div><dt>窗口</dt><dd>${html(result.workOrderDraft.dueWindow)}</dd></div>
           </dl>
+          <section class="agent-confirmation-gates">
+            <h4>派发前确认门</h4>
+            ${result.workOrderDraft.confirmationChecks.map((check) => `
+              <article>
+                <span>${html(check.owner)}</span>
+                <strong>${html(check.label)}</strong>
+                <p>${html(check.detail)}</p>
+              </article>
+            `).join("")}
+          </section>
           <ol>
             ${result.workOrderDraft.steps.map((step, index) => `
               <li><span>${String(index + 1).padStart(2, "0")}</span><strong>${html(step.action)}</strong><small>${html(step.owner)} / ${html(step.output)}</small></li>
             `).join("")}
           </ol>
+          <details class="agent-workorder-review">
+            <summary>验收与回写要求</summary>
+            <div>
+              <section>
+                <h4>验收标准</h4>
+                ${result.workOrderDraft.acceptanceCriteria.map((item) => `<p>${html(item)}</p>`).join("")}
+              </section>
+              <section>
+                <h4>复盘回写</h4>
+                ${result.workOrderDraft.writebackItems.map((item) => `<p><strong>${html(item.label)}</strong><span>${html(item.value)}</span></p>`).join("")}
+              </section>
+            </div>
+          </details>
           <button type="button" data-agent-create-workorder>打开工单草案</button>
         </section>
       ` : ""}

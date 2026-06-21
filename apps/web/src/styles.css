@@ -1717,6 +1717,8 @@ button {
 }
 
 .agent-link-grid h4,
+.agent-confirmation-gates h4,
+.agent-workorder-review h4,
 .agent-tool-trace h4,
 .agent-report-sections h4 {
   margin: 0;
@@ -1755,6 +1757,34 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
   margin: 0;
+}
+
+.agent-confirmation-gates {
+  display: grid;
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid rgba(246, 197, 104, 0.2);
+  background: rgba(246, 197, 104, 0.055);
+}
+
+.agent-confirmation-gates article {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid rgba(246, 197, 104, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.agent-confirmation-gates article strong {
+  color: rgba(255, 249, 232, 0.94);
+  font-size: 12px;
+}
+
+.agent-confirmation-gates article p {
+  margin: 0;
+  color: rgba(239, 246, 248, 0.68);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .agent-workorder-card dt {
@@ -1804,6 +1834,48 @@ button {
   color: rgba(216, 239, 243, 0.62);
   font-size: 11px;
   line-height: 1.4;
+}
+
+.agent-workorder-review {
+  padding: 9px;
+  border: 1px solid rgba(91, 224, 246, 0.14);
+  background: rgba(2, 18, 28, 0.56);
+}
+
+.agent-workorder-review summary {
+  cursor: pointer;
+  color: rgba(202, 236, 241, 0.78);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.agent-workorder-review > div {
+  display: grid;
+  gap: 9px;
+  margin-top: 9px;
+}
+
+.agent-workorder-review section {
+  display: grid;
+  gap: 5px;
+}
+
+.agent-workorder-review p {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  color: rgba(222, 246, 249, 0.72);
+  font-size: 11px;
+  line-height: 1.42;
+}
+
+.agent-workorder-review p strong {
+  color: rgba(91, 224, 246, 0.78);
+}
+
+.agent-workorder-review p span {
+  text-align: right;
 }
 
 .agent-workorder-card button {
