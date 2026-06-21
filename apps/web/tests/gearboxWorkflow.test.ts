@@ -153,6 +153,21 @@ describe("gearbox workflow case", () => {
     expect(gearboxWorkflowCase.modules.maintenance.decision?.operation).toBe("计算处置策略");
     expect(gearboxWorkflowCase.modules.workorder.decision?.operation).toBe("生成复核工单草案");
     expect(gearboxWorkflowCase.modules.workorder.decision?.confirm).toContain("确认后才执行");
+    expect(ticket?.confirmationChecks.map((item) => item.label)).toEqual([
+      "低风速作业窗口",
+      "安全许可与运行方式",
+      "备件与工器具",
+      "复盘回写责任",
+    ]);
+    expect(ticket?.confirmationChecks.map((item) => item.owner).join(" ")).toContain("集控值班长");
+    expect(ticket?.dispatchedState).toBe("已派发待现场复核");
+    expect(ticket?.dispatchActionLabel).toBe("确认派发工单");
+    expect(ticket?.writebackItems.map((item) => item.label)).toEqual([
+      "油液铁谱/颗粒度",
+      "内窥照片",
+      "CMS 复测频谱",
+      "AI 样本标签",
+    ]);
     expect(ticket?.finalCode).toBe("WO-GX-20260621-02");
     expect(ticket?.priority).toBe("P1 高优先级");
     expect(ticket?.assignee).toBe("传动链专业班组");

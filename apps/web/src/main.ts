@@ -614,6 +614,24 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
         <span>工器具 / 备件</span>
         <p>${html((ticket?.materials ?? []).join(" / "))}</p>
       </section>
+      <section class="workorder-confirmation">
+        <header>
+          <span>人工确认门</span>
+          <strong>4 项确认后才允许派发</strong>
+        </header>
+        <div class="workorder-confirm-grid">
+          ${(ticket?.confirmationChecks ?? []).map((item) => `
+            <label class="workorder-confirm">
+              <input type="checkbox" data-workorder-confirm="${html(item.id)}" />
+              <span>
+                <b>${html(item.label)}</b>
+                <small>${html(item.owner)} / ${html(item.detail)}</small>
+              </span>
+            </label>
+          `).join("")}
+        </div>
+        <button class="module-action primary" type="button" data-dispatch-workorder disabled>${html(ticket?.dispatchActionLabel ?? "确认派发工单")}</button>
+      </section>
       <details class="module-evidence-stack">
         <summary>展开工单步骤与验收标准</summary>
         <ol class="workorder-steps">
@@ -634,6 +652,12 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
           </ul>
         </section>
       </details>
+      <section class="workorder-writeback">
+        <span>复盘回写</span>
+        <ul>
+          ${(ticket?.writebackItems ?? []).map((item) => `<li data-writeback-item><b>${html(item.label)}</b><small>${html(item.value)}</small></li>`).join("")}
+        </ul>
+      </section>
       <button class="module-action" type="button" data-close-workorder disabled>${html(ticket?.closeActionLabel ?? "标记完成")}</button>
     </section>
   `;
@@ -1387,12 +1411,53 @@ function openGeneratedWorkOrder(status = activeWorkflowCase.statuses.ticketCreat
   const ticket = activeWorkflowCase.modules.workorder.ticket;
   const state = document.querySelector<HTMLElement>("#workorder-state");
   const code = document.querySelector<HTMLElement>("#workorder-code");
-  const button = document.querySelector<HTMLButtonElement>("[data-close-workorder]");
+  const dispatchButton = document.querySelector<HTMLButtonElement>("[data-dispatch-workorder]");
+  const closeButton = document.querySelector<HTMLButtonElement>("[data-close-workorder]");
   if (state) state.textContent = ticket?.generatedState ?? "已生成";
   if (code) code.textContent = ticket?.finalCode ?? "WO-GX-20260621-02";
-  if (button) button.disabled = false;
-  setEventTimelineStage("workorder-draft");
+  document.querySelectorAll<HTMLInputElement>("[data-workorder-confirm]").forEach((input) => {
+    input.disabled = false;
+  });
+  if (dispatchButton) {
+    dispatchButton.disabled = !areWorkOrderConfirmationsReady();
+    dispatchButton.textContent = ticket?.dispatchActionLabel ?? "确认派发工单";
+  }
+  if (closeButton) closeButton.disabled = true;
+  setEventTimelineStage("human-confirm");
   openWorkflowModule("workorder", status);
+}
+
+function areWorkOrderConfirmationsReady(): boolean {
+  const checks = Array.from(document.querySelectorAll<HTMLInputElement>("[data-workorder-confirm]"));
+  return checks.length > 0 && checks.every((input) => input.checked);
+}
+
+function updateWorkOrderConfirmationState(): void {
+  const dispatchButton = document.querySelector<HTMLButtonElement>("[data-dispatch-workorder]");
+  if (!dispatchButton) return;
+  dispatchButton.disabled = !areWorkOrderConfirmationsReady();
+}
+
+function dispatchWorkOrder(): void {
+  const ticket = activeWorkflowCase.modules.workorder.ticket;
+  const state = document.querySelector<HTMLElement>("#workorder-state");
+  const dispatchButton = document.querySelector<HTMLButtonElement>("[data-dispatch-workorder]");
+  const closeButton = document.querySelector<HTMLButtonElement>("[data-close-workorder]");
+  if (!areWorkOrderConfirmationsReady()) {
+    setBimStatus("工单仍有人工确认项未完成，暂不能派发");
+    return;
+  }
+  if (state) state.textContent = ticket?.dispatchedState ?? "已派发待现场复核";
+  document.querySelectorAll<HTMLInputElement>("[data-workorder-confirm]").forEach((input) => {
+    input.disabled = true;
+  });
+  if (dispatchButton) {
+    dispatchButton.textContent = "工单已派发";
+    dispatchButton.disabled = true;
+  }
+  if (closeButton) closeButton.disabled = false;
+  setEventTimelineStage("workorder-draft");
+  setBimStatus("工单已通过人工确认并派发，等待现场复核回写");
 }
 
 function bindAgentResultEvents(container: HTMLElement): void {
@@ -1499,6 +1564,16 @@ function bindWorkflowSurfaceEvents(): void {
     openGeneratedWorkOrder();
   });
 
+  workflowModuleDrawer.querySelectorAll<HTMLInputElement>("[data-workorder-confirm]").forEach((input) => {
+    input.addEventListener("change", () => {
+      updateWorkOrderConfirmationState();
+    });
+  });
+
+  workflowModuleDrawer.querySelector<HTMLButtonElement>("[data-dispatch-workorder]")?.addEventListener("click", () => {
+    dispatchWorkOrder();
+  });
+
   workflowModuleDrawer.querySelector<HTMLButtonElement>("[data-close-workorder]")?.addEventListener("click", () => {
     const ticket = activeWorkflowCase.modules.workorder.ticket;
     const button = document.querySelector<HTMLButtonElement>("[data-close-workorder]");
@@ -1510,6 +1585,13 @@ function bindWorkflowSurfaceEvents(): void {
       button.textContent = ticket?.closedActionLabel ?? "现场复核已完成";
       button.disabled = true;
     }
+    document.querySelectorAll<HTMLElement>("[data-writeback-item]").forEach((item) => {
+      item.dataset.status = "done";
+      const statusText = item.querySelector("small");
+      if (statusText && statusText.textContent?.startsWith("待")) {
+        statusText.textContent = statusText.textContent.replace(/^待/, "已");
+      }
+    });
     setEventTimelineStage("review-writeback");
     setBimStatus(activeWorkflowCase.statuses.ticketClosed);
   });

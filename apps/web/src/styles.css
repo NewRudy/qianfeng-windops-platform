@@ -2207,6 +2207,98 @@ button {
   margin-bottom: 12px;
 }
 
+.workorder-confirmation,
+.workorder-writeback {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid rgba(91, 224, 246, 0.16);
+  background: rgba(2, 18, 27, 0.58);
+}
+
+.workorder-confirmation header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.workorder-confirmation header span,
+.workorder-writeback > span {
+  color: rgba(91, 224, 246, 0.76);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.workorder-confirmation header strong {
+  color: #fff0c8;
+  font-size: 13px;
+}
+
+.workorder-confirm-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.workorder-confirm {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 9px;
+  align-items: start;
+  padding: 9px;
+  border: 1px solid rgba(91, 224, 246, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+  cursor: pointer;
+}
+
+.workorder-confirm input {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  accent-color: #f6c568;
+}
+
+.workorder-confirm b,
+.workorder-writeback b {
+  display: block;
+  color: #ffffff;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.workorder-confirm small,
+.workorder-writeback small {
+  display: block;
+  margin-top: 4px;
+  color: rgba(203, 234, 239, 0.68);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.workorder-writeback ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workorder-writeback li {
+  padding: 9px;
+  border: 1px solid rgba(246, 197, 104, 0.16);
+  background: rgba(246, 197, 104, 0.055);
+}
+
+.workorder-writeback li[data-status="done"] {
+  border-color: rgba(86, 240, 111, 0.26);
+  background: rgba(86, 240, 111, 0.06);
+}
+
+.workorder-writeback li[data-status="done"] small {
+  color: #a8ffb8;
+}
+
 .workorder-section ul {
   display: grid;
   gap: 6px;

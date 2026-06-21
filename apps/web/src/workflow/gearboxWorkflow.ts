@@ -189,8 +189,16 @@ export type WorkflowModule = {
     closeActionLabel: string;
     closedActionLabel: string;
     closedState: string;
+    confirmationChecks: Array<{
+      detail: string;
+      id: string;
+      label: string;
+      owner: string;
+    }>;
     draftCode: string;
     dueWindow: string;
+    dispatchedState: string;
+    dispatchActionLabel: string;
     finalCode: string;
     generatedState: string;
     initialState: string;
@@ -203,6 +211,10 @@ export type WorkflowModule = {
       action: string;
       owner: string;
       output: string;
+    }>;
+    writebackItems: Array<{
+      label: string;
+      value: string;
     }>;
   };
   title: string;
@@ -841,8 +853,36 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
           closeActionLabel: "标记现场复核完成",
           closedActionLabel: "现场复核已完成",
           closedState: "现场复核完成",
+          confirmationChecks: [
+            {
+              detail: "低风速 2h 停机窗口已由集控确认，避免高风速登塔和带病长时间运行。",
+              id: "window",
+              label: "低风速作业窗口",
+              owner: "集控值班长",
+            },
+            {
+              detail: "限功率策略、停机许可、登塔风速许可和双人作业要求已确认。",
+              id: "safety",
+              label: "安全许可与运行方式",
+              owner: "安全员 / 值长",
+            },
+            {
+              detail: "高速轴轴承备件、油液取样瓶、内窥镜和 CMS 复测采集器已可用。",
+              id: "resources",
+              label: "备件与工器具",
+              owner: "检修班组",
+            },
+            {
+              detail: "油液、内窥照片、CMS 复测和样本标签必须回写，用于模型校准。",
+              id: "writeback",
+              label: "复盘回写责任",
+              owner: "运维主管",
+            },
+          ],
           draftCode: "WO-GX-待创建",
           dueWindow: `${input.maintenance.actionWindowHours} / 低风速窗口优先`,
+          dispatchedState: "已派发待现场复核",
+          dispatchActionLabel: "确认派发工单",
           finalCode: `WO-GX-${input.caseDate}-${workOrderSuffix(input.turbineId)}`,
           generatedState: "已生成",
           initialState: "待生成",
@@ -872,6 +912,12 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
               owner: "运维主管",
               output: "闭环记录和样本标签",
             },
+          ],
+          writebackItems: [
+            { label: "油液铁谱/颗粒度", value: "待现场上传" },
+            { label: "内窥照片", value: "待覆盖高速轴轴承与齿面" },
+            { label: "CMS 复测频谱", value: "待与告警窗口对比" },
+            { label: "AI 样本标签", value: "待写入复盘样本" },
           ],
         },
         title: "运维工单",
