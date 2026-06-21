@@ -1,0 +1,239 @@
+import {
+  Cartesian2,
+  Cartesian3,
+  Color,
+  EllipsoidTerrainProvider,
+  HeadingPitchRoll,
+  HeadingPitchRange,
+  Matrix4,
+  Model,
+  ScreenSpaceEventHandler,
+  ScreenSpaceEventType,
+  Transforms,
+  Viewer,
+} from "cesium";
+import type { LocalOffset, SceneConfig, TurbineAsset } from "./sceneConfig";
+import { toViteFsUrl } from "./sceneConfig";
+
+export interface WindFarmScene {
+  focusTurbine: () => void;
+  showMountainOverview: () => void;
+  destroy: () => void;
+}
+
+export interface CreateWindFarmSceneOptions {
+  container: HTMLElement;
+  config: SceneConfig;
+  onTurbineSelected?: (turbine: TurbineAsset) => void;
+}
+
+interface PickableModelId {
+  kind: "turbine";
+  turbineId: string;
+}
+
+export async function createWindFarmScene({
+  container,
+  config,
+  onTurbineSelected,
+}: CreateWindFarmSceneOptions): Promise<WindFarmScene> {
+  const viewer = new Viewer(container, {
+    animation: false,
+    baseLayer: false,
+    baseLayerPicker: false,
+    fullscreenButton: false,
+    geocoder: false,
+    homeButton: false,
+    infoBox: false,
+    navigationHelpButton: false,
+    sceneModePicker: false,
+    selectionIndicator: false,
+    timeline: false,
+    terrainProvider: new EllipsoidTerrainProvider(),
+  });
+
+  viewer.scene.globe.show = false;
+  viewer.scene.skyAtmosphere = undefined;
+  viewer.scene.backgroundColor = Color.fromCssColorString("#07111f");
+  viewer.scene.highDynamicRange = true;
+  hideCesiumCredits(viewer);
+
+  const origin = Cartesian3.fromDegrees(
+    config.origin.longitude,
+    config.origin.latitude,
+    config.origin.height,
+  );
+  const localFrame = Transforms.eastNorthUpToFixedFrame(origin);
+
+  const mountain = await Model.fromGltfAsync({
+    url: toViteFsUrl(config.mountain.absolutePath),
+    modelMatrix: modelMatrixFromOffset(localFrame, config.mountain.offset),
+    scale: config.mountain.scale,
+  });
+  viewer.scene.primitives.add(mountain);
+
+  const turbine = await Model.fromGltfAsync({
+    url: toViteFsUrl(config.turbine.absolutePath),
+    modelMatrix: modelMatrixFromOffset(localFrame, config.turbine.offset),
+    scale: config.turbine.scale,
+    minimumPixelSize: 96,
+  });
+  turbine.id = {
+    kind: "turbine",
+    turbineId: config.turbine.turbineId,
+  } satisfies PickableModelId;
+  viewer.scene.primitives.add(turbine);
+
+  const turbinePosition = Matrix4.multiplyByPoint(
+    localFrame,
+    new Cartesian3(config.turbine.offset.east, config.turbine.offset.north, config.turbine.offset.up),
+    new Cartesian3(),
+  );
+
+  addTurbineGeometry(viewer, localFrame, config.turbine);
+
+  viewer.entities.add({
+    id: `${config.turbine.turbineId}-label`,
+    position: turbinePosition,
+    label: {
+      text: `${config.turbine.name} · 橙色预警`,
+      fillColor: Color.fromCssColorString("#dff7ff"),
+      outlineColor: Color.fromCssColorString("#00111f"),
+      outlineWidth: 3,
+      showBackground: true,
+      backgroundColor: Color.fromCssColorString("rgba(0, 35, 55, 0.72)"),
+      pixelOffset: new Cartesian2(0, -72),
+      font: "14px sans-serif",
+    },
+  });
+
+  const showMountainOverview = () => {
+    viewer.camera.lookAt(
+      origin,
+      new HeadingPitchRange(5.42, -0.62, 3100),
+    );
+  };
+
+  const focusTurbine = () => {
+    onTurbineSelected?.(config.turbine);
+    viewer.camera.lookAt(
+      turbinePosition,
+      new HeadingPitchRange(5.78, -0.28, 520),
+    );
+  };
+
+  showMountainOverview();
+
+  const handler = new ScreenSpaceEventHandler(viewer.canvas);
+  handler.setInputAction((movement: { position: Cartesian2 }) => {
+    const picked = viewer.scene.pick(movement.position);
+    const pickedId = picked?.primitive?.id as PickableModelId | undefined;
+    const pickedEntityId = typeof picked?.id?.id === "string" ? picked.id.id : "";
+    if (pickedId?.kind === "turbine" || pickedEntityId.startsWith(config.turbine.turbineId)) {
+      focusTurbine();
+    }
+  }, ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+
+  return {
+    focusTurbine,
+    showMountainOverview,
+    destroy: () => {
+      handler.destroy();
+      viewer.destroy();
+    },
+  };
+}
+
+function modelMatrixFromOffset(localFrame: Matrix4, offset: LocalOffset): Matrix4 {
+  return Matrix4.multiplyByTranslation(
+    localFrame,
+    new Cartesian3(offset.east, offset.north, offset.up),
+    new Matrix4(),
+  );
+}
+
+function addTurbineGeometry(viewer: Viewer, localFrame: Matrix4, turbine: TurbineAsset): void {
+  const { towerHeight, towerRadius, nacelleLength, bladeRadius } = turbine.geometry;
+  const towerCenter = pointFromOffset(localFrame, {
+    ...turbine.offset,
+    up: turbine.offset.up + towerHeight / 2,
+  });
+  const nacelleCenter = pointFromOffset(localFrame, {
+    east: turbine.offset.east + nacelleLength / 2,
+    north: turbine.offset.north,
+    up: turbine.offset.up + towerHeight + 10,
+  });
+  const hubOffset = {
+    east: turbine.offset.east + nacelleLength + 7,
+    north: turbine.offset.north,
+    up: turbine.offset.up + towerHeight + 10,
+  };
+  const hub = pointFromOffset(localFrame, hubOffset);
+  const orientation = Transforms.headingPitchRollQuaternion(
+    towerCenter,
+    new HeadingPitchRoll(0, 0, 0),
+  );
+
+  viewer.entities.add({
+    id: `${turbine.turbineId}-tower`,
+    position: towerCenter,
+    orientation,
+    cylinder: {
+      length: towerHeight,
+      topRadius: towerRadius * 0.62,
+      bottomRadius: towerRadius,
+      material: Color.fromCssColorString("rgba(230, 247, 255, 0.95)"),
+    },
+  });
+
+  viewer.entities.add({
+    id: `${turbine.turbineId}-nacelle`,
+    position: nacelleCenter,
+    orientation,
+    box: {
+      dimensions: new Cartesian3(nacelleLength, 16, 16),
+      material: Color.fromCssColorString("rgba(245, 252, 255, 0.96)"),
+    },
+  });
+
+  viewer.entities.add({
+    id: `${turbine.turbineId}-hub`,
+    position: hub,
+    ellipsoid: {
+      radii: new Cartesian3(8, 8, 8),
+      material: Color.fromCssColorString("#ffffff"),
+    },
+  });
+
+  const bladeEnds = [
+    { ...hubOffset, up: hubOffset.up + bladeRadius },
+    { ...hubOffset, north: hubOffset.north - bladeRadius * 0.82, up: hubOffset.up - bladeRadius * 0.48 },
+    { ...hubOffset, north: hubOffset.north + bladeRadius * 0.82, up: hubOffset.up - bladeRadius * 0.48 },
+  ];
+
+  bladeEnds.forEach((bladeEnd, index) => {
+    viewer.entities.add({
+      id: `${turbine.turbineId}-blade-${index + 1}`,
+      polyline: {
+        positions: [hub, pointFromOffset(localFrame, bladeEnd)],
+        width: 5,
+        material: Color.fromCssColorString("rgba(235, 250, 255, 0.98)"),
+      },
+    });
+  });
+}
+
+function pointFromOffset(localFrame: Matrix4, offset: LocalOffset): Cartesian3 {
+  return Matrix4.multiplyByPoint(
+    localFrame,
+    new Cartesian3(offset.east, offset.north, offset.up),
+    new Cartesian3(),
+  );
+}
+
+function hideCesiumCredits(viewer: Viewer): void {
+  const creditContainer = viewer.cesiumWidget.creditContainer as HTMLElement | undefined;
+  if (creditContainer) {
+    creditContainer.style.display = "none";
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "qianfeng-windops-platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm --workspace apps/web run dev",
+    "build": "npm --workspace apps/web run build",
+    "test": "npm --workspace apps/web run test",
+    "typecheck": "npm --workspace apps/web run typecheck"
+  },
+  "workspaces": [
+    "apps/web"
+  ]
+}
