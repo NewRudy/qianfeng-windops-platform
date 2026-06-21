@@ -1,7 +1,7 @@
 # Issue Tracker
 
-The repository is currently local-only.
+Use GitHub Issues in `NewRudy/qianfeng-windops-platform` as the task pool.
 
-After a GitHub remote is created, use GitHub Issues as the task pool. External pull requests are not a request surface by default.
+External pull requests are not a request surface by default. Treat them as code review artifacts only, unless the maintainer explicitly asks to triage PRs as incoming requests.
 
-Before the remote exists, do not create scattered task files. Keep short-term decisions in the conversation and commit only durable repository rules or implementation changes.
+Do not create scattered local task files for platform work. Durable work should be represented as GitHub issues or committed architecture decisions.

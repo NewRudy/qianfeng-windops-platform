@@ -22,7 +22,7 @@
 
 ### Issue tracker
 
-This repository is initialized locally. Use GitHub Issues after the GitHub remote is created. Until then, keep task decisions in the current conversation and commit only durable project rules.
+Use GitHub Issues in `NewRudy/qianfeng-windops-platform` as the task pool. External pull requests are not a request surface by default.
 
 ### Triage labels
 
