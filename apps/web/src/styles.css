@@ -640,6 +640,7 @@ button {
 .shell[data-active-module="cms"] .module-cms,
 .shell[data-active-module="bolts"] .module-bolts,
 .shell[data-active-module="alerts"] .module-alerts,
+.shell[data-active-module="inspection"] .module-inspection,
 .shell[data-active-module="maintenance"] .module-maintenance,
 .shell[data-active-module="workorder"] .module-workorder {
   display: block;
@@ -838,6 +839,65 @@ button {
 }
 
 .model-gate-list em {
+  color: #f6c568;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.inspection-list {
+  display: grid;
+  gap: 9px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inspection-list li {
+  display: grid;
+  grid-template-columns: 74px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 64px;
+  padding: 11px 12px;
+  border: 1px solid rgba(91, 224, 246, 0.14);
+  border-left: 3px solid rgba(91, 224, 246, 0.56);
+  background: rgba(255, 255, 255, 0.052);
+}
+
+.inspection-list li.confirmed {
+  border-left-color: #56f06f;
+}
+
+.inspection-list li.excluded {
+  border-left-color: rgba(160, 232, 244, 0.62);
+}
+
+.inspection-list li.pending {
+  border-left-color: #f6c568;
+}
+
+.inspection-list span {
+  color: rgba(91, 224, 246, 0.74);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.inspection-list strong {
+  display: block;
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.inspection-list p {
+  margin: 4px 0 0;
+  color: rgba(220, 242, 247, 0.68);
+  font-size: 12px;
+  line-height: 1.44;
+}
+
+.inspection-list em {
   color: #f6c568;
   font-size: 12px;
   font-style: normal;

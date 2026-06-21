@@ -1,6 +1,15 @@
 import { activeGearboxCaseInput, gearboxCaseCatalog } from "./gearboxCaseData";
 
-export type WorkflowModuleKey = "health" | "fusion" | "scada" | "cms" | "bolts" | "alerts" | "maintenance" | "workorder";
+export type WorkflowModuleKey =
+  | "health"
+  | "fusion"
+  | "scada"
+  | "cms"
+  | "bolts"
+  | "alerts"
+  | "inspection"
+  | "maintenance"
+  | "workorder";
 
 export type WorkflowMetric = {
   label: string;
@@ -37,6 +46,14 @@ export type ModelGate = {
   result: string;
   rule: string;
   status: "pass" | "watch" | "block";
+};
+
+export type InspectionItem = {
+  basis: string;
+  owner: string;
+  result: string;
+  status: "confirmed" | "excluded" | "pending";
+  step: string;
 };
 
 export type ChartAxis = {
@@ -112,6 +129,7 @@ export type WorkflowModule = {
     text: string;
   };
   kicker: string;
+  inspectionItems?: InspectionItem[];
   modelGates?: ModelGate[];
   metrics?: WorkflowMetric[];
   scadaChart?: ScadaChart;
@@ -331,7 +349,7 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       { component: "tower", module: "bolts", part: "tower", status: "载荷校核", title: "塔筒结构" },
     ],
     eventCode: input.eventCode,
-    moduleOrder: ["health", "fusion", "scada", "cms", "bolts", "alerts", "maintenance", "workorder"],
+    moduleOrder: ["health", "fusion", "scada", "cms", "bolts", "alerts", "inspection", "maintenance", "workorder"],
     modules: {
       health: {
         action: { label: "查看融合判据", module: "fusion" },
@@ -467,7 +485,7 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
         title: "螺栓与结构监测",
       },
       alerts: {
-        action: { label: "生成维护建议", module: "maintenance", primary: true },
+        action: { label: "进入隐患排查", module: "inspection", primary: true },
         body: "SCADA 残差、油温与 CMS 侧频三项证据一致，建议转入预测维护。",
         evidenceRows: [
           {
@@ -500,6 +518,47 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
         ],
         kicker: "Decision / Alarm Center",
         title: "齿轮箱 P1 预警研判",
+      },
+      inspection: {
+        action: { label: "形成维护策略", module: "maintenance", primary: true },
+        body: "排查原则：先锁定传动链主风险，再排除叶根/塔筒结构主风险；现场复核只保留能改变处置策略的动作。",
+        inspectionItems: [
+          {
+            basis: `SCADA 最大功率缺口 ${formatSignedPct(diagnostics.maxPowerShortfallPct)}，CMS 侧频 ${formatFixed(diagnostics.cmsSidebandRatio)}x 基线`,
+            owner: "诊断工程师",
+            result: "齿轮箱高速轴轴承早期磨损作为主隐患",
+            status: "confirmed",
+            step: "锁定主风险",
+          },
+          {
+            basis: `最低螺栓通道 ${diagnostics.boltLowestChannel.id}，松弛 ${formatFixed(diagnostics.boltLowestChannel.relaxationPct)}%`,
+            owner: "结构工程师",
+            result: "作为载荷放大因素跟踪，暂不升级为叶根结构主故障",
+            status: "excluded",
+            step: "排除结构主故障",
+          },
+          {
+            basis: `油温同场偏高 ${formatFixed(diagnostics.oilTempDeltaC)} ℃，建议 ${input.maintenance.actionWindowHours} 内复核`,
+            owner: "现场班组",
+            result: "停机窗口执行油液取样、铁谱和内窥复核",
+            status: "pending",
+            step: "现场复核动作",
+          },
+          {
+            basis: `预计剩余可运行 ${input.maintenance.estimatedRemainingHours} h，当前策略 ${input.maintenance.workMode}`,
+            owner: "值长/调度",
+            result: "复核前按建议限功率运行，若铁谱异常则升级计划检修",
+            status: "pending",
+            step: "运行限制与升级",
+          },
+        ],
+        kicker: "Troubleshooting / Hidden Risk",
+        metrics: [
+          { label: "主风险", value: "齿轮箱高速轴轴承" },
+          { label: "排除项", value: "叶根结构主故障" },
+          { label: "复核动作", value: "油液 + 内窥 + CMS 复测" },
+        ],
+        title: "隐患排查清单",
       },
       maintenance: {
         action: { label: "生成运维工单", module: "workorder", primary: true },

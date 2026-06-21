@@ -12,6 +12,7 @@ import {
   type CmsChart,
   type FusionSignal,
   type GearboxWorkflowCase,
+  type InspectionItem,
   type ModelGate,
   type ScadaChart,
   type WorkflowAction,
@@ -249,6 +250,23 @@ function renderModelGates(gates: ModelGate[] = []): string {
     .join("");
 }
 
+function renderInspectionItems(items: InspectionItem[] = []): string {
+  return items
+    .map(
+      (item) => `
+        <li class="${html(item.status)}">
+          <span>${html(item.step)}</span>
+          <div>
+            <strong>${html(item.result)}</strong>
+            <p>${html(item.basis)}</p>
+          </div>
+          <em>${html(item.owner)}</em>
+        </li>
+      `,
+    )
+    .join("");
+}
+
 function renderAction(action?: WorkflowAction, extraAttribute = ""): string {
   if (!action) return "";
   const primaryClass = action.primary ? " primary" : "";
@@ -361,6 +379,19 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
     `;
   }
 
+  if (moduleKey === "inspection") {
+    return `
+      <section class="module-panel module-inspection">
+        <div class="module-kicker">${html(module.kicker)}</div>
+        <h3>${html(module.title)}</h3>
+        <dl>${renderMetrics(module.metrics)}</dl>
+        <p>${html(module.body ?? "")}</p>
+        <ol class="inspection-list">${renderInspectionItems(module.inspectionItems)}</ol>
+        ${renderAction(module.action)}
+      </section>
+    `;
+  }
+
   if (moduleKey === "maintenance") {
     return `
       <section class="module-panel module-maintenance">
@@ -454,6 +485,7 @@ root.innerHTML = `
           <button class="module-tab" type="button" data-module="cms">CMS</button>
           <button class="module-tab" type="button" data-module="bolts">螺栓监测</button>
           <button class="module-tab" type="button" data-module="alerts">告警中心</button>
+          <button class="module-tab" type="button" data-module="inspection">隐患排查</button>
           <button class="module-tab" type="button" data-module="maintenance">预测维护</button>
           <button class="module-tab" type="button" data-module="workorder">运维工单</button>
         </nav>
@@ -564,7 +596,7 @@ function selectWorkflowCase(caseId: string): void {
   openWorkflowModule(activeModule, `已切换案例：${nextCase.title}`);
   setActiveComponent("gearbox");
 
-  if (["scada", "cms", "alerts", "maintenance", "workorder"].includes(activeModule)) {
+  if (["scada", "cms", "alerts", "inspection", "maintenance", "workorder"].includes(activeModule)) {
     void getBimViewer().focusPart("gearbox");
   }
 }
@@ -642,7 +674,7 @@ function bindWorkflowSurfaceEvents(): void {
       const moduleName = getWorkflowModule(button.dataset.openModule);
       if (!moduleName) return;
       openWorkflowModule(moduleName);
-      if (["scada", "cms", "alerts", "maintenance", "workorder"].includes(moduleName)) {
+      if (["scada", "cms", "alerts", "inspection", "maintenance", "workorder"].includes(moduleName)) {
         setActiveComponent("gearbox");
         void getBimViewer().focusPart("gearbox");
       }

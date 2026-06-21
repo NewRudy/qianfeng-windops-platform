@@ -16,6 +16,7 @@ describe("gearbox workflow case", () => {
       "cms",
       "bolts",
       "alerts",
+      "inspection",
       "maintenance",
       "workorder",
     ]);
@@ -48,6 +49,21 @@ describe("gearbox workflow case", () => {
     expect(evidenceText).toContain("油温");
     expect(evidenceText).toContain("SCADA");
     expect(evidenceText).toContain("CMS");
+  });
+
+  it("turns the alarm into a hidden-risk inspection checklist before maintenance", () => {
+    const alerts = gearboxWorkflowCase.modules.alerts;
+    const inspection = gearboxWorkflowCase.modules.inspection;
+    const statuses = inspection.inspectionItems?.map((item) => item.status);
+    const inspectionText = inspection.inspectionItems?.map((item) => `${item.step} ${item.result} ${item.basis}`).join(" ");
+
+    expect(alerts.action?.module).toBe("inspection");
+    expect(inspection.action?.module).toBe("maintenance");
+    expect(inspection.inspectionItems).toHaveLength(4);
+    expect(statuses).toEqual(["confirmed", "excluded", "pending", "pending"]);
+    expect(inspectionText).toContain("齿轮箱高速轴轴承");
+    expect(inspectionText).toContain("叶根结构主故障");
+    expect(inspectionText).toContain("油液取样");
   });
 
   it("defines professional chart axes for SCADA, CMS, and bolt monitoring", () => {
