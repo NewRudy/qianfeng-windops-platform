@@ -28,7 +28,7 @@ root.innerHTML = `
       <section class="bim-screen" aria-label="单机组 BIM 智驭诊断大屏">
         <header class="bim-header">
           <div>
-            <h2>黔风智维 - 风机组智能预警与故障诊断平台</h2>
+            <h2>黔风智维 - 风电机组智能预警与故障诊断平台</h2>
           </div>
           <strong id="bim-selected-title">HS-WTG-01</strong>
           <button id="close-bim" class="bim-back" type="button">返回 GIS 场景</button>
@@ -38,9 +38,9 @@ root.innerHTML = `
           <div class="blueprint-grid" aria-hidden="true"></div>
           <div id="bim-model-root" class="first-version-bim-canvas" aria-label="风机 BIM 精细模型"></div>
           <div class="bim-stage-hud">
-            <span>整机 BIM 模型</span>
+            <span>HS-WTG 单机透视</span>
             <strong id="bim-status">等待进入单机 BIM 诊断</strong>
-            <em>支持部件点击高亮、整机拆解/复原、疑似构件告警闪烁。</em>
+            <em>点击部件定位；需要证据、工单或维护策略时从下方流程打开。</em>
           </div>
           <div class="bim-stage-actions" aria-label="BIM 模型操作">
             <button id="bim-decompose" type="button">拆解模型</button>
@@ -146,7 +146,7 @@ root.innerHTML = `
         </aside>
 
         <nav class="bim-toolbar" aria-label="业务流程">
-          <button class="module-tab active" type="button" data-module="health">健康评分</button>
+          <button class="module-tab" type="button" data-module="health">健康评分</button>
           <button class="module-tab" type="button" data-module="scada">SCADA</button>
           <button class="module-tab" type="button" data-module="cms">CMS</button>
           <button class="module-tab" type="button" data-module="bolts">螺栓监测</button>
@@ -198,7 +198,7 @@ function setActiveModule(moduleName: string): void {
 
 function openDiagnosis(turbine: TurbineAsset): void {
   dashboardShell.dataset.mode = "bim";
-  setActiveModule("health");
+  setActiveModule("none");
   window.requestAnimationFrame(() => {
     void getBimViewer().initialize();
   });
@@ -210,7 +210,7 @@ function openDiagnosis(turbine: TurbineAsset): void {
 
 function closeDiagnosis(): void {
   dashboardShell.dataset.mode = "intro";
-  setActiveModule("health");
+  setActiveModule("none");
   if (warningActive) {
     getBimViewer().stopWarning();
     warningActive = false;

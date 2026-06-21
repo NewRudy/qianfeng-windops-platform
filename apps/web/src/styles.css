@@ -187,11 +187,12 @@ button {
   z-index: 6;
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% 46%, rgba(30, 151, 186, 0.18), transparent 33%),
-    linear-gradient(rgba(61, 193, 236, 0.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(61, 193, 236, 0.055) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(3, 17, 29, 0.97), rgba(0, 6, 12, 0.98));
-  background-size: auto, 24px 24px, 24px 24px, auto;
+    radial-gradient(circle at 47% 46%, rgba(29, 202, 247, 0.24), transparent 31%),
+    radial-gradient(circle at 48% 56%, rgba(251, 174, 64, 0.09), transparent 18%),
+    linear-gradient(rgba(61, 193, 236, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(61, 193, 236, 0.06) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(3, 16, 29, 0.98), rgba(0, 6, 12, 0.99));
+  background-size: auto, auto, 20px 20px, 20px 20px, auto;
   opacity: 0;
   pointer-events: none;
   visibility: hidden;
@@ -221,6 +222,17 @@ button {
   border-bottom: 1px solid rgba(92, 223, 247, 0.2);
 }
 
+.bim-header::after {
+  position: absolute;
+  right: 18%;
+  bottom: -1px;
+  left: 18%;
+  height: 2px;
+  content: "";
+  background: linear-gradient(90deg, transparent, rgba(63, 221, 255, 0.8), transparent);
+  box-shadow: 0 0 18px rgba(63, 221, 255, 0.42);
+}
+
 .bim-header span,
 .module-panel p,
 .module-panel dt,
@@ -232,7 +244,7 @@ button {
 .bim-header h2 {
   margin: 2px 0 0;
   color: #f6fdff;
-  font-size: 22px;
+  font-size: 19px;
   line-height: 1.1;
   text-shadow: 0 0 18px rgba(88, 226, 255, 0.45);
 }
@@ -253,20 +265,27 @@ button {
 
 .bim-stage {
   position: absolute;
-  inset: 78px 342px 76px 214px;
+  inset: 74px 20px 72px;
   min-width: 0;
+  transition: inset 220ms ease;
+}
+
+.shell[data-mode="bim"]:not([data-active-module="none"]) .bim-stage {
+  inset: 78px 342px 76px 20px;
 }
 
 .blueprint-grid {
   position: absolute;
   inset: 0;
-  border: 1px solid rgba(80, 206, 236, 0.12);
+  border: 1px solid rgba(80, 206, 236, 0.08);
   background:
-    radial-gradient(circle at 42% 45%, rgba(78, 224, 255, 0.12), transparent 24%),
-    linear-gradient(rgba(90, 217, 241, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(90, 217, 241, 0.07) 1px, transparent 1px);
-  background-size: auto, 20px 20px, 20px 20px;
-  mask-image: radial-gradient(circle at 48% 48%, black 55%, transparent 86%);
+    radial-gradient(circle at 46% 46%, rgba(78, 224, 255, 0.16), transparent 28%),
+    linear-gradient(rgba(90, 217, 241, 0.075) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(90, 217, 241, 0.075) 1px, transparent 1px),
+    linear-gradient(rgba(90, 217, 241, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(90, 217, 241, 0.035) 1px, transparent 1px);
+  background-size: auto, 20px 20px, 20px 20px, 100px 100px, 100px 100px;
+  mask-image: radial-gradient(circle at 48% 48%, black 60%, transparent 88%);
 }
 
 .first-version-bim-canvas {
@@ -274,11 +293,12 @@ button {
   inset: 0;
   z-index: 1;
   overflow: hidden;
-  border: 1px solid rgba(80, 206, 236, 0.12);
+  border: 0;
   background:
-    radial-gradient(circle at 51% 52%, rgba(83, 226, 255, 0.12), transparent 28%),
-    radial-gradient(circle at 48% 62%, rgba(246, 197, 104, 0.08), transparent 18%),
-    rgba(0, 9, 16, 0.12);
+    radial-gradient(circle at 47% 46%, rgba(83, 226, 255, 0.13), transparent 30%),
+    radial-gradient(circle at 49% 60%, rgba(246, 197, 104, 0.08), transparent 20%),
+    linear-gradient(90deg, rgba(0, 6, 12, 0.36), transparent 18%, transparent 82%, rgba(0, 6, 12, 0.42)),
+    rgba(0, 9, 16, 0.08);
 }
 
 .bim-webgl {
@@ -289,14 +309,16 @@ button {
 
 .bim-stage-hud {
   position: absolute;
-  top: 16px;
-  left: 18px;
+  top: auto;
+  bottom: 18px;
+  left: 20px;
   z-index: 3;
-  width: min(360px, calc(100% - 36px));
-  padding: 12px 14px;
-  border: 1px solid rgba(91, 224, 246, 0.22);
-  background: linear-gradient(180deg, rgba(5, 26, 38, 0.7), rgba(2, 13, 21, 0.42));
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+  width: min(340px, calc(100% - 40px));
+  padding: 8px 0 8px 14px;
+  border: 0;
+  border-left: 2px solid rgba(91, 224, 246, 0.64);
+  background: linear-gradient(90deg, rgba(2, 14, 24, 0.72), rgba(2, 14, 24, 0.1), transparent);
+  box-shadow: none;
   pointer-events: none;
 }
 
@@ -312,7 +334,7 @@ button {
   display: block;
   margin: 4px 0 3px;
   color: #ffffff;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.35;
 }
 
@@ -326,13 +348,15 @@ button {
 }
 
 .bim-stage-actions button {
-  height: 34px;
-  padding: 0 13px;
-  border: 1px solid rgba(91, 224, 246, 0.34);
-  background: rgba(3, 18, 29, 0.72);
-  color: rgba(235, 250, 253, 0.88);
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid rgba(91, 224, 246, 0.42);
+  background: linear-gradient(180deg, rgba(10, 41, 59, 0.78), rgba(2, 13, 21, 0.78));
+  color: rgba(235, 250, 253, 0.9);
   font-weight: 900;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+  box-shadow:
+    inset 0 0 18px rgba(91, 224, 246, 0.08),
+    0 12px 30px rgba(0, 0, 0, 0.24);
 }
 
 .bim-stage-actions button:hover {
@@ -466,45 +490,46 @@ button {
   position: absolute;
   z-index: 2;
   min-height: 28px;
-  padding: 4px 9px;
-  border: 1px solid rgba(91, 224, 246, 0.22);
-  background: rgba(2, 14, 24, 0.62);
+  padding: 2px 8px;
+  border: 0;
+  border-bottom: 1px solid rgba(91, 224, 246, 0.38);
+  background: linear-gradient(90deg, rgba(2, 14, 24, 0.62), rgba(2, 14, 24, 0.08));
   color: #ffffff;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
   text-shadow: 0 0 12px rgba(73, 223, 255, 0.8);
-  box-shadow: 0 0 20px rgba(73, 223, 255, 0.12);
+  box-shadow: none;
   pointer-events: auto;
 }
 
 .part-label:hover {
-  border-color: rgba(91, 224, 246, 0.86);
-  background: rgba(20, 92, 113, 0.78);
+  color: #67efff;
+  background: linear-gradient(90deg, rgba(12, 79, 101, 0.78), rgba(2, 14, 24, 0.08));
 }
 
 .label-blade {
-  top: 30%;
-  left: 21%;
+  top: 25%;
+  left: 24%;
 }
 
 .label-gearbox {
-  top: 53%;
-  left: 42%;
+  top: 58%;
+  left: 46%;
 }
 
 .label-generator {
-  top: 47%;
-  left: 56%;
-}
-
-.label-yaw {
-  top: 39%;
+  top: 43%;
   left: 58%;
 }
 
+.label-yaw {
+  top: 36%;
+  left: 44%;
+}
+
 .label-tower {
-  bottom: 18%;
-  left: 24%;
+  bottom: 22%;
+  left: 34%;
 }
 
 .component-strip {
@@ -515,6 +540,19 @@ button {
   display: grid;
   gap: 10px;
   width: 178px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-12px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.shell[data-active-module="alerts"] .component-strip,
+.shell[data-active-module="workorder"] .component-strip {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
 }
 
 .component,
@@ -554,7 +592,9 @@ button {
   display: none;
   min-height: 360px;
   padding: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.36);
+  box-shadow:
+    inset 0 0 26px rgba(62, 219, 255, 0.08),
+    0 20px 60px rgba(0, 0, 0, 0.36);
   backdrop-filter: blur(16px);
 }
 

@@ -59,7 +59,7 @@ function setMeshOpacity(mesh: BimMesh, opacity: number): void {
   materialList(mesh.material).forEach((material) => {
     material.transparent = opacity < 1;
     material.opacity = opacity;
-    material.depthWrite = opacity >= 0.5;
+    material.depthWrite = opacity >= 0.78;
   });
 }
 
@@ -232,11 +232,11 @@ export class BimTurbineViewer {
     this.setStatus("正在加载整机 BIM 模型...");
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x04111f);
-    scene.fog = new THREE.Fog(0x04111f, 5.6, 10.2);
+    scene.background = new THREE.Color(0x020b15);
+    scene.fog = new THREE.Fog(0x020b15, 5.4, 10.8);
 
     const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 120);
-    camera.position.set(3.15, 1.6, 3.35);
+    camera.position.set(2.15, 1.05, 2.45);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.domElement.className = "bim-webgl";
@@ -248,8 +248,8 @@ export class BimTurbineViewer {
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.target.set(0.22, 0.12, 0);
-    controls.minDistance = 1.15;
+    controls.target.set(0.1, 0.06, 0.02);
+    controls.minDistance = 0.9;
     controls.maxDistance = 7.2;
     controls.update();
 
@@ -305,52 +305,49 @@ export class BimTurbineViewer {
         loader.loadAsync(SKELETON_MODEL_URL),
       ]);
 
-      const skeletonModel = this.normalizeModel(skeleton.scene, "first_version_skeleton");
-      const equipmentModel = this.normalizeModel(equipment.scene, "first_version_equipment");
+      const sourceGroup = new THREE.Group();
+      sourceGroup.name = "first_version_aligned_layers";
+      const skeletonModel = this.prepareModelLayer(skeleton.scene, "first_version_skeleton");
+      const equipmentModel = this.prepareModelLayer(equipment.scene, "first_version_equipment");
       this.playAnimations(skeletonModel, skeleton.animations);
       this.playAnimations(equipmentModel, equipment.animations);
       skeletonModel.traverse((child) => {
         const mesh = child as BimMesh;
         if (mesh.isMesh) {
+          disposeMaterial(mesh.material);
           mesh.material = new THREE.MeshStandardMaterial({
-            color: 0x18d7f3,
-            opacity: 0.25,
+            color: 0x19dcff,
+            emissive: 0x0a82a4,
+            emissiveIntensity: 0.52,
+            opacity: 0.36,
             transparent: true,
             wireframe: true,
+            depthWrite: false,
             roughness: 0.42,
           });
         }
       });
-      group.add(skeletonModel, equipmentModel);
-      this.setStatus("已加载整机 BIM：设备实体层 + 构件骨架层");
+      sourceGroup.add(skeletonModel, equipmentModel);
+      group.add(this.fitModelToFocus(sourceGroup, equipmentModel, 5.15));
+      this.setStatus("整机透视：设备实体层与蓝色骨架层已对齐");
     } catch (error) {
       console.warn("[WindOps BIM] failed to load detailed BIM model, using fallback", error);
-      group.add(buildFallbackTurbine());
+      const fallback = buildFallbackTurbine();
+      this.prepareModelLayer(fallback, "first_version_equipment");
+      group.add(this.fitModelToStage(fallback, 4.2));
       this.setStatus("BIM 模型加载失败，已启用安全备用模型");
     } finally {
       draco.dispose();
     }
 
-    group.rotation.x = -0.12;
+    group.rotation.set(-0.08, -0.38, 0.01);
     scene.add(group);
     this.rootGroup = group;
     this.prepareExplodeTargets(group);
-    this.focusPart("gearbox").catch(() => undefined);
   }
 
-  private normalizeModel(model: THREE.Object3D, name: string): THREE.Object3D {
+  private prepareModelLayer(model: THREE.Object3D, name: string): THREE.Object3D {
     model.name = name;
-    const bounds = new THREE.Box3().setFromObject(model);
-    const size = bounds.getSize(new THREE.Vector3());
-    const maxDimension = Math.max(size.x, size.y, size.z);
-
-    if (Number.isFinite(maxDimension) && maxDimension > 0) {
-      model.scale.multiplyScalar(3.45 / maxDimension);
-      bounds.setFromObject(model);
-      const center = bounds.getCenter(new THREE.Vector3());
-      model.position.sub(center);
-    }
-
     model.traverse((child) => {
       const mesh = child as BimMesh;
       if (!mesh.isMesh) return;
@@ -358,6 +355,9 @@ export class BimTurbineViewer {
       if (!mesh.name) mesh.name = `${name}_part`;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
+      mesh.material = Array.isArray(mesh.material)
+        ? mesh.material.map((material) => material.clone())
+        : mesh.material.clone();
       this.selectableMeshes.push(mesh);
       setMeshOpacity(mesh, name === "first_version_skeleton" ? 0.34 : 0.92);
     });
@@ -365,17 +365,46 @@ export class BimTurbineViewer {
     return model;
   }
 
+  private fitModelToStage(model: THREE.Object3D, targetSize: number): THREE.Object3D {
+    const bounds = new THREE.Box3().setFromObject(model);
+    const size = bounds.getSize(new THREE.Vector3());
+    const maxDimension = Math.max(size.x, size.y, size.z);
+
+    if (Number.isFinite(maxDimension) && maxDimension > 0) {
+      model.scale.multiplyScalar(targetSize / maxDimension);
+      bounds.setFromObject(model);
+      const center = bounds.getCenter(new THREE.Vector3());
+      model.position.sub(center);
+    }
+
+    return model;
+  }
+
+  private fitModelToFocus(model: THREE.Object3D, focusObject: THREE.Object3D, targetSize: number): THREE.Object3D {
+    const focusBounds = new THREE.Box3().setFromObject(focusObject);
+    const size = focusBounds.getSize(new THREE.Vector3());
+    const maxDimension = Math.max(size.x, size.y, size.z);
+
+    if (Number.isFinite(maxDimension) && maxDimension > 0) {
+      const scale = targetSize / maxDimension;
+      const center = focusBounds.getCenter(new THREE.Vector3());
+      model.scale.multiplyScalar(scale);
+      model.position.set(-center.x * scale - 0.12, -center.y * scale - 0.02, -center.z * scale);
+    }
+
+    return model;
+  }
+
   private prepareExplodeTargets(root: THREE.Group): void {
     this.explodableObjects.length = 0;
-    const candidates: THREE.Object3D[] = [];
+    this.originalPositions.clear();
+    const candidates = new Map<string, THREE.Object3D>();
 
-    root.children.forEach((layer) => {
-      if (/skeleton/i.test(layer.name) || /骨架|线框/.test(layer.name)) {
-        layer.children.forEach((child) => candidates.push(child));
-        return;
-      }
-
-      layer.children.forEach((child) => candidates.push(child));
+    root.traverse((object) => {
+      if (object === root || object.type === "Mesh") return;
+      const name = object.name || "";
+      if (!/(blade|pitch|hub|rotor|shaft|gear|generator|cool|cabinet|yaw|tower|foundation|叶|变桨|转子|主轴|齿轮|发电|冷|柜|偏航|塔筒|基础|骨架|skeleton|wire)/i.test(name)) return;
+      candidates.set(name || object.uuid, object);
     });
 
     candidates.forEach((object) => {
@@ -506,18 +535,18 @@ export class BimTurbineViewer {
 
   private componentExplodeOffset(object: THREE.Object3D, index: number): THREE.Vector3 {
     const name = object.name;
-    if (/变桨|扇叶|blade|pitch/i.test(name)) return new THREE.Vector3(-1.12, 0.18, 0.5);
-    if (/转子|主轴|rotor|shaft/i.test(name)) return new THREE.Vector3(-0.62, 0.06, 0.12);
-    if (/齿轮|gear/i.test(name)) return new THREE.Vector3(-0.1, 0.08, 0.52);
-    if (/发电|generator/i.test(name)) return new THREE.Vector3(0.54, 0.08, 0.2);
-    if (/风冷|油冷|cool/i.test(name)) return new THREE.Vector3(0.34, 0.5, 0.38);
-    if (/控制|柜|cabinet/i.test(name)) return new THREE.Vector3(0.74, 0.34, 0.42);
-    if (/偏航|yaw/i.test(name)) return new THREE.Vector3(0.06, -0.22, -0.38);
-    if (/线框|骨架|skeleton|wire|材质/i.test(name)) return new THREE.Vector3(0.1, 0.14, -0.58);
+    if (/变桨|扇叶|blade|pitch/i.test(name)) return new THREE.Vector3(-0.42, 0.1, 0.18);
+    if (/转子|主轴|rotor|shaft/i.test(name)) return new THREE.Vector3(-0.28, 0.04, 0.08);
+    if (/齿轮|gear/i.test(name)) return new THREE.Vector3(-0.02, 0.05, 0.2);
+    if (/发电|generator/i.test(name)) return new THREE.Vector3(0.24, 0.05, 0.08);
+    if (/风冷|油冷|cool/i.test(name)) return new THREE.Vector3(0.18, 0.2, 0.14);
+    if (/控制|柜|cabinet/i.test(name)) return new THREE.Vector3(0.32, 0.16, 0.18);
+    if (/偏航|yaw/i.test(name)) return new THREE.Vector3(0.04, -0.1, -0.16);
+    if (/线框|骨架|skeleton|wire|材质/i.test(name)) return new THREE.Vector3(0.02, 0.06, -0.24);
 
-    const fallbackX = index % 2 === 0 ? 0.42 : -0.42;
-    const fallbackZ = index % 3 === 0 ? 0.38 : -0.38;
-    return new THREE.Vector3(fallbackX, 0.08 + (index % 4) * 0.05, fallbackZ);
+    const fallbackX = index % 2 === 0 ? 0.16 : -0.16;
+    const fallbackZ = index % 3 === 0 ? 0.18 : -0.18;
+    return new THREE.Vector3(fallbackX, 0.04 + (index % 4) * 0.03, fallbackZ);
   }
 
   private toLocalOffset(object: THREE.Object3D, worldOffset: THREE.Vector3): THREE.Vector3 {

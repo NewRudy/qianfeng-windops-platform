@@ -200,8 +200,7 @@ function addTurbineFoundation(viewer: Viewer, localFrame: Matrix4, turbine: Turb
       semiMajorAxis: 36,
       semiMinorAxis: 24,
       material: Color.fromCssColorString("rgba(169, 190, 154, 0.18)"),
-      outline: true,
-      outlineColor: Color.fromCssColorString("rgba(159, 245, 255, 0.24)"),
+      outline: false,
     },
   });
 
@@ -213,8 +212,7 @@ function addTurbineFoundation(viewer: Viewer, localFrame: Matrix4, turbine: Turb
       topRadius: 13,
       bottomRadius: 18,
       material: Color.fromCssColorString("rgba(194, 205, 185, 0.62)"),
-      outline: true,
-      outlineColor: Color.fromCssColorString("rgba(120, 245, 255, 0.3)"),
+      outline: false,
     },
   });
 
