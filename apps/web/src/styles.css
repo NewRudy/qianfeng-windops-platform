@@ -635,6 +635,7 @@ button {
 }
 
 .shell[data-active-module="health"] .module-health,
+.shell[data-active-module="fusion"] .module-fusion,
 .shell[data-active-module="scada"] .module-scada,
 .shell[data-active-module="cms"] .module-cms,
 .shell[data-active-module="bolts"] .module-bolts,
@@ -680,7 +681,8 @@ button {
 }
 
 .case-hero p,
-.alarm-card p {
+.alarm-card p,
+.module-panel > p {
   margin: 6px 0 0;
 }
 
@@ -730,6 +732,115 @@ button {
   color: #ffffff;
   font-size: 14px;
   font-weight: 900;
+}
+
+.fusion-source-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.fusion-card {
+  padding: 12px;
+  border: 1px solid rgba(91, 224, 246, 0.16);
+  background: linear-gradient(135deg, rgba(5, 34, 46, 0.86), rgba(2, 12, 20, 0.76));
+}
+
+.fusion-card.alarm {
+  border-color: rgba(255, 153, 64, 0.4);
+  background: linear-gradient(135deg, rgba(103, 44, 20, 0.42), rgba(3, 20, 31, 0.8));
+}
+
+.fusion-card.watch {
+  border-color: rgba(246, 197, 104, 0.32);
+}
+
+.fusion-card > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.fusion-card span {
+  color: rgba(91, 224, 246, 0.78);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.fusion-card strong {
+  color: #ffffff;
+  font-size: 15px;
+}
+
+.fusion-card p {
+  margin: 7px 0 10px;
+  color: rgba(229, 248, 251, 0.74);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.fusion-card dl {
+  gap: 6px;
+}
+
+.fusion-card dl div {
+  min-height: 30px;
+  padding: 0 8px;
+}
+
+.model-gate-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.model-gate-list li {
+  display: grid;
+  grid-template-columns: 62px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 56px;
+  padding: 10px;
+  border-left: 3px solid rgba(91, 224, 246, 0.4);
+  background: rgba(255, 255, 255, 0.052);
+}
+
+.model-gate-list li.block {
+  border-left-color: #ff9440;
+}
+
+.model-gate-list li.watch {
+  border-left-color: #f6c568;
+}
+
+.model-gate-list span {
+  color: rgba(91, 224, 246, 0.74);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.model-gate-list strong {
+  display: block;
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.model-gate-list p {
+  margin: 3px 0 0;
+  color: rgba(220, 242, 247, 0.68);
+  font-size: 11px;
+  line-height: 1.42;
+}
+
+.model-gate-list em {
+  color: #f6c568;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .engineering-chart {

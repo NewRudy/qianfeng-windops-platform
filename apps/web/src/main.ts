@@ -10,7 +10,9 @@ import {
   type BoltChart,
   type ComponentRisk,
   type CmsChart,
+  type FusionSignal,
   type GearboxWorkflowCase,
+  type ModelGate,
   type ScadaChart,
   type WorkflowAction,
   type WorkflowEvidence,
@@ -209,6 +211,44 @@ function renderEvidenceRows(rows: WorkflowEvidence[] = []): string {
     .join("");
 }
 
+function renderFusionSignals(signals: FusionSignal[] = []): string {
+  return signals
+    .map(
+      (signal) => `
+        <article class="fusion-card ${html(signal.status)}">
+          <div>
+            <span>${html(signal.source)}</span>
+            <strong>${html(signal.metric)}</strong>
+          </div>
+          <p>${html(signal.contribution)}</p>
+          <dl>
+            <div><dt>质量</dt><dd>${html(signal.quality)}</dd></div>
+            <div><dt>窗口</dt><dd>${html(signal.window)}</dd></div>
+            <div><dt>判据</dt><dd>${html(signal.rule)}</dd></div>
+          </dl>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function renderModelGates(gates: ModelGate[] = []): string {
+  return gates
+    .map(
+      (gate) => `
+        <li class="${html(gate.status)}">
+          <span>${html(gate.layer)}</span>
+          <div>
+            <strong>${html(gate.method)}</strong>
+            <p>${html(gate.rule)}</p>
+          </div>
+          <em>${html(gate.result)}</em>
+        </li>
+      `,
+    )
+    .join("");
+}
+
 function renderAction(action?: WorkflowAction, extraAttribute = ""): string {
   if (!action) return "";
   const primaryClass = action.primary ? " primary" : "";
@@ -260,6 +300,20 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
         ${renderScadaChart(module.scadaChart)}
         <dl>${renderMetrics(module.metrics)}</dl>
         <p>${html(module.body ?? "")}</p>
+        ${renderAction(module.action)}
+      </section>
+    `;
+  }
+
+  if (moduleKey === "fusion") {
+    return `
+      <section class="module-panel module-fusion">
+        <div class="module-kicker">${html(module.kicker)}</div>
+        <h3>${html(module.title)}</h3>
+        <dl>${renderMetrics(module.metrics)}</dl>
+        <p>${html(module.body ?? "")}</p>
+        <div class="fusion-source-grid">${renderFusionSignals(module.fusionSignals)}</div>
+        <ol class="model-gate-list">${renderModelGates(module.modelGates)}</ol>
         ${renderAction(module.action)}
       </section>
     `;
@@ -395,6 +449,7 @@ root.innerHTML = `
 
         <nav class="bim-toolbar" aria-label="业务流程">
           <button class="module-tab" type="button" data-module="health">健康评分</button>
+          <button class="module-tab" type="button" data-module="fusion">融合判据</button>
           <button class="module-tab" type="button" data-module="scada">SCADA</button>
           <button class="module-tab" type="button" data-module="cms">CMS</button>
           <button class="module-tab" type="button" data-module="bolts">螺栓监测</button>

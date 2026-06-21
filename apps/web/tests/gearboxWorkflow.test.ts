@@ -11,6 +11,7 @@ describe("gearbox workflow case", () => {
   it("keeps the operator flow in evidence-to-work-order order", () => {
     expect(gearboxWorkflowCase.moduleOrder).toEqual([
       "health",
+      "fusion",
       "scada",
       "cms",
       "bolts",
@@ -18,6 +19,21 @@ describe("gearbox workflow case", () => {
       "maintenance",
       "workorder",
     ]);
+  });
+
+  it("explains the multi-source fusion gates behind the warning", () => {
+    const fusion = gearboxWorkflowCase.modules.fusion;
+    const sources = fusion.fusionSignals?.map((signal) => signal.source).join(" ");
+    const gateText = fusion.modelGates?.map((gate) => `${gate.layer} ${gate.method} ${gate.rule} ${gate.result}`).join(" ");
+
+    expect(fusion.fusionSignals).toHaveLength(4);
+    expect(fusion.modelGates).toHaveLength(4);
+    expect(fusion.metrics).toContainEqual({ label: "融合结论", value: "齿轮箱 P1 预警" });
+    expect(sources).toContain("SCADA 功率曲线");
+    expect(sources).toContain("CMS 振动频谱");
+    expect(sources).toContain("螺栓/结构监测");
+    expect(gateText).toContain("OpenOA 风速-功率基线");
+    expect(gateText).toContain("齿轮啮合频率");
   });
 
   it("contains multi-source evidence for the gearbox warning", () => {

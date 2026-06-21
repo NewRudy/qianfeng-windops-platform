@@ -1,6 +1,6 @@
 import { activeGearboxCaseInput, gearboxCaseCatalog } from "./gearboxCaseData";
 
-export type WorkflowModuleKey = "health" | "scada" | "cms" | "bolts" | "alerts" | "maintenance" | "workorder";
+export type WorkflowModuleKey = "health" | "fusion" | "scada" | "cms" | "bolts" | "alerts" | "maintenance" | "workorder";
 
 export type WorkflowMetric = {
   label: string;
@@ -19,6 +19,24 @@ export type WorkflowAction = {
   label: string;
   module: WorkflowModuleKey;
   primary?: boolean;
+};
+
+export type FusionSignal = {
+  contribution: string;
+  metric: string;
+  quality: string;
+  rule: string;
+  source: string;
+  status: "normal" | "watch" | "alarm";
+  window: string;
+};
+
+export type ModelGate = {
+  layer: string;
+  method: string;
+  result: string;
+  rule: string;
+  status: "pass" | "watch" | "block";
 };
 
 export type ChartAxis = {
@@ -86,6 +104,7 @@ export type WorkflowModule = {
   boltChart?: BoltChart;
   cmsChart?: CmsChart;
   evidenceRows?: WorkflowEvidence[];
+  fusionSignals?: FusionSignal[];
   hero?: {
     score: string;
     scoreLabel: string;
@@ -93,6 +112,7 @@ export type WorkflowModule = {
     text: string;
   };
   kicker: string;
+  modelGates?: ModelGate[];
   metrics?: WorkflowMetric[];
   scadaChart?: ScadaChart;
   ticket?: {
@@ -296,6 +316,11 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
     yAxis: { label: "振动幅值 mm/s", max: 2, min: 0, ticks: [0, 0.5, 1, 1.5, 2] },
   };
   const boltChart = createBoltChart(input);
+  const scadaAlarm = diagnostics.maxPowerShortfallPct >= input.thresholds.scadaPowerShortfallPct;
+  const cmsAlarm = diagnostics.cmsSidebandRatio >= input.thresholds.cmsSidebandRatio;
+  const oilTempAlarm = diagnostics.oilTempDeltaC >= input.thresholds.oilTempDeltaC;
+  const boltWatch = diagnostics.boltWarningChannels > 0;
+  const exceededCoreSignals = [scadaAlarm, cmsAlarm, oilTempAlarm].filter(Boolean).length;
 
   return {
     component: "齿轮箱",
@@ -306,10 +331,10 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       { component: "tower", module: "bolts", part: "tower", status: "载荷校核", title: "塔筒结构" },
     ],
     eventCode: input.eventCode,
-    moduleOrder: ["health", "scada", "cms", "bolts", "alerts", "maintenance", "workorder"],
+    moduleOrder: ["health", "fusion", "scada", "cms", "bolts", "alerts", "maintenance", "workorder"],
     modules: {
       health: {
-        action: { label: "查看 SCADA 证据", module: "scada" },
+        action: { label: "查看融合判据", module: "fusion" },
         hero: {
           score: String(diagnostics.healthScore),
           scoreLabel: "综合健康",
@@ -323,6 +348,85 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
           { label: "风险置信度", value: `${diagnostics.riskConfidencePct}%` },
         ],
         title: `${input.turbineId} 健康评分`,
+      },
+      fusion: {
+        action: { label: "进入告警研判", module: "alerts", primary: true },
+        body: `判定门槛：SCADA 功率残差、CMS 侧频、油温热平衡三项核心证据中 ${exceededCoreSignals}/3 项越限；螺栓/结构监测用于排除叶根主风险并保留山地阵风载荷联动。`,
+        fusionSignals: [
+          {
+            contribution: "运行异常主证据",
+            metric: `最大功率缺口 ${formatSignedPct(diagnostics.maxPowerShortfallPct)}`,
+            quality: `${input.scadaSamples.length}/${input.scadaSamples.length} 个 10 min 窗口有效`,
+            rule: `残差 >= ${input.thresholds.scadaPowerShortfallPct}%`,
+            source: "SCADA 功率曲线",
+            status: scadaAlarm ? "alarm" : "normal",
+            window: "最近 60 min",
+          },
+          {
+            contribution: "部件故障主证据",
+            metric: `GMF 侧频 ${formatFixed(diagnostics.cmsSidebandRatio)}x 基线`,
+            quality: "20 kHz 高频采样 / 60 s 包络谱",
+            rule: `侧频 >= ${formatFixed(input.thresholds.cmsSidebandRatio)}x 基线`,
+            source: "CMS 振动频谱",
+            status: cmsAlarm ? "alarm" : "watch",
+            window: "最近一次高频包",
+          },
+          {
+            contribution: "热异常辅助证据",
+            metric: `油温同场偏高 ${formatFixed(diagnostics.oilTempDeltaC)} ℃`,
+            quality: "同场同机型对标完成",
+            rule: `温差 >= ${input.thresholds.oilTempDeltaC} ℃`,
+            source: "SCADA 油温",
+            status: oilTempAlarm ? "alarm" : "watch",
+            window: "最近 6 h",
+          },
+          {
+            contribution: "结构风险排查",
+            metric: `${diagnostics.boltWarningChannels} 路预紧力关注`,
+            quality: `${boltChart.channels.length} 路叶根螺栓通道在线`,
+            rule: `单通道松弛 >= ${input.thresholds.boltRelaxationWarningPct}% 进入结构关注，不直接归因为齿轮箱主故障`,
+            source: "螺栓/结构监测",
+            status: boltWatch ? "watch" : "normal",
+            window: "日内滚动",
+          },
+        ],
+        kicker: "Fusion / Mechanism + Data Model",
+        metrics: [
+          { label: "核心证据越限", value: `${exceededCoreSignals} / 3` },
+          { label: "融合结论", value: "齿轮箱 P1 预警" },
+          { label: "处置门槛", value: exceededCoreSignals >= 2 ? "进入现场复核" : "继续观察" },
+        ],
+        modelGates: [
+          {
+            layer: "数值模型",
+            method: "OpenOA 风速-功率基线",
+            result: `残差 ${formatSignedPct(diagnostics.maxPowerShortfallPct)}`,
+            rule: "同风速段功率低于期望曲线且连续越限",
+            status: scadaAlarm ? "block" : "pass",
+          },
+          {
+            layer: "机理模型",
+            method: "齿轮啮合频率 + 边带",
+            result: `${formatFixed(diagnostics.cmsSidebandRatio)}x 基线`,
+            rule: "GMF 与边带同步抬升指向齿轮箱轴承/啮合异常",
+            status: cmsAlarm ? "block" : "watch",
+          },
+          {
+            layer: "热平衡校核",
+            method: "同场同机型油温对标",
+            result: `${formatFixed(diagnostics.oilTempDeltaC)} ℃`,
+            rule: "油温偏高用于增强传动链摩擦/润滑异常判断",
+            status: oilTempAlarm ? "block" : "watch",
+          },
+          {
+            layer: "排查项",
+            method: "叶根螺栓预紧力",
+            result: `${diagnostics.boltLowestChannel.id} ${formatFixed(diagnostics.boltLowestChannel.relaxationPct)}% 松弛`,
+            rule: "若螺栓松弛未形成环向扩展，则作为载荷放大因素跟踪，主闭环仍指向齿轮箱",
+            status: boltWatch ? "watch" : "pass",
+          },
+        ],
+        title: "多源融合与模型判据",
       },
       scada: {
         action: { label: "联动 CMS 振动", module: "cms" },
