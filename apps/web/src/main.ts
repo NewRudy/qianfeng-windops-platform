@@ -55,35 +55,42 @@ root.innerHTML = `
         </section>
 
         <aside class="component-strip" aria-label="部件拆分">
-          <button class="component active" type="button" data-component="blade-root" data-bim-part="blade">
-            <span>叶根螺栓</span><strong>预紧力异常</strong>
+          <button class="component" type="button" data-component="blade-root" data-bim-part="blade" data-module="bolts">
+            <span>叶根螺栓</span><strong>稳定监视</strong>
           </button>
-          <button class="component" type="button" data-component="drivetrain" data-bim-part="hub">
-            <span>传动链</span><strong>振动峰值上升</strong>
+          <button class="component" type="button" data-component="drivetrain" data-bim-part="hub" data-module="cms">
+            <span>传动链</span><strong>侧频复核</strong>
           </button>
-          <button class="component" type="button" data-component="gearbox" data-bim-part="gearbox">
-            <span>齿轮箱</span><strong>温升趋势</strong>
+          <button class="component active" type="button" data-component="gearbox" data-bim-part="gearbox" data-module="alerts">
+            <span>齿轮箱</span><strong>P1 预警闭环</strong>
           </button>
-          <button class="component" type="button" data-component="tower" data-bim-part="tower">
-            <span>塔筒结构</span><strong>螺栓复核</strong>
+          <button class="component" type="button" data-component="tower" data-bim-part="tower" data-module="bolts">
+            <span>塔筒结构</span><strong>载荷校核</strong>
           </button>
         </aside>
 
         <aside class="module-drawer" aria-label="业务模块">
           <section class="module-panel module-health">
-            <h3>健康评分</h3>
-            <div class="score-ring"><strong>90</strong><span>健康评分</span></div>
+            <div class="module-kicker">Asset Health</div>
+            <h3>HS-WTG-02 健康评分</h3>
+            <div class="case-hero">
+              <div class="score-ring"><strong>78</strong><span>综合健康</span></div>
+              <div>
+                <strong>齿轮箱链路进入 P1 关注</strong>
+                <p>风机仍可限功率运行，但需在低风速窗口完成 CMS 复核与油液取样。</p>
+              </div>
+            </div>
             <dl>
-              <div><dt>正常</dt><dd>7</dd></div>
-              <div><dt>关注</dt><dd>1</dd></div>
-              <div><dt>预警</dt><dd>1</dd></div>
-              <div><dt>严重</dt><dd>0</dd></div>
+              <div><dt>传动链健康</dt><dd>72 / 100</dd></div>
+              <div><dt>功率曲线偏差</dt><dd>+12.8%</dd></div>
+              <div><dt>风险置信度</dt><dd>84%</dd></div>
             </dl>
-            <p>模型：IsolationForest；异常点：2936；风险分：38.3。</p>
+            <button class="module-action" type="button" data-open-module="scada">查看 SCADA 证据</button>
           </section>
 
           <section class="module-panel module-scada">
-            <h3>SCADA 状态监测</h3>
+            <div class="module-kicker">Evidence 01 / SCADA</div>
+            <h3>运行状态与模型残差</h3>
             <div class="signal-chart">
               <i style="height:42%"></i><i style="height:72%"></i><i style="height:58%"></i>
               <i style="height:85%"></i><i style="height:46%"></i><i style="height:64%"></i>
@@ -93,55 +100,85 @@ root.innerHTML = `
               <div><dt>风速</dt><dd>6.71 m/s</dd></div>
               <div><dt>有功功率</dt><dd>812 kW</dd></div>
               <div><dt>功率残差</dt><dd>+12.8%</dd></div>
+              <div><dt>齿轮箱油温</dt><dd>74.6 ℃</dd></div>
             </dl>
+            <p>判断：同风速段输出偏低且油温抬升，符合传动链效率下降的早期迹象。</p>
+            <button class="module-action" type="button" data-open-module="cms">联动 CMS 振动</button>
           </section>
 
           <section class="module-panel module-cms">
-            <h3>CMS 振动诊断</h3>
+            <div class="module-kicker">Evidence 02 / CMS</div>
+            <h3>齿轮箱振动诊断</h3>
+            <div class="spectrum-strip" aria-label="频谱能量">
+              <i style="height:28%"></i><i style="height:44%"></i><i style="height:64%"></i>
+              <i style="height:38%"></i><i style="height:88%"></i><i style="height:42%"></i>
+              <i style="height:74%"></i><i style="height:36%"></i><i style="height:58%"></i>
+            </div>
             <dl>
               <div><dt>RMS 振动</dt><dd>2.562 mm/s</dd></div>
-              <div><dt>主频偏移</dt><dd>1P + 3P</dd></div>
-              <div><dt>疑似部件</dt><dd>传动链 / 齿轮箱</dd></div>
+              <div><dt>啮合侧频</dt><dd>2.1x 基线</dd></div>
+              <div><dt>疑似部件</dt><dd>齿轮箱高速轴轴承</dd></div>
             </dl>
-            <p>机理判断：风切变载荷叠加传动链侧频，需联动油温与扭矩残差核验。</p>
+            <p>机理+数值判断：山地阵风工况下侧频增强，结合 SCADA 残差指向齿轮箱早期磨损。</p>
+            <button class="module-action" type="button" data-open-module="alerts">进入告警研判</button>
           </section>
 
           <section class="module-panel module-bolts">
-            <h3>螺栓监测</h3>
+            <div class="module-kicker">Evidence 03 / Bolt & Structure</div>
+            <h3>螺栓与结构监测</h3>
             <dl>
-              <div><dt>平均预紧力</dt><dd>288.6 kN</dd></div>
+              <div><dt>叶根平均预紧力</dt><dd>288.6 kN</dd></div>
               <div><dt>最低通道</dt><dd>B17 / 263.1 kN</dd></div>
               <div><dt>温漂补偿</dt><dd>已启用</dd></div>
+              <div><dt>塔筒一阶频率</dt><dd>0.329 Hz</dd></div>
             </dl>
-            <p>隐患排查：叶根螺栓预紧力下探，建议低风速窗口复测并安排扭矩复核。</p>
+            <p>排查结论：当前主风险不来自叶根螺栓，但山地阵风载荷会放大传动链冲击，保留联动监视。</p>
+            <button class="module-action" type="button" data-open-module="alerts">回到告警研判</button>
           </section>
 
           <section class="module-panel module-alerts">
-            <h3>告警中心</h3>
+            <div class="module-kicker">Decision / Alarm Center</div>
+            <h3>齿轮箱 P1 预警研判</h3>
+            <article class="alarm-card">
+              <span>ORANGE</span>
+              <strong>HS-WTG-02 gearbox_bearing_wear</strong>
+              <p>SCADA 残差、油温与 CMS 侧频三项证据一致，建议转入预测维护。</p>
+            </article>
             <ul class="event-list">
-              <li><span>P1-高</span>结构健康预警 - ORANGE</li>
-              <li><span>P1-高</span>叶根螺栓预紧力下探</li>
-              <li><span>P2-中</span>山地阵风切变风险升高</li>
+              <li><span>证据 1</span>同风速段功率残差 +12.8%</li>
+              <li><span>证据 2</span>齿轮啮合侧频 2.1x 基线</li>
+              <li><span>证据 3</span>油温 6h 均值高于同类机组 8.4 ℃</li>
             </ul>
+            <button class="module-action primary" type="button" data-open-module="maintenance">生成维护建议</button>
           </section>
 
           <section class="module-panel module-maintenance">
-            <h3>预测性维护</h3>
+            <div class="module-kicker">Action Plan / Predictive Maintenance</div>
+            <h3>预测性维护建议</h3>
             <dl>
-              <div><dt>钢绞线预应力</dt><dd>98.8 天</dd></div>
-              <div><dt>连接螺栓剩余寿命</dt><dd>329.2 天</dd></div>
-              <div><dt>塔筒固有频率</dt><dd>395.1 天</dd></div>
+              <div><dt>建议处置窗口</dt><dd>48 - 72 h</dd></div>
+              <div><dt>预计剩余可运行</dt><dd>168 h</dd></div>
+              <div><dt>建议运行方式</dt><dd>限功率 80%</dd></div>
+              <div><dt>备件</dt><dd>高速轴轴承 / 油液包</dd></div>
             </dl>
-            <p>维护策略：常规保养；若预紧力连续 3 次低于阈值，升级为停机复检。</p>
+            <p>策略：利用明晚低风速窗口停机 2h，先做油液取样与内窥复核，若铁谱异常则升级检修。</p>
+            <button class="module-action primary" type="button" data-create-workorder>生成运维工单</button>
           </section>
 
           <section class="module-panel module-workorder">
+            <div class="module-kicker">Closed Loop / Work Order</div>
             <h3>运维工单</h3>
+            <div class="workorder-ticket">
+              <span id="workorder-state">待生成</span>
+              <strong id="workorder-code">WO-GX-待创建</strong>
+            </div>
             <ol class="workflow-list">
-              <li><span>01</span>冻结高载荷运行窗口</li>
-              <li><span>02</span>复核叶根螺栓与温湿度漂移</li>
-              <li><span>03</span>生成 48h 预测维护工单</li>
+              <li><span>01</span>调度低风速停机窗口</li>
+              <li><span>02</span>执行齿轮箱油液取样与内窥复核</li>
+              <li><span>03</span>上传照片、油液报告和振动复测结果</li>
+              <li><span>04</span>关闭告警并回写诊断样本</li>
             </ol>
+            <button class="module-action" type="button" data-close-workorder>标记现场复核完成</button>
           </section>
         </aside>
 
@@ -177,10 +214,33 @@ function setBimStatus(status: string): void {
   if (bimStatus) bimStatus.textContent = status;
 }
 
+function setActiveComponent(componentName: string): void {
+  document.querySelectorAll<HTMLButtonElement>(".component").forEach((item) => {
+    item.classList.toggle("active", item.dataset.component === componentName);
+  });
+}
+
+function openWorkflowModule(moduleName: string, status?: string): void {
+  setActiveModule(moduleName);
+  if (status) setBimStatus(status);
+}
+
+function isGearboxPart(partName: string): boolean {
+  return /齿轮|gearbox|gear/i.test(partName);
+}
+
+function activateGearboxWorkflow(moduleName = "alerts"): void {
+  setActiveComponent("gearbox");
+  openWorkflowModule(moduleName, "齿轮箱预警闭环：已锁定 HS-WTG-02 高速轴轴承风险");
+}
+
 function getBimViewer(): BimTurbineViewer {
   if (!bimViewer) {
     bimViewer = new BimTurbineViewer({
       container: bimModelContainer,
+      onPartPicked: (partName) => {
+        if (isGearboxPart(partName)) activateGearboxWorkflow("alerts");
+      },
       onStatus: setBimStatus,
     });
   }
@@ -232,16 +292,31 @@ void createWindFarmScene({
 
 document.querySelectorAll<HTMLButtonElement>(".component").forEach((button) => {
   button.addEventListener("click", () => {
-    document.querySelectorAll(".component").forEach((item) => item.classList.remove("active"));
-    button.classList.add("active");
+    const componentName = button.dataset.component ?? "";
+    setActiveComponent(componentName);
     const part = button.dataset.bimPart as BimPartKey | undefined;
+    if (componentName === "gearbox") {
+      if (part) {
+        void getBimViewer()
+          .focusPart(part)
+          .then(() => openWorkflowModule(button.dataset.module ?? "alerts", "齿轮箱预警闭环：从部件风险进入证据研判"));
+      } else {
+        openWorkflowModule(button.dataset.module ?? "alerts", "齿轮箱预警闭环：从部件风险进入证据研判");
+      }
+      return;
+    }
     if (part) void getBimViewer().focusPart(part);
+    if (button.dataset.module) openWorkflowModule(button.dataset.module);
   });
 });
 
 document.querySelectorAll<HTMLButtonElement>(".part-label[data-bim-part]").forEach((button) => {
   button.addEventListener("click", () => {
     const part = button.dataset.bimPart as BimPartKey | undefined;
+    if (part === "gearbox") {
+      void getBimViewer().focusPart(part).then(() => activateGearboxWorkflow("alerts"));
+      return;
+    }
     if (part) void getBimViewer().focusPart(part);
   });
 });
@@ -253,6 +328,39 @@ document.querySelectorAll<HTMLButtonElement>(".module-tab").forEach((button) => 
 
     setActiveModule(nextModule);
   });
+});
+
+document.querySelectorAll<HTMLButtonElement>("[data-open-module]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const moduleName = button.dataset.openModule;
+    if (!moduleName) return;
+    openWorkflowModule(moduleName);
+    if (["scada", "cms", "alerts", "maintenance", "workorder"].includes(moduleName)) {
+      setActiveComponent("gearbox");
+      void getBimViewer().focusPart("gearbox");
+    }
+  });
+});
+
+document.querySelector<HTMLButtonElement>("[data-create-workorder]")?.addEventListener("click", () => {
+  const state = document.querySelector<HTMLElement>("#workorder-state");
+  const code = document.querySelector<HTMLElement>("#workorder-code");
+  if (state) state.textContent = "已生成";
+  if (code) code.textContent = "WO-GX-20260621-02";
+  openWorkflowModule("workorder", "已生成齿轮箱预测维护工单：等待现场复核");
+});
+
+document.querySelector<HTMLButtonElement>("[data-close-workorder]")?.addEventListener("click", () => {
+  const button = document.querySelector<HTMLButtonElement>("[data-close-workorder]");
+  const state = document.querySelector<HTMLElement>("#workorder-state");
+  const code = document.querySelector<HTMLElement>("#workorder-code");
+  if (state) state.textContent = "现场复核完成";
+  if (code) code.textContent = "WO-GX-20260621-02";
+  if (button) {
+    button.textContent = "现场复核已完成";
+    button.disabled = true;
+  }
+  setBimStatus("工单回写完成：齿轮箱油液与内窥结果已进入复盘样本");
 });
 
 document.querySelector<HTMLButtonElement>("#bim-decompose")?.addEventListener("click", () => {

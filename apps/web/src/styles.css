@@ -549,6 +549,7 @@ button {
 }
 
 .shell[data-active-module="alerts"] .component-strip,
+.shell[data-active-module="maintenance"] .component-strip,
 .shell[data-active-module="workorder"] .component-strip {
   opacity: 1;
   pointer-events: auto;
@@ -591,7 +592,9 @@ button {
 .module-panel {
   display: none;
   min-height: 360px;
+  max-height: calc(100vh - 184px);
   padding: 16px;
+  overflow: auto;
   box-shadow:
     inset 0 0 26px rgba(62, 219, 255, 0.08),
     0 20px 60px rgba(0, 0, 0, 0.36);
@@ -609,16 +612,49 @@ button {
 }
 
 .module-panel h3 {
-  margin: 0 0 14px;
+  margin: 0 0 12px;
   color: #ffffff;
   font-size: 18px;
+}
+
+.module-kicker {
+  margin-bottom: 6px;
+  color: rgba(91, 224, 246, 0.76);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.case-hero {
+  display: grid;
+  grid-template-columns: 104px 1fr;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.case-hero > div:last-child {
+  padding: 10px 0;
+}
+
+.case-hero > div:last-child strong {
+  display: block;
+  color: #ffffff;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.case-hero p,
+.alarm-card p {
+  margin: 6px 0 0;
 }
 
 .score-ring {
   display: grid;
   place-items: center;
-  width: 118px;
-  height: 118px;
+  width: 96px;
+  height: 96px;
   margin: 6px auto 18px;
   border: 8px solid rgba(249, 178, 55, 0.9);
   border-radius: 50%;
@@ -627,7 +663,7 @@ button {
 
 .score-ring strong {
   color: #ffffff;
-  font-size: 34px;
+  font-size: 30px;
   line-height: 1;
 }
 
@@ -682,6 +718,52 @@ button {
   box-shadow: 0 0 12px rgba(90, 255, 104, 0.32);
 }
 
+.spectrum-strip {
+  display: flex;
+  gap: 5px;
+  align-items: end;
+  height: 118px;
+  padding: 12px;
+  margin-bottom: 14px;
+  background:
+    linear-gradient(rgba(91, 224, 246, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(91, 224, 246, 0.08) 1px, transparent 1px),
+    rgba(2, 13, 20, 0.68);
+  background-size: 16px 16px;
+}
+
+.spectrum-strip i {
+  flex: 1;
+  min-height: 12px;
+  background: linear-gradient(180deg, #f6c568, #ff6b2d 58%, #52210d);
+  box-shadow: 0 0 14px rgba(255, 122, 37, 0.34);
+}
+
+.alarm-card,
+.workorder-ticket {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid rgba(246, 197, 104, 0.28);
+  background: linear-gradient(135deg, rgba(126, 54, 22, 0.34), rgba(4, 24, 36, 0.72));
+}
+
+.alarm-card span,
+.workorder-ticket span {
+  display: inline-block;
+  margin-bottom: 7px;
+  color: #f6c568;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.alarm-card strong,
+.workorder-ticket strong {
+  display: block;
+  color: #ffffff;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
 .event-list,
 .workflow-list {
   display: grid;
@@ -702,6 +784,34 @@ button {
 .workflow-list span {
   color: #f6c568;
   font-weight: 900;
+}
+
+.module-action {
+  width: 100%;
+  height: 38px;
+  margin-top: 14px;
+  border: 1px solid rgba(91, 224, 246, 0.36);
+  background: linear-gradient(180deg, rgba(10, 52, 70, 0.82), rgba(2, 17, 26, 0.86));
+  color: rgba(235, 250, 253, 0.9);
+  font-weight: 900;
+}
+
+.module-action:hover {
+  border-color: rgba(91, 224, 246, 0.82);
+  background: rgba(21, 91, 112, 0.84);
+}
+
+.module-action:disabled {
+  cursor: default;
+  border-color: rgba(91, 224, 246, 0.18);
+  background: rgba(4, 26, 34, 0.68);
+  color: rgba(219, 246, 250, 0.58);
+}
+
+.module-action.primary {
+  border-color: rgba(246, 197, 104, 0.68);
+  background: linear-gradient(180deg, rgba(135, 72, 21, 0.86), rgba(38, 22, 12, 0.9));
+  color: #fff7e7;
 }
 
 .bim-toolbar {

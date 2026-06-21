@@ -12,6 +12,7 @@ type BimPartKey = "blade" | "hub" | "nacelle" | "tower" | "foundation" | "gearbo
 
 type BimTurbineViewerOptions = {
   container: HTMLElement;
+  onPartPicked?: (partName: string) => void;
   onStatus?: (status: string) => void;
 };
 
@@ -126,6 +127,7 @@ function buildFallbackTurbine(): THREE.Group {
 
 export class BimTurbineViewer {
   private readonly container: HTMLElement;
+  private readonly onPartPicked?: (partName: string) => void;
   private readonly onStatus?: (status: string) => void;
   private readonly selectableMeshes: BimMesh[] = [];
   private readonly originalPositions = new Map<THREE.Object3D, THREE.Vector3>();
@@ -150,6 +152,7 @@ export class BimTurbineViewer {
 
   constructor(options: BimTurbineViewerOptions) {
     this.container = options.container;
+    this.onPartPicked = options.onPartPicked;
     this.onStatus = options.onStatus;
   }
 
@@ -452,7 +455,9 @@ export class BimTurbineViewer {
 
     if (!picked) return;
     this.applyHighlight([picked]);
-    this.setStatus(`已选中构件：${picked.name || picked.parent?.name || "BIM part"}`);
+    const partName = picked.name || picked.parent?.name || "BIM part";
+    this.setStatus(`已选中构件：${partName}`);
+    this.onPartPicked?.(partName);
   };
 
   private findPartMeshes(part: BimPartKey): BimMesh[] {
