@@ -69,9 +69,9 @@ export const firstSliceSceneConfig: SceneConfig = {
       '3D Tiles 1.1 wrapper generated from "Laoyeling Mountain" by Li Yanquan, licensed under CC-BY-4.0.',
   },
   turbines: [
-    createRidgeTurbine("HS-WTG-01", "warning", { east: -420, north: -460, up: 28 }, -18),
-    createRidgeTurbine("HS-WTG-02", "normal", { east: 70, north: -185, up: 36 }, -8),
-    createRidgeTurbine("HS-WTG-03", "warning", { east: 565, north: 95, up: 26 }, 4),
+    createRidgeTurbine("HS-WTG-01", "warning", { east: -500, north: -330, up: 136 }, 94),
+    createRidgeTurbine("HS-WTG-02", "normal", { east: -20, north: -210, up: 137 }, 94),
+    createRidgeTurbine("HS-WTG-03", "warning", { east: 460, north: -90, up: 134 }, 94),
   ],
 };
 
@@ -85,12 +85,12 @@ function createRidgeTurbine(
     name: turbineId,
     turbineId,
     absolutePath: "/Users/rudy/Downloads/wind_turbine/scene.gltf",
-    scale: 6.0,
+    scale: 2.8,
     offset,
     headingDegrees,
     hasRotorAnimation: true,
     geometry: {
-      towerHeight: 188,
+      towerHeight: 126,
       towerRadius: 5,
       nacelleLength: 64,
       bladeRadius: 74,

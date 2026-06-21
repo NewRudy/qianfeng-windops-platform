@@ -34,8 +34,8 @@ export interface CreateWindFarmSceneOptions {
   onTurbineSelected?: (turbine: TurbineAsset) => void;
 }
 
-const RIDGE_OVERVIEW_CAMERA = new HeadingPitchRange(5.68, -0.34, 1620);
-const TURBINE_DETAIL_CAMERA = new HeadingPitchRange(5.78, -0.32, 640);
+const RIDGE_OVERVIEW_CAMERA = new HeadingPitchRange(5.66, -0.24, 1180);
+const TURBINE_DETAIL_CAMERA = new HeadingPitchRange(5.82, -0.22, 520);
 
 interface PickableModelId {
   kind: "turbine";
@@ -104,8 +104,10 @@ export async function createWindFarmScene({
     });
   }
 
+  const ridgeTarget = pointFromOffset(localFrame, getRidgeCenterOffset(config.turbines));
+
   const showMountainOverview = () => {
-    viewer.camera.flyToBoundingSphere(new BoundingSphere(origin, 1320), {
+    viewer.camera.flyToBoundingSphere(new BoundingSphere(ridgeTarget, 780), {
       duration: 2.6,
       offset: RIDGE_OVERVIEW_CAMERA,
     });
@@ -127,7 +129,7 @@ export async function createWindFarmScene({
     focusTurbine();
   };
 
-  playIntroFlight(viewer, origin);
+  playIntroFlight(viewer, origin, ridgeTarget);
 
   const handler = new ScreenSpaceEventHandler(viewer.canvas);
   handler.setInputAction((movement: { position: Cartesian2 }) => {
@@ -152,12 +154,12 @@ export async function createWindFarmScene({
   };
 }
 
-function playIntroFlight(viewer: Viewer, origin: Cartesian3): void {
+function playIntroFlight(viewer: Viewer, origin: Cartesian3, ridgeTarget: Cartesian3): void {
   viewer.camera.lookAt(origin, new HeadingPitchRange(5.08, -1.12, 8200));
   viewer.camera.lookAtTransform(Matrix4.IDENTITY);
 
   window.setTimeout(() => {
-    viewer.camera.flyToBoundingSphere(new BoundingSphere(origin, 1320), {
+    viewer.camera.flyToBoundingSphere(new BoundingSphere(ridgeTarget, 780), {
       duration: 4.2,
       offset: RIDGE_OVERVIEW_CAMERA,
     });
@@ -179,7 +181,7 @@ function addMountainSurface(viewer: Viewer, config: SceneConfig): void {
         centerLongitude + halfWidthDegrees,
         centerLatitude + halfHeightDegrees,
       ),
-      height: config.origin.height + 24,
+      height: config.origin.height + 8,
       material: new ImageMaterialProperty({
         image: toViteFsUrl(config.mountain.baseColorTexturePath),
       }),
@@ -188,22 +190,31 @@ function addMountainSurface(viewer: Viewer, config: SceneConfig): void {
 }
 
 function addTurbineFoundation(viewer: Viewer, localFrame: Matrix4, turbine: TurbineAsset): void {
-  const base = pointFromOffset(localFrame, {
-    east: turbine.offset.east,
-    north: turbine.offset.north,
-    up: turbine.offset.up - 8,
+  const groundOffset = getGroundOffset(turbine);
+  const base = pointFromOffset(localFrame, { ...groundOffset, up: groundOffset.up - 2 });
+
+  viewer.entities.add({
+    id: `${turbine.turbineId}-ridge-pad`,
+    position: pointFromOffset(localFrame, { ...groundOffset, up: groundOffset.up + 1 }),
+    ellipse: {
+      semiMajorAxis: 36,
+      semiMinorAxis: 24,
+      material: Color.fromCssColorString("rgba(169, 190, 154, 0.18)"),
+      outline: true,
+      outlineColor: Color.fromCssColorString("rgba(159, 245, 255, 0.24)"),
+    },
   });
 
   viewer.entities.add({
     id: `${turbine.turbineId}-foundation`,
     position: base,
     cylinder: {
-      length: 18,
-      topRadius: 28,
-      bottomRadius: 34,
-      material: Color.fromCssColorString("rgba(210, 230, 218, 0.72)"),
+      length: 8,
+      topRadius: 13,
+      bottomRadius: 18,
+      material: Color.fromCssColorString("rgba(194, 205, 185, 0.62)"),
       outline: true,
-      outlineColor: Color.fromCssColorString("rgba(120, 245, 255, 0.46)"),
+      outlineColor: Color.fromCssColorString("rgba(120, 245, 255, 0.3)"),
     },
   });
 
@@ -211,17 +222,17 @@ function addTurbineFoundation(viewer: Viewer, localFrame: Matrix4, turbine: Turb
     pointFromOffset(localFrame, {
       east: turbine.offset.east - 155,
       north: turbine.offset.north - 70,
-      up: turbine.offset.up - 3,
+      up: groundOffset.up,
     }),
     pointFromOffset(localFrame, {
       east: turbine.offset.east - 72,
       north: turbine.offset.north - 34,
-      up: turbine.offset.up - 2,
+      up: groundOffset.up + 1,
     }),
     pointFromOffset(localFrame, {
       east: turbine.offset.east + 16,
       north: turbine.offset.north,
-      up: turbine.offset.up - 1,
+      up: groundOffset.up + 1,
     }),
   ];
 
@@ -291,9 +302,38 @@ function modelMatrixFromOffsetAndHeading(localFrame: Matrix4, turbineAsset: Turb
 
 function getHubOffset(turbine: TurbineAsset): LocalOffset {
   return {
-    east: turbine.offset.east + turbine.geometry.nacelleLength + 7,
+    east: turbine.offset.east + 10,
     north: turbine.offset.north,
-    up: turbine.offset.up + turbine.geometry.towerHeight + 10,
+    up: turbine.offset.up + 8,
+  };
+}
+
+function getGroundOffset(turbine: TurbineAsset): LocalOffset {
+  return {
+    east: turbine.offset.east,
+    north: turbine.offset.north,
+    up: turbine.offset.up - turbine.geometry.towerHeight,
+  };
+}
+
+function getRidgeCenterOffset(turbines: TurbineAsset[]): LocalOffset {
+  const totals = turbines.reduce(
+    (sum, turbine) => {
+      const hub = getHubOffset(turbine);
+      return {
+        east: sum.east + hub.east,
+        north: sum.north + hub.north,
+        up: sum.up + hub.up,
+      };
+    },
+    { east: 0, north: 0, up: 0 },
+  );
+  const count = Math.max(turbines.length, 1);
+
+  return {
+    east: totals.east / count,
+    north: totals.north / count,
+    up: totals.up / count - 24,
   };
 }
 

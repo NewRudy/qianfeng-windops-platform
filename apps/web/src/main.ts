@@ -24,12 +24,6 @@ root.innerHTML = `
         <strong>多气候山地风电机组智驭预警及故障诊断平台</strong>
       </header>
 
-      <div class="scene-caption">
-        <span>GIS 3D Tiles 山地底座</span>
-        <span>3 台动画风机 BIM 模型</span>
-        <span>双击风机进入诊断</span>
-      </div>
-
       <aside class="diagnosis-dock" aria-label="风机诊断业务面板">
         <button id="close-diagnosis" class="dock-close" type="button" aria-label="关闭诊断面板">×</button>
         <div class="dock-kicker">Wind Turbine Diagnosis</div>
