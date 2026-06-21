@@ -1,5 +1,6 @@
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import "./styles.css";
+import { BimTurbineViewer, type BimPartKey } from "./bim/BimTurbineViewer";
 import { createWindFarmScene } from "./scene/createWindFarmScene";
 import { firstSliceSceneConfig, type TurbineAsset } from "./scene/sceneConfig";
 
@@ -27,7 +28,6 @@ root.innerHTML = `
       <section class="bim-screen" aria-label="单机组 BIM 智驭诊断大屏">
         <header class="bim-header">
           <div>
-            <span>多源数据 · 机理模型 · 预测维护</span>
             <h2>黔风智维 - 风机组智能预警与故障诊断平台</h2>
           </div>
           <strong id="bim-selected-title">HS-WTG-01</strong>
@@ -36,38 +36,35 @@ root.innerHTML = `
 
         <section class="bim-stage" aria-label="风机 BIM 部件拆分视图">
           <div class="blueprint-grid" aria-hidden="true"></div>
-          <div class="turbine-blueprint" aria-hidden="true">
-            <i class="wire blade-wire blade-wire-a"></i>
-            <i class="wire blade-wire blade-wire-b"></i>
-            <i class="wire blade-wire blade-wire-c"></i>
-            <i class="wire hub-ring"></i>
-            <i class="wire nacelle-wire"></i>
-            <i class="solid gearbox-core"></i>
-            <i class="solid generator-core"></i>
-            <i class="solid yaw-system"></i>
-            <i class="solid tower-core"></i>
-            <i class="wire tail-frame"></i>
-            <i class="wire split-line split-line-a"></i>
-            <i class="wire split-line split-line-b"></i>
+          <div id="bim-model-root" class="first-version-bim-canvas" aria-label="风机 BIM 精细模型"></div>
+          <div class="bim-stage-hud">
+            <span>整机 BIM 模型</span>
+            <strong id="bim-status">等待进入单机 BIM 诊断</strong>
+            <em>支持部件点击高亮、整机拆解/复原、疑似构件告警闪烁。</em>
           </div>
-          <div class="part-label label-blade">叶根螺栓</div>
-          <div class="part-label label-gearbox">齿轮箱</div>
-          <div class="part-label label-generator">发电机</div>
-          <div class="part-label label-yaw">偏航系统</div>
-          <div class="part-label label-tower">塔筒结构</div>
+          <div class="bim-stage-actions" aria-label="BIM 模型操作">
+            <button id="bim-decompose" type="button">拆解模型</button>
+            <button id="bim-compose" type="button">复原模型</button>
+            <button id="bim-warning" type="button">告警闪烁</button>
+          </div>
+          <button class="part-label label-blade" type="button" data-bim-part="blade">叶片/变桨</button>
+          <button class="part-label label-gearbox" type="button" data-bim-part="gearbox">齿轮箱</button>
+          <button class="part-label label-generator" type="button" data-bim-part="nacelle">发电机</button>
+          <button class="part-label label-yaw" type="button" data-bim-part="hub">转子主轴</button>
+          <button class="part-label label-tower" type="button" data-bim-part="tower">塔筒结构</button>
         </section>
 
         <aside class="component-strip" aria-label="部件拆分">
-          <button class="component active" type="button" data-component="blade-root">
+          <button class="component active" type="button" data-component="blade-root" data-bim-part="blade">
             <span>叶根螺栓</span><strong>预紧力异常</strong>
           </button>
-          <button class="component" type="button" data-component="drivetrain">
+          <button class="component" type="button" data-component="drivetrain" data-bim-part="hub">
             <span>传动链</span><strong>振动峰值上升</strong>
           </button>
-          <button class="component" type="button" data-component="gearbox">
+          <button class="component" type="button" data-component="gearbox" data-bim-part="gearbox">
             <span>齿轮箱</span><strong>温升趋势</strong>
           </button>
-          <button class="component" type="button" data-component="tower">
+          <button class="component" type="button" data-component="tower" data-bim-part="tower">
             <span>塔筒结构</span><strong>螺栓复核</strong>
           </button>
         </aside>
@@ -164,12 +161,32 @@ root.innerHTML = `
 
 const shell = document.querySelector<HTMLElement>(".shell");
 const sceneRoot = document.querySelector<HTMLDivElement>("#cesium-root");
+const bimModelRoot = document.querySelector<HTMLDivElement>("#bim-model-root");
+const bimStatus = document.querySelector<HTMLElement>("#bim-status");
 
-if (!shell || !sceneRoot) {
-  throw new Error("Missing dashboard shell or Cesium root");
+if (!shell || !sceneRoot || !bimModelRoot) {
+  throw new Error("Missing dashboard shell, Cesium root, or BIM root");
 }
 
 const dashboardShell = shell;
+const bimModelContainer = bimModelRoot;
+let bimViewer: BimTurbineViewer | undefined;
+let warningActive = false;
+
+function setBimStatus(status: string): void {
+  if (bimStatus) bimStatus.textContent = status;
+}
+
+function getBimViewer(): BimTurbineViewer {
+  if (!bimViewer) {
+    bimViewer = new BimTurbineViewer({
+      container: bimModelContainer,
+      onStatus: setBimStatus,
+    });
+  }
+
+  return bimViewer;
+}
 
 function setActiveModule(moduleName: string): void {
   dashboardShell.dataset.activeModule = moduleName;
@@ -182,6 +199,9 @@ function setActiveModule(moduleName: string): void {
 function openDiagnosis(turbine: TurbineAsset): void {
   dashboardShell.dataset.mode = "bim";
   setActiveModule("health");
+  window.requestAnimationFrame(() => {
+    void getBimViewer().initialize();
+  });
 
   const title = document.querySelector("#bim-selected-title");
 
@@ -191,6 +211,12 @@ function openDiagnosis(turbine: TurbineAsset): void {
 function closeDiagnosis(): void {
   dashboardShell.dataset.mode = "intro";
   setActiveModule("health");
+  if (warningActive) {
+    getBimViewer().stopWarning();
+    warningActive = false;
+    const warningButton = document.querySelector<HTMLButtonElement>("#bim-warning");
+    if (warningButton) warningButton.textContent = "告警闪烁";
+  }
 }
 
 void createWindFarmScene({
@@ -208,6 +234,15 @@ document.querySelectorAll<HTMLButtonElement>(".component").forEach((button) => {
   button.addEventListener("click", () => {
     document.querySelectorAll(".component").forEach((item) => item.classList.remove("active"));
     button.classList.add("active");
+    const part = button.dataset.bimPart as BimPartKey | undefined;
+    if (part) void getBimViewer().focusPart(part);
+  });
+});
+
+document.querySelectorAll<HTMLButtonElement>(".part-label[data-bim-part]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const part = button.dataset.bimPart as BimPartKey | undefined;
+    if (part) void getBimViewer().focusPart(part);
   });
 });
 
@@ -218,4 +253,19 @@ document.querySelectorAll<HTMLButtonElement>(".module-tab").forEach((button) => 
 
     setActiveModule(nextModule);
   });
+});
+
+document.querySelector<HTMLButtonElement>("#bim-decompose")?.addEventListener("click", () => {
+  void getBimViewer().decompose();
+});
+
+document.querySelector<HTMLButtonElement>("#bim-compose")?.addEventListener("click", () => {
+  void getBimViewer().compose();
+});
+
+document.querySelector<HTMLButtonElement>("#bim-warning")?.addEventListener("click", (event) => {
+  const button = event.currentTarget;
+  if (!(button instanceof HTMLButtonElement)) return;
+  warningActive = getBimViewer().toggleWarning();
+  button.textContent = warningActive ? "停止告警" : "告警闪烁";
 });

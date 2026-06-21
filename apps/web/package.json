@@ -10,10 +10,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "cesium": "^1.127.0"
+    "cesium": "^1.127.0",
+    "three": "^0.184.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.4",
+    "@types/three": "^0.184.1",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
     "vite-plugin-cesium": "^1.2.23",
