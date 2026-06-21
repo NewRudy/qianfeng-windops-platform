@@ -4,10 +4,13 @@ import { BimTurbineViewer, type BimPartKey } from "./bim/BimTurbineViewer";
 import { createWindFarmScene } from "./scene/createWindFarmScene";
 import { firstSliceSceneConfig, type TurbineAsset } from "./scene/sceneConfig";
 import {
+  buildGearboxWorkflowCase,
+  gearboxCaseCatalog,
   gearboxWorkflowCase,
   type BoltChart,
   type ComponentRisk,
   type CmsChart,
+  type GearboxWorkflowCase,
   type ScadaChart,
   type WorkflowAction,
   type WorkflowEvidence,
@@ -21,6 +24,9 @@ const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) {
   throw new Error("Missing app root");
 }
+
+let activeCaseId = gearboxCaseCatalog[0]?.id ?? "";
+let activeWorkflowCase: GearboxWorkflowCase = gearboxWorkflowCase;
 
 function html(value: string | number): string {
   return String(value)
@@ -209,6 +215,15 @@ function renderAction(action?: WorkflowAction, extraAttribute = ""): string {
   return `<button class="module-action${primaryClass}" type="button" data-open-module="${html(action.module)}"${extraAttribute}>${html(action.label)}</button>`;
 }
 
+function renderCaseOptions(): string {
+  return gearboxCaseCatalog
+    .map((entry) => {
+      const selected = entry.id === activeCaseId ? " selected" : "";
+      return `<option value="${html(entry.id)}"${selected}>${html(entry.title)}</option>`;
+    })
+    .join("");
+}
+
 function renderComponentButton(item: ComponentRisk): string {
   const isActive = item.component === "gearbox" ? " active" : "";
   return `
@@ -218,7 +233,7 @@ function renderComponentButton(item: ComponentRisk): string {
   `;
 }
 
-function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule): string {
+function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule, workflowCase: GearboxWorkflowCase): string {
   if (moduleKey === "health" && module.hero) {
     return `
       <section class="module-panel module-health">
@@ -283,7 +298,7 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule)
         <h3>${html(module.title)}</h3>
         <article class="alarm-card">
           <span>ORANGE</span>
-          <strong>${html(gearboxWorkflowCase.turbineId)} ${html(gearboxWorkflowCase.eventCode)}</strong>
+          <strong>${html(workflowCase.turbineId)} ${html(workflowCase.eventCode)}</strong>
           <p>${html(module.body ?? "")}</p>
         </article>
         <ul class="event-list">${renderEvidenceRows(module.evidenceRows)}</ul>
@@ -321,8 +336,6 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule)
   `;
 }
 
-const workflowModules = gearboxWorkflowCase.modules;
-
 root.innerHTML = `
   <main class="shell" data-mode="intro">
     <section class="scene-wrap">
@@ -343,6 +356,12 @@ root.innerHTML = `
           <div>
             <h2>黔风智维 - 风电机组智能预警与故障诊断平台</h2>
           </div>
+          <label class="case-switcher" for="case-selector">
+            <span>案例</span>
+            <select id="case-selector" aria-label="切换故障案例">
+              ${renderCaseOptions()}
+            </select>
+          </label>
           <strong id="bim-selected-title">HS-WTG-01</strong>
           <button id="close-bim" class="bim-back" type="button">返回 GIS 场景</button>
         </header>
@@ -367,11 +386,11 @@ root.innerHTML = `
         </section>
 
         <aside class="component-strip" aria-label="部件拆分">
-          ${gearboxWorkflowCase.componentRisks.map(renderComponentButton).join("")}
+          ${activeWorkflowCase.componentRisks.map(renderComponentButton).join("")}
         </aside>
 
         <aside class="module-drawer" aria-label="业务模块">
-          ${gearboxWorkflowCase.moduleOrder.map((moduleKey) => renderModulePanel(moduleKey, workflowModules[moduleKey])).join("")}
+          ${activeWorkflowCase.moduleOrder.map((moduleKey) => renderModulePanel(moduleKey, activeWorkflowCase.modules[moduleKey], activeWorkflowCase)).join("")}
         </aside>
 
         <nav class="bim-toolbar" aria-label="业务流程">
@@ -392,13 +411,19 @@ const shell = document.querySelector<HTMLElement>(".shell");
 const sceneRoot = document.querySelector<HTMLDivElement>("#cesium-root");
 const bimModelRoot = document.querySelector<HTMLDivElement>("#bim-model-root");
 const bimStatus = document.querySelector<HTMLElement>("#bim-status");
+const componentStrip = document.querySelector<HTMLElement>(".component-strip");
+const moduleDrawer = document.querySelector<HTMLElement>(".module-drawer");
+const caseSelector = document.querySelector<HTMLSelectElement>("#case-selector");
 
-if (!shell || !sceneRoot || !bimModelRoot) {
-  throw new Error("Missing dashboard shell, Cesium root, or BIM root");
+if (!shell || !sceneRoot || !bimModelRoot || !componentStrip || !moduleDrawer || !caseSelector) {
+  throw new Error("Missing dashboard shell, Cesium root, BIM root, or workflow controls");
 }
 
 const dashboardShell = shell;
 const bimModelContainer = bimModelRoot;
+const workflowComponentStrip = componentStrip;
+const workflowModuleDrawer = moduleDrawer;
+const workflowCaseSelector = caseSelector;
 let bimViewer: BimTurbineViewer | undefined;
 let warningActive = false;
 let modelDecomposed = false;
@@ -414,7 +439,7 @@ function setActiveComponent(componentName: string): void {
 }
 
 function isWorkflowModuleKey(value: string): value is WorkflowModuleKey {
-  return gearboxWorkflowCase.moduleOrder.includes(value as WorkflowModuleKey);
+  return activeWorkflowCase.moduleOrder.includes(value as WorkflowModuleKey);
 }
 
 function getWorkflowModule(value: string | undefined, fallback?: WorkflowModuleKey): WorkflowModuleKey | undefined {
@@ -428,12 +453,12 @@ function openWorkflowModule(moduleName: WorkflowModuleKey, status?: string): voi
 }
 
 function isGearboxPart(partName: string): boolean {
-  return gearboxWorkflowCase.partNamePattern.test(partName);
+  return activeWorkflowCase.partNamePattern.test(partName);
 }
 
 function activateGearboxWorkflow(moduleName: WorkflowModuleKey = "alerts"): void {
   setActiveComponent("gearbox");
-  openWorkflowModule(moduleName, gearboxWorkflowCase.statuses.locked);
+  openWorkflowModule(moduleName, activeWorkflowCase.statuses.locked);
 }
 
 function getBimViewer(): BimTurbineViewer {
@@ -458,6 +483,37 @@ function setActiveModule(moduleName: string): void {
   });
 }
 
+function setSelectedTurbineTitle(turbineId: string): void {
+  const title = document.querySelector("#bim-selected-title");
+  if (title) title.textContent = turbineId;
+}
+
+function renderWorkflowSurfaces(): void {
+  workflowComponentStrip.innerHTML = activeWorkflowCase.componentRisks.map(renderComponentButton).join("");
+  workflowModuleDrawer.innerHTML = activeWorkflowCase.moduleOrder
+    .map((moduleKey) => renderModulePanel(moduleKey, activeWorkflowCase.modules[moduleKey], activeWorkflowCase))
+    .join("");
+  bindWorkflowSurfaceEvents();
+}
+
+function selectWorkflowCase(caseId: string): void {
+  const nextCase = gearboxCaseCatalog.find((entry) => entry.id === caseId);
+  if (!nextCase) return;
+
+  const activeModule = getWorkflowModule(dashboardShell.dataset.activeModule ?? "", "health") ?? "health";
+  activeCaseId = nextCase.id;
+  workflowCaseSelector.value = activeCaseId;
+  activeWorkflowCase = buildGearboxWorkflowCase(nextCase.input);
+  renderWorkflowSurfaces();
+  setSelectedTurbineTitle(activeWorkflowCase.turbineId);
+  openWorkflowModule(activeModule, `已切换案例：${nextCase.title}`);
+  setActiveComponent("gearbox");
+
+  if (["scada", "cms", "alerts", "maintenance", "workorder"].includes(activeModule)) {
+    void getBimViewer().focusPart("gearbox");
+  }
+}
+
 function openDiagnosis(turbine: TurbineAsset): void {
   dashboardShell.dataset.mode = "bim";
   setActiveModule("none");
@@ -465,9 +521,11 @@ function openDiagnosis(turbine: TurbineAsset): void {
     void getBimViewer().initialize();
   });
 
-  const title = document.querySelector("#bim-selected-title");
-
-  if (title) title.textContent = turbine.name;
+  if (turbine.name === activeWorkflowCase.turbineId) {
+    setSelectedTurbineTitle(turbine.name);
+  } else {
+    setSelectedTurbineTitle(activeWorkflowCase.turbineId);
+  }
 }
 
 function closeDiagnosis(): void {
@@ -501,26 +559,71 @@ void createWindFarmScene({
   });
 });
 
-document.querySelectorAll<HTMLButtonElement>(".component").forEach((button) => {
-  button.addEventListener("click", () => {
-    const componentName = button.dataset.component ?? "";
-    setActiveComponent(componentName);
-    const part = button.dataset.bimPart as BimPartKey | undefined;
-    if (componentName === "gearbox") {
-      const nextModule = getWorkflowModule(button.dataset.module) ?? "alerts";
-      if (part) {
-        void getBimViewer()
-          .focusPart(part)
-          .then(() => openWorkflowModule(nextModule, gearboxWorkflowCase.statuses.componentEntry));
-      } else {
-        openWorkflowModule(nextModule, gearboxWorkflowCase.statuses.componentEntry);
+function bindWorkflowSurfaceEvents(): void {
+  workflowComponentStrip.querySelectorAll<HTMLButtonElement>(".component").forEach((button) => {
+    button.addEventListener("click", () => {
+      const componentName = button.dataset.component ?? "";
+      setActiveComponent(componentName);
+      const part = button.dataset.bimPart as BimPartKey | undefined;
+      if (componentName === "gearbox") {
+        const nextModule = getWorkflowModule(button.dataset.module) ?? "alerts";
+        if (part) {
+          void getBimViewer()
+            .focusPart(part)
+            .then(() => openWorkflowModule(nextModule, activeWorkflowCase.statuses.componentEntry));
+        } else {
+          openWorkflowModule(nextModule, activeWorkflowCase.statuses.componentEntry);
+        }
+        return;
       }
-      return;
-    }
-    if (part) void getBimViewer().focusPart(part);
-    const moduleName = getWorkflowModule(button.dataset.module);
-    if (moduleName) openWorkflowModule(moduleName);
+      if (part) void getBimViewer().focusPart(part);
+      const moduleName = getWorkflowModule(button.dataset.module);
+      if (moduleName) openWorkflowModule(moduleName);
+    });
   });
+
+  workflowModuleDrawer.querySelectorAll<HTMLButtonElement>("[data-open-module]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const moduleName = getWorkflowModule(button.dataset.openModule);
+      if (!moduleName) return;
+      openWorkflowModule(moduleName);
+      if (["scada", "cms", "alerts", "maintenance", "workorder"].includes(moduleName)) {
+        setActiveComponent("gearbox");
+        void getBimViewer().focusPart("gearbox");
+      }
+    });
+  });
+
+  workflowModuleDrawer.querySelector<HTMLButtonElement>("[data-create-workorder]")?.addEventListener("click", () => {
+    const ticket = activeWorkflowCase.modules.workorder.ticket;
+    const state = document.querySelector<HTMLElement>("#workorder-state");
+    const code = document.querySelector<HTMLElement>("#workorder-code");
+    const button = document.querySelector<HTMLButtonElement>("[data-close-workorder]");
+    if (state) state.textContent = ticket?.generatedState ?? "已生成";
+    if (code) code.textContent = ticket?.finalCode ?? "WO-GX-20260621-02";
+    if (button) button.disabled = false;
+    openWorkflowModule("workorder", activeWorkflowCase.statuses.ticketCreated);
+  });
+
+  workflowModuleDrawer.querySelector<HTMLButtonElement>("[data-close-workorder]")?.addEventListener("click", () => {
+    const ticket = activeWorkflowCase.modules.workorder.ticket;
+    const button = document.querySelector<HTMLButtonElement>("[data-close-workorder]");
+    const state = document.querySelector<HTMLElement>("#workorder-state");
+    const code = document.querySelector<HTMLElement>("#workorder-code");
+    if (state) state.textContent = ticket?.closedState ?? "现场复核完成";
+    if (code) code.textContent = ticket?.finalCode ?? "WO-GX-20260621-02";
+    if (button) {
+      button.textContent = ticket?.closedActionLabel ?? "现场复核已完成";
+      button.disabled = true;
+    }
+    setBimStatus(activeWorkflowCase.statuses.ticketClosed);
+  });
+}
+
+bindWorkflowSurfaceEvents();
+
+workflowCaseSelector.addEventListener("change", () => {
+  selectWorkflowCase(workflowCaseSelector.value);
 });
 
 document.querySelectorAll<HTMLButtonElement>(".part-label[data-bim-part]").forEach((button) => {
@@ -541,43 +644,6 @@ document.querySelectorAll<HTMLButtonElement>(".module-tab").forEach((button) => 
 
     setActiveModule(nextModule);
   });
-});
-
-document.querySelectorAll<HTMLButtonElement>("[data-open-module]").forEach((button) => {
-  button.addEventListener("click", () => {
-    const moduleName = getWorkflowModule(button.dataset.openModule);
-    if (!moduleName) return;
-    openWorkflowModule(moduleName);
-    if (["scada", "cms", "alerts", "maintenance", "workorder"].includes(moduleName)) {
-      setActiveComponent("gearbox");
-      void getBimViewer().focusPart("gearbox");
-    }
-  });
-});
-
-document.querySelector<HTMLButtonElement>("[data-create-workorder]")?.addEventListener("click", () => {
-  const ticket = gearboxWorkflowCase.modules.workorder.ticket;
-  const state = document.querySelector<HTMLElement>("#workorder-state");
-  const code = document.querySelector<HTMLElement>("#workorder-code");
-  const button = document.querySelector<HTMLButtonElement>("[data-close-workorder]");
-  if (state) state.textContent = ticket?.generatedState ?? "已生成";
-  if (code) code.textContent = ticket?.finalCode ?? "WO-GX-20260621-02";
-  if (button) button.disabled = false;
-  openWorkflowModule("workorder", gearboxWorkflowCase.statuses.ticketCreated);
-});
-
-document.querySelector<HTMLButtonElement>("[data-close-workorder]")?.addEventListener("click", () => {
-  const ticket = gearboxWorkflowCase.modules.workorder.ticket;
-  const button = document.querySelector<HTMLButtonElement>("[data-close-workorder]");
-  const state = document.querySelector<HTMLElement>("#workorder-state");
-  const code = document.querySelector<HTMLElement>("#workorder-code");
-  if (state) state.textContent = ticket?.closedState ?? "现场复核完成";
-  if (code) code.textContent = ticket?.finalCode ?? "WO-GX-20260621-02";
-  if (button) {
-    button.textContent = ticket?.closedActionLabel ?? "现场复核已完成";
-    button.disabled = true;
-  }
-  setBimStatus(gearboxWorkflowCase.statuses.ticketClosed);
 });
 
 document.querySelector<HTMLButtonElement>("#bim-toggle-decompose")?.addEventListener("click", (event) => {
