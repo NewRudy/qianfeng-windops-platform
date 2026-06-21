@@ -29,11 +29,20 @@ describe("gearbox workflow case", () => {
 
     expect(brief.action?.module).toBe("fusion");
     expect(aiBrief?.broadcast).toContain("2号机");
-    expect(aiBrief?.broadcast).toContain("黔风智维提示");
+    expect(aiBrief?.broadcast).toContain("黔风智维");
     expect(aiBrief?.primaryFinding).toContain("齿轮箱");
     expect(aiBrief?.evidence).toHaveLength(4);
     expect(aiBrief?.operatorQuestions.join(" ")).toContain("为什么");
     expect(brief.metrics).toContainEqual({ label: "证据来源", value: "SCADA / CMS / 螺栓 / 油温" });
+  });
+
+  it("keeps voice broadcast short and scoped to the active warning turbine", () => {
+    const broadcast = gearboxWorkflowCase.modules.brief.aiBrief?.broadcast ?? "";
+
+    expect(broadcast.length).toBeLessThanOrEqual(90);
+    expect(broadcast).toContain("2号机");
+    expect(broadcast).not.toContain("1号机");
+    expect(broadcast).not.toContain("3号机");
   });
 
   it("explains the multi-source fusion gates behind the warning", () => {

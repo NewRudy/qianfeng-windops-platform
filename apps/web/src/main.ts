@@ -295,6 +295,13 @@ function renderAiBrief(module: WorkflowModule): string {
     <div class="ai-question-chips" aria-label="常用追问">
       ${brief.operatorQuestions.map((question) => `<button type="button" data-ai-question="${html(question)}">${html(question)}</button>`).join("")}
     </div>
+    <section class="ai-generated-report" aria-live="polite">
+      <header>
+        <span>MiMo AI Report</span>
+        <button type="button" data-ai-generate-report>生成AI报告</button>
+      </header>
+      <p id="ai-generated-report-text">后端代理已准备接收诊断包。点击生成后，模型不可用时会自动返回规则兜底报告。</p>
+    </section>
   `;
 }
 
@@ -705,7 +712,7 @@ function speakAiDutyBrief(userInitiated = true): void {
 
   const utterance = new SpeechSynthesisUtterance(brief.broadcast);
   utterance.lang = "zh-CN";
-  utterance.rate = 1.12;
+  utterance.rate = 1.25;
   utterance.pitch = 0.96;
   utterance.onstart = () => {
     if (aiDutyStatus) aiDutyStatus.textContent = "AI 正在播报当前风机风险";
@@ -722,6 +729,40 @@ function speakAiDutyBrief(userInitiated = true): void {
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
   window.speechSynthesis.resume();
+}
+
+function setAiReportText(text: string): void {
+  const report = workflowModuleDrawer.querySelector<HTMLElement>("#ai-generated-report-text");
+  if (report) report.textContent = text;
+}
+
+async function requestAiDiagnosisReport(question = "生成当前风险诊断摘要"): Promise<void> {
+  const brief = activeWorkflowCase.modules.brief.aiBrief;
+  if (!brief) return;
+
+  setAiReportText("AI 正在读取诊断包并生成报告...");
+  try {
+    const response = await fetch("/api/ai/diagnosis", {
+      body: JSON.stringify({
+        caseId: activeCaseId,
+        diagnosis: {
+          conclusion: brief.conclusion,
+          evidence: brief.evidence,
+          primaryFinding: brief.primaryFinding,
+          recommendedAction: brief.recommendedAction,
+        },
+        question,
+        turbineId: activeWorkflowCase.turbineId,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    const result = await response.json() as { answer?: string; source?: string };
+    const sourceLabel = result.source === "llm" ? "MiMo 模型" : "规则兜底";
+    setAiReportText(`${sourceLabel}：${result.answer || "未返回有效报告"}`);
+  } catch {
+    setAiReportText(`规则兜底：${brief.conclusion} 建议动作：${brief.recommendedAction}`);
+  }
 }
 
 function closeDiagnosis(): void {
@@ -804,7 +845,12 @@ function bindWorkflowSurfaceEvents(): void {
     button.addEventListener("click", () => {
       const question = button.dataset.aiQuestion ?? "查看证据链";
       setBimStatus(`AI 已收到追问：${question}；下一步将接入语音问答服务`);
+      void requestAiDiagnosisReport(question);
     });
+  });
+
+  workflowModuleDrawer.querySelector<HTMLButtonElement>("[data-ai-generate-report]")?.addEventListener("click", () => {
+    void requestAiDiagnosisReport();
   });
 
   workflowModuleDrawer.querySelector<HTMLButtonElement>("[data-create-workorder]")?.addEventListener("click", () => {

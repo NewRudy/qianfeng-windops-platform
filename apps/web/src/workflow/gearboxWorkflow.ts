@@ -375,7 +375,7 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       brief: {
         action: { label: "展开证据链", module: "fusion", primary: true },
         aiBrief: {
-          broadcast: `黔风智维提示：${spokenTurbineName(input.turbineId)}出现齿轮箱 P1 预警。功率残差、啮合侧频和油温同步异常，建议进入诊断包，并在 ${input.maintenance.actionWindowHours} 内安排复核。`,
+          broadcast: `黔风智维：${spokenTurbineName(input.turbineId)}齿轮箱 P1 预警。SCADA、CMS、油温三源一致，${input.maintenance.actionWindowHours} 内复核，先按限载策略运行。`,
           conclusion: `${input.turbineId} 当前不是孤立阈值报警，而是运行残差、振动频谱和热异常共同指向齿轮箱高速轴轴承早期磨损。系统建议按预测维护流程生成巡检工单，复核前执行 ${input.maintenance.workMode}。`,
           evidence: [
             `SCADA 最大功率缺口 ${formatSignedPct(diagnostics.maxPowerShortfallPct)}，异常窗口 ${diagnostics.scadaAbnormalSamples}/${input.scadaSamples.length}`,
