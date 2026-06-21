@@ -340,23 +340,24 @@ button {
 
 .bim-stage-actions {
   position: absolute;
-  right: 18px;
-  bottom: 18px;
+  right: 14px;
+  bottom: 14px;
   z-index: 4;
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .bim-stage-actions button {
-  height: 36px;
-  padding: 0 16px;
-  border: 1px solid rgba(91, 224, 246, 0.42);
-  background: linear-gradient(180deg, rgba(10, 41, 59, 0.78), rgba(2, 13, 21, 0.78));
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(91, 224, 246, 0.32);
+  background: linear-gradient(180deg, rgba(7, 34, 49, 0.72), rgba(2, 13, 21, 0.74));
   color: rgba(235, 250, 253, 0.9);
+  font-size: 12px;
   font-weight: 900;
   box-shadow:
-    inset 0 0 18px rgba(91, 224, 246, 0.08),
-    0 12px 30px rgba(0, 0, 0, 0.24);
+    inset 0 0 14px rgba(91, 224, 246, 0.06),
+    0 8px 20px rgba(0, 0, 0, 0.22);
 }
 
 .bim-stage-actions button:hover {
@@ -697,46 +698,198 @@ button {
   font-weight: 900;
 }
 
-.signal-chart {
-  display: flex;
-  gap: 6px;
-  align-items: end;
-  height: 150px;
-  padding: 12px;
-  margin-bottom: 14px;
+.engineering-chart {
+  margin: 0 0 12px;
+  padding: 10px;
+  border: 1px solid rgba(91, 224, 246, 0.16);
   background:
-    linear-gradient(rgba(52, 203, 92, 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(52, 203, 92, 0.08) 1px, transparent 1px),
-    rgba(2, 13, 20, 0.64);
+    linear-gradient(rgba(91, 224, 246, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(91, 224, 246, 0.05) 1px, transparent 1px),
+    rgba(1, 12, 19, 0.68);
   background-size: 18px 18px;
 }
 
-.signal-chart i {
-  flex: 1;
-  min-height: 16px;
-  background: linear-gradient(180deg, #62ff58, #1d8a3d);
-  box-shadow: 0 0 12px rgba(90, 255, 104, 0.32);
-}
-
-.spectrum-strip {
+.engineering-chart figcaption {
   display: flex;
-  gap: 5px;
-  align-items: end;
-  height: 118px;
-  padding: 12px;
-  margin-bottom: 14px;
-  background:
-    linear-gradient(rgba(91, 224, 246, 0.09) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(91, 224, 246, 0.08) 1px, transparent 1px),
-    rgba(2, 13, 20, 0.68);
-  background-size: 16px 16px;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+  color: rgba(221, 249, 252, 0.72);
+  font-size: 10px;
+  line-height: 1.35;
 }
 
-.spectrum-strip i {
-  flex: 1;
-  min-height: 12px;
-  background: linear-gradient(180deg, #f6c568, #ff6b2d 58%, #52210d);
-  box-shadow: 0 0 14px rgba(255, 122, 37, 0.34);
+.engineering-chart figcaption strong {
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.engineering-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.grid-line {
+  stroke: rgba(91, 224, 246, 0.12);
+  stroke-width: 1;
+}
+
+.grid-line.vertical {
+  stroke: rgba(91, 224, 246, 0.08);
+}
+
+.axis-line {
+  stroke: rgba(200, 247, 255, 0.44);
+  stroke-width: 1.2;
+}
+
+.axis-title,
+.tick-label {
+  fill: rgba(221, 249, 252, 0.68);
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.chart-line {
+  fill: none;
+  stroke-width: 2.2;
+}
+
+.chart-line.baseline {
+  stroke: rgba(91, 224, 246, 0.75);
+  stroke-dasharray: 4 4;
+}
+
+.chart-line.measured {
+  stroke: #56f06f;
+}
+
+.chart-point {
+  fill: #56f06f;
+  stroke: rgba(245, 255, 248, 0.86);
+  stroke-width: 1;
+}
+
+.chart-point.abnormal {
+  fill: #ffb13b;
+  filter: drop-shadow(0 0 5px rgba(255, 177, 59, 0.8));
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  color: rgba(222, 249, 252, 0.72);
+  font-size: 10px;
+}
+
+.chart-legend span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 18px;
+  height: 2px;
+}
+
+.legend-line.baseline {
+  border-top: 2px dashed rgba(91, 224, 246, 0.82);
+}
+
+.legend-line.measured {
+  background: #56f06f;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.legend-dot.abnormal,
+.legend-dot.warning {
+  background: #ffb13b;
+}
+
+.legend-dot.watch {
+  background: #f0df58;
+}
+
+.legend-dot.normal {
+  background: #56f06f;
+}
+
+.threshold-line {
+  stroke: #ffb13b;
+  stroke-dasharray: 5 4;
+  stroke-width: 1.4;
+}
+
+.threshold-label {
+  fill: #ffcb78;
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.spectrum-peak rect {
+  fill: rgba(91, 224, 246, 0.58);
+  stroke: rgba(221, 249, 252, 0.36);
+}
+
+.spectrum-peak.warning rect {
+  fill: rgba(255, 145, 56, 0.84);
+  filter: drop-shadow(0 0 5px rgba(255, 145, 56, 0.64));
+}
+
+.spectrum-peak text {
+  fill: rgba(236, 252, 255, 0.82);
+  font-size: 7px;
+  font-weight: 800;
+}
+
+.bolt-ring,
+.bolt-hub {
+  fill: none;
+  stroke: rgba(91, 224, 246, 0.32);
+  stroke-width: 1.5;
+}
+
+.bolt-hub {
+  fill: rgba(91, 224, 246, 0.06);
+}
+
+.bolt-channel line {
+  stroke: rgba(91, 224, 246, 0.14);
+}
+
+.bolt-channel circle {
+  stroke: rgba(238, 252, 255, 0.82);
+  stroke-width: 1;
+}
+
+.bolt-channel.normal circle {
+  fill: #56f06f;
+}
+
+.bolt-channel.watch circle {
+  fill: #f0df58;
+}
+
+.bolt-channel.warning circle {
+  fill: #ff8f3b;
+  filter: drop-shadow(0 0 6px rgba(255, 143, 59, 0.74));
+}
+
+.bolt-channel text {
+  fill: rgba(235, 250, 253, 0.78);
+  font-size: 8px;
+  font-weight: 900;
 }
 
 .alarm-card,
@@ -778,6 +931,28 @@ button {
   grid-template-columns: auto 1fr;
   color: rgba(235, 249, 252, 0.82);
   font-size: 13px;
+}
+
+.event-list li.evidence-row {
+  grid-template-columns: 1fr;
+  gap: 6px;
+  padding: 10px;
+}
+
+.evidence-row div {
+  display: grid;
+  gap: 4px;
+}
+
+.evidence-row strong {
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.evidence-row small {
+  color: rgba(203, 234, 239, 0.68);
+  font-size: 10px;
+  line-height: 1.45;
 }
 
 .event-list span,

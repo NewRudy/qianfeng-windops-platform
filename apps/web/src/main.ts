@@ -5,8 +5,12 @@ import { createWindFarmScene } from "./scene/createWindFarmScene";
 import { firstSliceSceneConfig, type TurbineAsset } from "./scene/sceneConfig";
 import {
   gearboxWorkflowCase,
+  type BoltChart,
   type ComponentRisk,
+  type CmsChart,
+  type ScadaChart,
   type WorkflowAction,
+  type WorkflowEvidence,
   type WorkflowMetric,
   type WorkflowModule,
   type WorkflowModuleKey,
@@ -31,12 +35,172 @@ function renderMetrics(metrics: WorkflowMetric[] = []): string {
   return metrics.map((item) => `<div><dt>${html(item.label)}</dt><dd>${html(item.value)}</dd></div>`).join("");
 }
 
-function renderListRows(metrics: WorkflowMetric[] = []): string {
-  return metrics.map((item) => `<li><span>${html(item.label)}</span>${html(item.value)}</li>`).join("");
+function scaleValue(value: number, min: number, max: number, low: number, high: number): number {
+  if (max === min) return low;
+  return low + ((value - min) / (max - min)) * (high - low);
 }
 
-function renderBars(heights: number[] = []): string {
-  return heights.map((height) => `<i style="height:${height}%"></i>`).join("");
+type SvgPlotArea = {
+  bottom: number;
+  left: number;
+  right: number;
+  top: number;
+};
+
+function renderSvgTicks(axis: ScadaChart["xAxis"] | ScadaChart["yAxis"], orientation: "x" | "y", plot: SvgPlotArea): string {
+  return axis.ticks
+    .map((tick) => {
+      if (orientation === "x") {
+        const x = scaleValue(tick, axis.min, axis.max, plot.left, plot.right);
+        return `
+          <line class="grid-line vertical" x1="${x}" y1="${plot.top}" x2="${x}" y2="${plot.bottom}"></line>
+          <text class="tick-label" x="${x}" y="164" text-anchor="middle">${html(tick)}</text>
+        `;
+      }
+      const y = scaleValue(tick, axis.min, axis.max, plot.bottom, plot.top);
+      return `
+        <line class="grid-line" x1="${plot.left}" y1="${y}" x2="${plot.right}" y2="${y}"></line>
+        <text class="tick-label" x="34" y="${y + 4}" text-anchor="end">${html(tick)}</text>
+      `;
+    })
+    .join("");
+}
+
+function renderScadaChart(chart?: ScadaChart): string {
+  if (!chart) return "";
+  const plot = { left: 42, right: 286, top: 18, bottom: 144 };
+  const pointToSvg = (windSpeed: number, powerKw: number) =>
+    `${scaleValue(windSpeed, chart.xAxis.min, chart.xAxis.max, plot.left, plot.right)},${scaleValue(powerKw, chart.yAxis.min, chart.yAxis.max, plot.bottom, plot.top)}`;
+  const baseline = chart.points.map((point) => pointToSvg(point.windSpeed, point.expectedKw)).join(" ");
+  const measured = chart.points.map((point) => pointToSvg(point.windSpeed, point.powerKw)).join(" ");
+  const points = chart.points
+    .map((point) => {
+      const [x, y] = pointToSvg(point.windSpeed, point.powerKw).split(",");
+      const abnormalClass = point.abnormal ? " abnormal" : "";
+      return `<circle class="chart-point${abnormalClass}" cx="${x}" cy="${y}" r="${point.abnormal ? 4.6 : 3.2}"><title>${html(point.timestamp)} 残差 ${html(point.residualPct)}%</title></circle>`;
+    })
+    .join("");
+
+  return `
+    <figure class="engineering-chart scada-diagnostic">
+      <figcaption>
+        <strong>${html(chart.title)}</strong>
+        <span>${html(chart.sampleWindow)}</span>
+      </figcaption>
+      <svg viewBox="0 0 304 184" role="img" aria-label="${html(chart.title)}">
+        ${renderSvgTicks(chart.yAxis, "y", plot)}
+        ${renderSvgTicks(chart.xAxis, "x", plot)}
+        <line class="axis-line" x1="${plot.left}" y1="${plot.bottom}" x2="${plot.right}" y2="${plot.bottom}"></line>
+        <line class="axis-line" x1="${plot.left}" y1="${plot.top}" x2="${plot.left}" y2="${plot.bottom}"></line>
+        <polyline class="chart-line baseline" points="${baseline}"></polyline>
+        <polyline class="chart-line measured" points="${measured}"></polyline>
+        ${points}
+        <text class="axis-title x-title" x="164" y="181" text-anchor="middle">${html(chart.xAxis.label)}</text>
+        <text class="axis-title y-title" x="-82" y="12" text-anchor="middle" transform="rotate(-90)">${html(chart.yAxis.label)}</text>
+      </svg>
+      <div class="chart-legend">
+        <span><i class="legend-line baseline"></i>${html(chart.baselineLabel)}</span>
+        <span><i class="legend-line measured"></i>实测功率</span>
+        <span><i class="legend-dot abnormal"></i>异常采样</span>
+      </div>
+    </figure>
+  `;
+}
+
+function renderCmsChart(chart?: CmsChart): string {
+  if (!chart) return "";
+  const plot = { left: 42, right: 286, top: 18, bottom: 132 };
+  const thresholdY = scaleValue(chart.threshold.value, chart.yAxis.min, chart.yAxis.max, plot.bottom, plot.top);
+  const bars = chart.peaks
+    .map((peak) => {
+      const x = scaleValue(peak.frequencyHz, chart.xAxis.min, chart.xAxis.max, plot.left, plot.right);
+      const y = scaleValue(peak.amplitude, chart.yAxis.min, chart.yAxis.max, plot.bottom, plot.top);
+      const height = plot.bottom - y;
+      return `
+        <g class="spectrum-peak ${peak.status}">
+          <rect x="${x - 5}" y="${y}" width="10" height="${height}"></rect>
+          <text x="${x}" y="${Math.max(12, y - 5)}" text-anchor="middle">${html(peak.label)}</text>
+        </g>
+      `;
+    })
+    .join("");
+
+  return `
+    <figure class="engineering-chart cms-spectrum">
+      <figcaption>
+        <strong>${html(chart.title)}</strong>
+        <span>${html(chart.sampleWindow)}</span>
+      </figcaption>
+      <svg viewBox="0 0 304 184" role="img" aria-label="${html(chart.title)}">
+        ${renderSvgTicks(chart.yAxis, "y", plot)}
+        ${renderSvgTicks(chart.xAxis, "x", plot)}
+        <line class="axis-line" x1="${plot.left}" y1="${plot.bottom}" x2="${plot.right}" y2="${plot.bottom}"></line>
+        <line class="axis-line" x1="${plot.left}" y1="${plot.top}" x2="${plot.left}" y2="${plot.bottom}"></line>
+        <line class="threshold-line" x1="${plot.left}" y1="${thresholdY}" x2="${plot.right}" y2="${thresholdY}"></line>
+        <text class="threshold-label" x="${plot.right - 2}" y="${thresholdY - 4}" text-anchor="end">${html(chart.threshold.label)} ${html(chart.threshold.value)}</text>
+        ${bars}
+        <text class="axis-title x-title" x="164" y="181" text-anchor="middle">${html(chart.xAxis.label)}</text>
+        <text class="axis-title y-title" x="-82" y="12" text-anchor="middle" transform="rotate(-90)">${html(chart.yAxis.label)}</text>
+      </svg>
+    </figure>
+  `;
+}
+
+function renderBoltChart(chart?: BoltChart): string {
+  if (!chart) return "";
+  const center = { x: 152, y: 82 };
+  const radius = 48;
+  const channels = chart.channels
+    .map((channel) => {
+      const radians = (channel.angle - 90) * (Math.PI / 180);
+      const x = center.x + Math.cos(radians) * radius;
+      const y = center.y + Math.sin(radians) * radius;
+      const labelX = center.x + Math.cos(radians) * (radius + 24);
+      const labelY = center.y + Math.sin(radians) * (radius + 24);
+      return `
+        <g class="bolt-channel ${channel.status}">
+          <line x1="${center.x}" y1="${center.y}" x2="${x}" y2="${y}"></line>
+          <circle cx="${x}" cy="${y}" r="6"><title>${html(channel.id)} ${html(channel.preloadKn)} kN / 松弛 ${html(channel.relaxationPct)}%</title></circle>
+          <text x="${labelX}" y="${labelY + 3}" text-anchor="middle">${html(channel.id)}</text>
+        </g>
+      `;
+    })
+    .join("");
+
+  return `
+    <figure class="engineering-chart bolt-map">
+      <figcaption>
+        <strong>${html(chart.title)}</strong>
+        <span>标称预紧力 ${html(chart.nominalPreloadKn)} kN / 松弛预警 ${html(chart.warningRelaxationPct)}%</span>
+      </figcaption>
+      <svg viewBox="0 0 304 164" role="img" aria-label="${html(chart.title)}">
+        <circle class="bolt-ring" cx="${center.x}" cy="${center.y}" r="${radius}"></circle>
+        <circle class="bolt-hub" cx="${center.x}" cy="${center.y}" r="20"></circle>
+        ${channels}
+      </svg>
+      <div class="chart-legend">
+        <span><i class="legend-dot normal"></i>正常</span>
+        <span><i class="legend-dot watch"></i>关注</span>
+        <span><i class="legend-dot warning"></i>预警</span>
+      </div>
+    </figure>
+  `;
+}
+
+function renderEvidenceRows(rows: WorkflowEvidence[] = []): string {
+  return rows
+    .map(
+      (row) => `
+        <li class="evidence-row">
+          <div>
+            <span>${html(row.label)} · ${html(row.source)}</span>
+            <strong>${html(row.value)}</strong>
+          </div>
+          <small>窗口 ${html(row.window)} / 模型 ${html(row.model)} / 阈值 ${html(row.threshold)} / 置信度 ${html(row.confidence)}</small>
+        </li>
+      `,
+    )
+    .join("");
 }
 
 function renderAction(action?: WorkflowAction, extraAttribute = ""): string {
@@ -78,7 +242,7 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule)
       <section class="module-panel module-scada">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        <div class="signal-chart">${renderBars(module.chartHeights)}</div>
+        ${renderScadaChart(module.scadaChart)}
         <dl>${renderMetrics(module.metrics)}</dl>
         <p>${html(module.body ?? "")}</p>
         ${renderAction(module.action)}
@@ -91,7 +255,7 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule)
       <section class="module-panel module-cms">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        <div class="spectrum-strip" aria-label="频谱能量">${renderBars(module.spectrumHeights)}</div>
+        ${renderCmsChart(module.cmsChart)}
         <dl>${renderMetrics(module.metrics)}</dl>
         <p>${html(module.body ?? "")}</p>
         ${renderAction(module.action)}
@@ -104,6 +268,7 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule)
       <section class="module-panel module-bolts">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
+        ${renderBoltChart(module.boltChart)}
         <dl>${renderMetrics(module.metrics)}</dl>
         <p>${html(module.body ?? "")}</p>
         ${renderAction(module.action)}
@@ -121,7 +286,7 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule)
           <strong>${html(gearboxWorkflowCase.turbineId)} ${html(gearboxWorkflowCase.eventCode)}</strong>
           <p>${html(module.body ?? "")}</p>
         </article>
-        <ul class="event-list">${renderListRows(module.evidenceRows)}</ul>
+        <ul class="event-list">${renderEvidenceRows(module.evidenceRows)}</ul>
         ${renderAction(module.action)}
       </section>
     `;
@@ -191,8 +356,7 @@ root.innerHTML = `
             <em>点击部件定位；需要证据、工单或维护策略时从下方流程打开。</em>
           </div>
           <div class="bim-stage-actions" aria-label="BIM 模型操作">
-            <button id="bim-decompose" type="button">拆解模型</button>
-            <button id="bim-compose" type="button">复原模型</button>
+            <button id="bim-toggle-decompose" type="button" data-state="composed">拆解模型</button>
             <button id="bim-warning" type="button">告警闪烁</button>
           </div>
           <button class="part-label label-blade" type="button" data-bim-part="blade">叶片/变桨</button>
@@ -237,6 +401,7 @@ const dashboardShell = shell;
 const bimModelContainer = bimModelRoot;
 let bimViewer: BimTurbineViewer | undefined;
 let warningActive = false;
+let modelDecomposed = false;
 
 function setBimStatus(status: string): void {
   if (bimStatus) bimStatus.textContent = status;
@@ -313,6 +478,15 @@ function closeDiagnosis(): void {
     warningActive = false;
     const warningButton = document.querySelector<HTMLButtonElement>("#bim-warning");
     if (warningButton) warningButton.textContent = "告警闪烁";
+  }
+  if (modelDecomposed) {
+    void getBimViewer().compose();
+    modelDecomposed = false;
+    const toggleButton = document.querySelector<HTMLButtonElement>("#bim-toggle-decompose");
+    if (toggleButton) {
+      toggleButton.textContent = "拆解模型";
+      toggleButton.dataset.state = "composed";
+    }
   }
 }
 
@@ -406,12 +580,15 @@ document.querySelector<HTMLButtonElement>("[data-close-workorder]")?.addEventLis
   setBimStatus(gearboxWorkflowCase.statuses.ticketClosed);
 });
 
-document.querySelector<HTMLButtonElement>("#bim-decompose")?.addEventListener("click", () => {
-  void getBimViewer().decompose();
-});
-
-document.querySelector<HTMLButtonElement>("#bim-compose")?.addEventListener("click", () => {
-  void getBimViewer().compose();
+document.querySelector<HTMLButtonElement>("#bim-toggle-decompose")?.addEventListener("click", (event) => {
+  const button = event.currentTarget;
+  if (!(button instanceof HTMLButtonElement)) return;
+  const nextAction = modelDecomposed ? getBimViewer().compose() : getBimViewer().decompose();
+  void nextAction.then(() => {
+    modelDecomposed = !modelDecomposed;
+    button.textContent = modelDecomposed ? "复原模型" : "拆解模型";
+    button.dataset.state = modelDecomposed ? "decomposed" : "composed";
+  });
 });
 
 document.querySelector<HTMLButtonElement>("#bim-warning")?.addEventListener("click", (event) => {
