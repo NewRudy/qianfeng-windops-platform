@@ -262,6 +262,45 @@ function renderFusionSignals(signals: FusionSignal[] = []): string {
     .join("");
 }
 
+function renderEvidenceReviewPath(signals: FusionSignal[] = [], gates: ModelGate[] = []): string {
+  const pairedSignals = signals.slice(0, gates.length);
+  if (!pairedSignals.length) return "";
+
+  return `
+    <section class="evidence-review-path" aria-label="证据复核路径">
+      <header>
+        <span>复核路径</span>
+        <strong>输入 -> 判据 -> 结论</strong>
+      </header>
+      <ol>
+        ${pairedSignals.map((signal, index) => {
+          const gate = gates[index];
+          return `
+            <li class="${html(signal.status)}">
+              <span>${String(index + 1).padStart(2, "0")}</span>
+              <div>
+                <small>输入数据</small>
+                <strong>${html(signal.source)}</strong>
+                <p>${html(signal.metric)} / ${html(signal.window)}</p>
+              </div>
+              <div>
+                <small>模型判据</small>
+                <strong>${html(gate?.method ?? signal.rule)}</strong>
+                <p>${html(gate?.rule ?? signal.rule)}</p>
+              </div>
+              <div>
+                <small>输出结论</small>
+                <strong>${html(gate?.result ?? signal.contribution)}</strong>
+                <p>${html(signal.quality)}</p>
+              </div>
+            </li>
+          `;
+        }).join("")}
+      </ol>
+    </section>
+  `;
+}
+
 function renderModelGates(gates: ModelGate[] = []): string {
   return gates
     .map(
@@ -348,6 +387,10 @@ function renderEvidenceReviewCard(decision?: WorkflowDecision): string {
         <span>人工确认</span>
         <p>${html(decision.confirm)}</p>
       </footer>
+      <details>
+        <summary>展开证据依据</summary>
+        <p>${html(decision.evidence)}</p>
+      </details>
     </article>
   `;
 }
@@ -545,6 +588,7 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
         <details class="module-evidence-stack">
           <summary>展开多源证据与模型门控</summary>
           ${renderModuleEvidenceNote(module.body)}
+          ${renderEvidenceReviewPath(module.fusionSignals, module.modelGates)}
           <div class="fusion-source-grid">${renderFusionSignals(module.fusionSignals)}</div>
           <ol class="model-gate-list">${renderModelGates(module.modelGates)}</ol>
         </details>

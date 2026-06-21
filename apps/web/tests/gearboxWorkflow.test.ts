@@ -87,6 +87,11 @@ describe("gearbox workflow case", () => {
     expect(fusion.fusionSignals).toHaveLength(4);
     expect(fusion.modelGates).toHaveLength(4);
     expect(fusion.metrics).toContainEqual({ label: "融合结论", value: "齿轮箱 P1 预警" });
+    expect(fusion.metrics).toContainEqual({ label: "人工复核", value: "时间窗 / 采样质量 / 结构反证" });
+    expect(fusion.body).toContain("运行异常 -> 部件定位 -> 热异常增强 -> 结构反证");
+    expect(fusion.decision?.input).toContain("同一事件窗口");
+    expect(fusion.decision?.confirm).toContain("采样质量");
+    expect(fusion.decision?.evidence).toContain("未发现足以改写主故障");
     expect(sources).toContain("SCADA 功率曲线");
     expect(sources).toContain("CMS 振动频谱");
     expect(sources).toContain("螺栓/结构监测");

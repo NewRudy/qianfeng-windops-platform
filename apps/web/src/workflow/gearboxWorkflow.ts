@@ -572,11 +572,11 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       },
       fusion: {
         action: { label: "进入告警研判", module: "alerts", primary: true },
-        body: `判定门槛：SCADA 功率残差、CMS 侧频、油温热平衡三项核心证据中 ${exceededCoreSignals}/3 项越限；螺栓/结构监测用于排除叶根主风险并保留山地阵风载荷联动。`,
+        body: `复核逻辑：先确认 SCADA/CMS/油温/螺栓都来自同一事件窗口，再按“运行异常 -> 部件定位 -> 热异常增强 -> 结构反证”的顺序过判据门。三项核心证据中 ${exceededCoreSignals}/3 项越限，螺栓/结构监测不改写主故障，只作为山地阵风载荷放大因素跟踪。`,
         decision: {
-          confirm: "诊断工程师复核模型门控后，才把事件从数据异常升级为 P1 预测维护预警。",
-          evidence: `核心证据 ${exceededCoreSignals}/3 越限；SCADA 残差、CMS 侧频、油温热异常同向，螺栓监测作为结构反证保留。`,
-          input: "同一事件窗口内的 SCADA、CMS、油温、螺栓/结构监测",
+          confirm: "诊断工程师确认时间窗对齐、采样质量和结构反证后，才把事件从数据异常升级为 P1 预测维护预警。",
+          evidence: `核心证据 ${exceededCoreSignals}/3 越限；SCADA 残差、CMS 侧频、油温热异常同向，螺栓监测作为结构反证保留，未发现足以改写主故障的环向扩展。`,
+          input: "同一事件窗口内的 SCADA 功率曲线、CMS 包络谱、油温对标、螺栓/结构监测",
           model: "OpenOA 功率基线 + GMF 包络谱 + 热平衡残差 + 结构排查门控",
           operation: "运行融合判据",
           result: exceededCoreSignals >= 2 ? "升级为齿轮箱 P1 预测维护事件" : "继续观察，不生成工单",
@@ -624,6 +624,7 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
           { label: "核心证据越限", value: `${exceededCoreSignals} / 3` },
           { label: "融合结论", value: "齿轮箱 P1 预警" },
           { label: "处置门槛", value: exceededCoreSignals >= 2 ? "进入现场复核" : "继续观察" },
+          { label: "人工复核", value: "时间窗 / 采样质量 / 结构反证" },
         ],
         modelGates: [
           {
