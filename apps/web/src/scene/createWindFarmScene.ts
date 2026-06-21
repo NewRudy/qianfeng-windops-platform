@@ -1,4 +1,5 @@
 import {
+  BoundingSphere,
   Cartesian2,
   Cartesian3,
   Cesium3DTileset,
@@ -12,6 +13,7 @@ import {
   Model,
   ModelAnimationLoop,
   Rectangle,
+  SceneTransforms,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
   Transforms,
@@ -31,6 +33,9 @@ export interface CreateWindFarmSceneOptions {
   config: SceneConfig;
   onTurbineSelected?: (turbine: TurbineAsset) => void;
 }
+
+const RIDGE_OVERVIEW_CAMERA = new HeadingPitchRange(5.68, -0.34, 1620);
+const TURBINE_DETAIL_CAMERA = new HeadingPitchRange(5.78, -0.32, 640);
 
 interface PickableModelId {
   kind: "turbine";
@@ -92,39 +97,27 @@ export async function createWindFarmScene({
   }
 
   for (const turbine of config.turbines) {
+    addTurbineFoundation(viewer, localFrame, turbine);
+
     void loadTurbineGltfModel(viewer, localFrame, turbine).catch((error: unknown) => {
       console.error(`Failed to load ${turbine.turbineId} wind turbine model.`, error);
-    });
-
-    viewer.entities.add({
-      id: `${turbine.turbineId}-label`,
-      position: pointFromOffset(localFrame, getHubOffset(turbine)),
-      label: {
-        text: `${turbine.name} · ${riskText(turbine.riskLevel)}`,
-        fillColor: Color.fromCssColorString("#dff7ff"),
-        outlineColor: Color.fromCssColorString("#00111f"),
-        outlineWidth: 3,
-        showBackground: true,
-        backgroundColor: Color.fromCssColorString("rgba(0, 35, 55, 0.72)"),
-        pixelOffset: new Cartesian2(0, -72),
-        font: "14px sans-serif",
-      },
     });
   }
 
   const showMountainOverview = () => {
-    viewer.camera.lookAt(
-      origin,
-      new HeadingPitchRange(5.56, -0.88, 2920),
-    );
+    viewer.camera.flyToBoundingSphere(new BoundingSphere(origin, 1320), {
+      duration: 2.6,
+      offset: RIDGE_OVERVIEW_CAMERA,
+    });
   };
 
   const focusTurbine = () => {
     onTurbineSelected?.(selectedTurbine);
     viewer.camera.lookAt(
       pointFromOffset(localFrame, getHubOffset(selectedTurbine)),
-      new HeadingPitchRange(5.78, -0.32, 640),
+      TURBINE_DETAIL_CAMERA,
     );
+    viewer.camera.lookAtTransform(Matrix4.IDENTITY);
   };
 
   const selectTurbine = (turbineId: string) => {
@@ -134,14 +127,16 @@ export async function createWindFarmScene({
     focusTurbine();
   };
 
-  showMountainOverview();
+  playIntroFlight(viewer, origin);
 
   const handler = new ScreenSpaceEventHandler(viewer.canvas);
   handler.setInputAction((movement: { position: Cartesian2 }) => {
     const picked = viewer.scene.pick(movement.position);
     const pickedId = picked?.primitive?.id as PickableModelId | undefined;
     const pickedEntityId = typeof picked?.id?.id === "string" ? picked.id.id : "";
-    const pickedTurbineId = pickedId?.kind === "turbine" ? pickedId.turbineId : turbineIdFromEntityId(pickedEntityId);
+    const pickedTurbineId = pickedId?.kind === "turbine"
+      ? pickedId.turbineId
+      : turbineIdFromEntityId(pickedEntityId) ?? turbineNearScreenPoint(viewer, localFrame, config, movement.position);
     if (pickedTurbineId) {
       selectTurbine(pickedTurbineId);
     }
@@ -155,6 +150,18 @@ export async function createWindFarmScene({
       viewer.destroy();
     },
   };
+}
+
+function playIntroFlight(viewer: Viewer, origin: Cartesian3): void {
+  viewer.camera.lookAt(origin, new HeadingPitchRange(5.08, -1.12, 8200));
+  viewer.camera.lookAtTransform(Matrix4.IDENTITY);
+
+  window.setTimeout(() => {
+    viewer.camera.flyToBoundingSphere(new BoundingSphere(origin, 1320), {
+      duration: 4.2,
+      offset: RIDGE_OVERVIEW_CAMERA,
+    });
+  }, 700);
 }
 
 function addMountainSurface(viewer: Viewer, config: SceneConfig): void {
@@ -172,10 +179,58 @@ function addMountainSurface(viewer: Viewer, config: SceneConfig): void {
         centerLongitude + halfWidthDegrees,
         centerLatitude + halfHeightDegrees,
       ),
-      height: config.origin.height - 31,
+      height: config.origin.height + 24,
       material: new ImageMaterialProperty({
         image: toViteFsUrl(config.mountain.baseColorTexturePath),
       }),
+    },
+  });
+}
+
+function addTurbineFoundation(viewer: Viewer, localFrame: Matrix4, turbine: TurbineAsset): void {
+  const base = pointFromOffset(localFrame, {
+    east: turbine.offset.east,
+    north: turbine.offset.north,
+    up: turbine.offset.up - 8,
+  });
+
+  viewer.entities.add({
+    id: `${turbine.turbineId}-foundation`,
+    position: base,
+    cylinder: {
+      length: 18,
+      topRadius: 28,
+      bottomRadius: 34,
+      material: Color.fromCssColorString("rgba(210, 230, 218, 0.72)"),
+      outline: true,
+      outlineColor: Color.fromCssColorString("rgba(120, 245, 255, 0.46)"),
+    },
+  });
+
+  const serviceRoad = [
+    pointFromOffset(localFrame, {
+      east: turbine.offset.east - 155,
+      north: turbine.offset.north - 70,
+      up: turbine.offset.up - 3,
+    }),
+    pointFromOffset(localFrame, {
+      east: turbine.offset.east - 72,
+      north: turbine.offset.north - 34,
+      up: turbine.offset.up - 2,
+    }),
+    pointFromOffset(localFrame, {
+      east: turbine.offset.east + 16,
+      north: turbine.offset.north,
+      up: turbine.offset.up - 1,
+    }),
+  ];
+
+  viewer.entities.add({
+    id: `${turbine.turbineId}-service-road`,
+    corridor: {
+      positions: serviceRoad,
+      width: 8,
+      material: Color.fromCssColorString("rgba(226, 214, 164, 0.62)"),
     },
   });
 }
@@ -246,10 +301,29 @@ function turbineIdFromEntityId(entityId: string): string | undefined {
   return entityId.match(/^HS-WTG-\d{2}/)?.[0];
 }
 
-function riskText(riskLevel: TurbineAsset["riskLevel"]): string {
-  if (riskLevel === "critical") return "红色告警";
-  if (riskLevel === "warning") return "橙色预警";
-  return "运行正常";
+function turbineNearScreenPoint(
+  viewer: Viewer,
+  localFrame: Matrix4,
+  config: SceneConfig,
+  position: Cartesian2,
+): string | undefined {
+  let nearest: { turbineId: string; distance: number } | undefined;
+
+  for (const turbine of config.turbines) {
+    const screenPosition = SceneTransforms.worldToWindowCoordinates(
+      viewer.scene,
+      pointFromOffset(localFrame, getHubOffset(turbine)),
+    );
+
+    if (!screenPosition) continue;
+
+    const distance = Cartesian2.distance(position, screenPosition);
+    if (!nearest || distance < nearest.distance) {
+      nearest = { turbineId: turbine.turbineId, distance };
+    }
+  }
+
+  return nearest && nearest.distance <= 120 ? nearest.turbineId : undefined;
 }
 
 function degreesToRadians(degrees: number): number {
