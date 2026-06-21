@@ -3,12 +3,15 @@ import {
   Cartesian3,
   Cesium3DTileset,
   Color,
+  DirectionalLight,
   EllipsoidTerrainProvider,
   HeadingPitchRoll,
   HeadingPitchRange,
+  ImageMaterialProperty,
   Matrix4,
   Model,
   ModelAnimationLoop,
+  Rectangle,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
   Transforms,
@@ -50,14 +53,25 @@ export async function createWindFarmScene({
     navigationHelpButton: false,
     sceneModePicker: false,
     selectionIndicator: false,
+    skyBox: false,
     timeline: false,
     terrainProvider: new EllipsoidTerrainProvider(),
+    useBrowserRecommendedResolution: false,
   });
 
-  viewer.scene.globe.show = false;
+  viewer.scene.globe.show = true;
+  viewer.scene.globe.baseColor = Color.fromCssColorString("#102129");
+  viewer.scene.globe.enableLighting = false;
   viewer.scene.skyAtmosphere = undefined;
-  viewer.scene.backgroundColor = Color.fromCssColorString("#07111f");
-  viewer.scene.highDynamicRange = true;
+  viewer.scene.backgroundColor = Color.fromCssColorString("#172129");
+  viewer.scene.highDynamicRange = false;
+  viewer.scene.fog.enabled = false;
+  viewer.scene.light = new DirectionalLight({
+    direction: Cartesian3.normalize(new Cartesian3(0.35, 0.58, -0.74), new Cartesian3()),
+    color: Color.WHITE,
+    intensity: 3.4,
+  });
+  viewer.resolutionScale = 1;
   hideCesiumCredits(viewer);
 
   const origin = Cartesian3.fromDegrees(
@@ -68,7 +82,9 @@ export async function createWindFarmScene({
   const localFrame = Transforms.eastNorthUpToFixedFrame(origin);
 
   const mountain = await Cesium3DTileset.fromUrl(toViteFsUrl(config.mountain.absolutePath));
+  mountain.maximumScreenSpaceError = 2;
   viewer.scene.primitives.add(mountain);
+  addMountainSurface(viewer, config);
 
   let selectedTurbine = config.turbines[0];
   if (!selectedTurbine) {
@@ -99,7 +115,7 @@ export async function createWindFarmScene({
   const showMountainOverview = () => {
     viewer.camera.lookAt(
       origin,
-      new HeadingPitchRange(5.42, -0.62, 3100),
+      new HeadingPitchRange(5.56, -0.88, 2920),
     );
   };
 
@@ -107,7 +123,7 @@ export async function createWindFarmScene({
     onTurbineSelected?.(selectedTurbine);
     viewer.camera.lookAt(
       pointFromOffset(localFrame, getHubOffset(selectedTurbine)),
-      new HeadingPitchRange(5.78, -0.18, 840),
+      new HeadingPitchRange(5.78, -0.32, 640),
     );
   };
 
@@ -139,6 +155,29 @@ export async function createWindFarmScene({
       viewer.destroy();
     },
   };
+}
+
+function addMountainSurface(viewer: Viewer, config: SceneConfig): void {
+  const centerLongitude = config.origin.longitude;
+  const centerLatitude = config.origin.latitude;
+  const halfWidthDegrees = 0.023;
+  const halfHeightDegrees = 0.0182;
+
+  viewer.entities.add({
+    id: "laoyeling-mountain-surface",
+    rectangle: {
+      coordinates: Rectangle.fromDegrees(
+        centerLongitude - halfWidthDegrees,
+        centerLatitude - halfHeightDegrees,
+        centerLongitude + halfWidthDegrees,
+        centerLatitude + halfHeightDegrees,
+      ),
+      height: config.origin.height - 31,
+      material: new ImageMaterialProperty({
+        image: toViteFsUrl(config.mountain.baseColorTexturePath),
+      }),
+    },
+  });
 }
 
 async function loadTurbineGltfModel(

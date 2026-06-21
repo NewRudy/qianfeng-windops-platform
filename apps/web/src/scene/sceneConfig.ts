@@ -15,6 +15,7 @@ export interface ModelAsset {
 export interface TilesetAsset {
   name: string;
   absolutePath: string;
+  baseColorTexturePath: string;
   credit: string;
 }
 
@@ -62,13 +63,15 @@ export const firstSliceSceneConfig: SceneConfig = {
     name: "Laoyeling Mountain",
     absolutePath:
       "/Users/rudy/Documents/geo_agent/qianfeng-windops-platform/data/external/tilesets/laoyeling-mountain/tileset.json",
+    baseColorTexturePath:
+      "/Users/rudy/Documents/geo_agent/qianfeng-windops-platform/data/external/tilesets/laoyeling-mountain/textures/Scene_-_Root_baseColor.png",
     credit:
       '3D Tiles 1.1 wrapper generated from "Laoyeling Mountain" by Li Yanquan, licensed under CC-BY-4.0.',
   },
   turbines: [
-    createRidgeTurbine("HS-WTG-01", "warning", { east: 20, north: -360, up: 324 }, -18),
-    createRidgeTurbine("HS-WTG-02", "normal", { east: 320, north: -125, up: 326 }, -8),
-    createRidgeTurbine("HS-WTG-03", "warning", { east: 585, north: 70, up: 320 }, 4),
+    createRidgeTurbine("HS-WTG-01", "warning", { east: -420, north: -460, up: 28 }, -18),
+    createRidgeTurbine("HS-WTG-02", "normal", { east: 70, north: -185, up: 36 }, -8),
+    createRidgeTurbine("HS-WTG-03", "warning", { east: 565, north: 95, up: 26 }, 4),
   ],
 };
 
@@ -82,7 +85,7 @@ function createRidgeTurbine(
     name: turbineId,
     turbineId,
     absolutePath: "/Users/rudy/Downloads/wind_turbine/scene.gltf",
-    scale: 4.0,
+    scale: 6.0,
     offset,
     headingDegrees,
     hasRotorAnimation: true,
