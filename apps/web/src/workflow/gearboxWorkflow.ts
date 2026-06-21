@@ -146,14 +146,27 @@ export type WorkflowModule = {
   metrics?: WorkflowMetric[];
   scadaChart?: ScadaChart;
   ticket?: {
+    acceptanceCriteria: string[];
+    asset: string;
+    assignee: string;
     closeActionLabel: string;
     closedActionLabel: string;
     closedState: string;
     draftCode: string;
+    dueWindow: string;
     finalCode: string;
     generatedState: string;
     initialState: string;
-    steps: string[];
+    location: string;
+    materials: string[];
+    precondition: string;
+    priority: string;
+    safetyRequirement: string;
+    steps: Array<{
+      action: string;
+      owner: string;
+      output: string;
+    }>;
   };
   title: string;
 };
@@ -375,7 +388,7 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       brief: {
         action: { label: "展开证据链", module: "fusion", primary: true },
         aiBrief: {
-          broadcast: `黔风智维：${spokenTurbineName(input.turbineId)}齿轮箱 P1 预警。SCADA、CMS、油温三源一致，${input.maintenance.actionWindowHours} 内复核，先按限载策略运行。`,
+          broadcast: `黔风智维提醒：${spokenTurbineName(input.turbineId)}齿轮箱出现一级预警，请进入诊断包查看证据链。`,
           conclusion: `${input.turbineId} 当前不是孤立阈值报警，而是运行残差、振动频谱和热异常共同指向齿轮箱高速轴轴承早期磨损。系统建议按预测维护流程生成巡检工单，复核前执行 ${input.maintenance.workMode}。`,
           evidence: [
             `SCADA 最大功率缺口 ${formatSignedPct(diagnostics.maxPowerShortfallPct)}，异常窗口 ${diagnostics.scadaAbnormalSamples}/${input.scadaSamples.length}`,
@@ -626,18 +639,48 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       workorder: {
         kicker: "Closed Loop / Work Order",
         ticket: {
+          acceptanceCriteria: [
+            "油液铁谱/颗粒度报告完成上传",
+            "内窥照片覆盖高速轴轴承与齿面",
+            "复测 CMS 侧频低于预警线或形成检修建议",
+            "AI 诊断样本回写完成",
+          ],
+          asset: `${input.turbineId} / 齿轮箱高速轴轴承`,
+          assignee: "传动链专业班组",
           closeActionLabel: "标记现场复核完成",
           closedActionLabel: "现场复核已完成",
           closedState: "现场复核完成",
           draftCode: "WO-GX-待创建",
+          dueWindow: `${input.maintenance.actionWindowHours} / 低风速窗口优先`,
           finalCode: `WO-GX-${input.caseDate}-${workOrderSuffix(input.turbineId)}`,
           generatedState: "已生成",
           initialState: "待生成",
+          location: "黔西南山地风场 / 3 号山脊检修道路",
+          materials: ["内窥镜", "油液取样瓶", "振动复测采集器", input.maintenance.parts],
+          precondition: input.maintenance.workMode,
+          priority: input.eventCode.includes("RED") ? "P0 紧急" : "P1 高优先级",
+          safetyRequirement: "复核前保持限载策略；登塔作业执行双人确认和风速许可。",
           steps: [
-            "调度低风速停机窗口",
-            "执行齿轮箱油液取样与内窥复核",
-            "上传照片、油液报告和振动复测结果",
-            "关闭告警并回写诊断样本",
+            {
+              action: "调度低风速停机窗口并锁定远程运行策略",
+              owner: "集控值班长",
+              output: "停机/限载许可记录",
+            },
+            {
+              action: "执行齿轮箱油液取样与内窥复核",
+              owner: "传动链检修工程师",
+              output: "油液报告、内窥照片",
+            },
+            {
+              action: "完成 CMS 振动复测并与告警前窗口对比",
+              owner: "诊断工程师",
+              output: "复测频谱和结论",
+            },
+            {
+              action: "关闭告警并回写诊断样本",
+              owner: "运维主管",
+              output: "闭环记录和样本标签",
+            },
           ],
         },
         title: "运维工单",

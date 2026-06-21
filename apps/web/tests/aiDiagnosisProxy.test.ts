@@ -32,6 +32,7 @@ describe("AI diagnosis proxy", () => {
     expect(prompt).toContain("HS-WTG-02");
     expect(prompt).toContain("齿轮箱高速轴轴承");
     expect(prompt).toContain("SCADA 最大功率缺口");
+    expect(prompt).toContain("机理解释");
     expect(prompt).toContain("不编造真实风场接入");
   });
 

@@ -41,6 +41,9 @@ describe("gearbox workflow case", () => {
 
     expect(broadcast.length).toBeLessThanOrEqual(90);
     expect(broadcast).toContain("2号机");
+    expect(broadcast).toContain("一级预警");
+    expect(broadcast).not.toContain("HS-WTG");
+    expect(broadcast).not.toContain("SCADA");
     expect(broadcast).not.toContain("1号机");
     expect(broadcast).not.toContain("3号机");
   });
@@ -111,8 +114,14 @@ describe("gearbox workflow case", () => {
     const ticket = gearboxWorkflowCase.modules.workorder.ticket;
 
     expect(ticket?.finalCode).toBe("WO-GX-20260621-02");
+    expect(ticket?.priority).toBe("P1 高优先级");
+    expect(ticket?.assignee).toBe("传动链专业班组");
+    expect(ticket?.asset).toContain("齿轮箱高速轴轴承");
+    expect(ticket?.materials.join(" ")).toContain("内窥镜");
     expect(ticket?.steps).toHaveLength(4);
-    expect(ticket?.steps.join(" ")).toContain("油液取样");
+    expect(ticket?.steps.map((step) => step.action).join(" ")).toContain("油液取样");
+    expect(ticket?.steps[0].owner).toBe("集控值班长");
+    expect(ticket?.acceptanceCriteria.join(" ")).toContain("油液");
     expect(gearboxWorkflowCase.statuses.ticketClosed).toContain("回写");
   });
 

@@ -329,7 +329,11 @@ function renderAiBrief(module: WorkflowModule): string {
           <button type="button" data-ai-generate-report>生成AI报告</button>
         </div>
       </header>
-      <p id="ai-generated-report-text">后端代理已准备接收诊断包。点击生成后，模型不可用时会自动返回规则兜底报告。</p>
+      <div class="ai-question-console">
+        <input id="ai-question-input" type="text" placeholder="例如：为什么不是螺栓问题？下一步怎么处理？" />
+        <button type="button" data-ai-send-question>发送问题</button>
+      </div>
+      <div id="ai-generated-report-text" class="ai-report-body">后端代理已准备接收诊断包。点击生成后，模型不可用时会自动返回规则兜底报告。</div>
     </section>
   `;
 }
@@ -487,16 +491,50 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
         <span id="workorder-state">${html(ticket?.initialState ?? "待生成")}</span>
         <strong id="workorder-code">${html(ticket?.draftCode ?? "WO-待创建")}</strong>
       </div>
-      <ol class="workflow-list">
-        ${(ticket?.steps ?? []).map((step, index) => `<li><span>${String(index + 1).padStart(2, "0")}</span>${html(step)}</li>`).join("")}
+      <dl class="workorder-meta">
+        <div><dt>优先级</dt><dd>${html(ticket?.priority ?? "P1 高优先级")}</dd></div>
+        <div><dt>责任班组</dt><dd>${html(ticket?.assignee ?? "传动链专业班组")}</dd></div>
+        <div><dt>设备对象</dt><dd>${html(ticket?.asset ?? activeWorkflowCase.turbineId)}</dd></div>
+        <div><dt>作业窗口</dt><dd>${html(ticket?.dueWindow ?? "48-72 h")}</dd></div>
+        <div><dt>位置</dt><dd>${html(ticket?.location ?? "山地风场")}</dd></div>
+        <div><dt>作业前提</dt><dd>${html(ticket?.precondition ?? "限功率运行")}</dd></div>
+      </dl>
+      <section class="workorder-section">
+        <span>安全要求</span>
+        <p>${html(ticket?.safetyRequirement ?? "按风场登塔和停机规程执行。")}</p>
+      </section>
+      <section class="workorder-section">
+        <span>工器具 / 备件</span>
+        <p>${html((ticket?.materials ?? []).join(" / "))}</p>
+      </section>
+      <ol class="workorder-steps">
+        ${(ticket?.steps ?? []).map((step, index) => `
+          <li>
+            <span>${String(index + 1).padStart(2, "0")}</span>
+            <div>
+              <strong>${html(step.action)}</strong>
+              <small>${html(step.owner)} / 输出：${html(step.output)}</small>
+            </div>
+          </li>
+        `).join("")}
       </ol>
+      <section class="workorder-section">
+        <span>验收标准</span>
+        <ul>
+          ${(ticket?.acceptanceCriteria ?? []).map((item) => `<li>${html(item)}</li>`).join("")}
+        </ul>
+      </section>
       <button class="module-action" type="button" data-close-workorder disabled>${html(ticket?.closeActionLabel ?? "标记完成")}</button>
     </section>
   `;
 }
 
+function getAiDutyEventText(): string {
+  return `${shortTurbineName(activeWorkflowCase.turbineId)}齿轮箱出现一级预警。已锁定多源证据，进入诊断包查看证据链与工单。`;
+}
+
 root.innerHTML = `
-  <main class="shell" data-mode="intro">
+  <main class="shell" data-mode="intro" data-ai-event="standby">
     <section class="scene-wrap">
       <div id="cesium-root" class="cesium-root" aria-label="山地风电 GIS+BIM 主场景"></div>
       <div class="scene-grade" aria-hidden="true"></div>
@@ -515,7 +553,7 @@ root.innerHTML = `
           <span>AI 值班事件</span>
           <strong id="ai-duty-title">${html(activeWorkflowCase.modules.brief.aiBrief?.primaryFinding ?? "等待诊断事件")}</strong>
         </div>
-        <p id="ai-duty-text">${html(activeWorkflowCase.modules.brief.aiBrief?.conclusion ?? "")}</p>
+        <p id="ai-duty-text">${html(getAiDutyEventText())}</p>
         <footer>
           <small id="ai-duty-status">已生成播报，等待风场巡航完成</small>
           <button id="ai-duty-speak" type="button">语音播报</button>
@@ -670,8 +708,18 @@ function setSelectedTurbineTitle(turbineId: string): void {
 function updateAiDutyCard(): void {
   const brief = activeWorkflowCase.modules.brief.aiBrief;
   if (aiDutyTitle) aiDutyTitle.textContent = brief?.primaryFinding ?? "等待诊断事件";
-  if (aiDutyText) aiDutyText.textContent = brief?.conclusion ?? "";
+  if (aiDutyText) aiDutyText.textContent = getAiDutyEventText();
   if (aiDutyStatus) aiDutyStatus.textContent = "AI 已生成诊断播报，可语音复述或进入诊断包";
+}
+
+function triggerIntroAiAlert(turbine: TurbineAsset): void {
+  if (hasPlayedIntroBroadcast) return;
+  hasPlayedIntroBroadcast = true;
+  selectWorkflowCaseForTurbine(turbine.turbineId);
+  dashboardShell.dataset.aiEvent = "active";
+  updateAiDutyCard();
+  if (aiDutyStatus) aiDutyStatus.textContent = "巡航发现异常，AI 已自动生成值班提醒";
+  speakAiDutyBrief(false);
 }
 
 function renderWorkflowSurfaces(): void {
@@ -794,6 +842,68 @@ function setAiReportText(text: string): void {
   if (report) report.textContent = text;
 }
 
+function setAiReportHtml(markup: string): void {
+  const report = workflowModuleDrawer.querySelector<HTMLElement>("#ai-generated-report-text");
+  if (report) report.innerHTML = markup;
+}
+
+function getAiQuestionInput(): HTMLInputElement | null {
+  return workflowModuleDrawer.querySelector<HTMLInputElement>("#ai-question-input");
+}
+
+function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string): string {
+  const brief = activeWorkflowCase.modules.brief.aiBrief;
+  const evidenceRows = activeWorkflowCase.modules.alerts.evidenceRows ?? [];
+  const maintenance = activeWorkflowCase.modules.maintenance.metrics ?? [];
+  const workMode = maintenance.find((metric) => metric.label === "建议运行方式")?.value ?? "限功率运行";
+  const parts = maintenance.find((metric) => metric.label === "备件")?.value ?? "按工单准备";
+  const sourceLabel = result.source === "llm" ? "MiMo 大模型" : "规则诊断包";
+  const answer = result.answer || brief?.conclusion || "AI 未返回有效报告";
+
+  return `
+    <article class="ai-domain-report">
+      <header>
+        <small>${html(sourceLabel)} / ${html(question)}</small>
+        <strong>${html(activeWorkflowCase.turbineId)} 齿轮箱一级预警诊断报告</strong>
+      </header>
+      <section class="ai-report-summary">
+        <div><span>疑似部件</span><b>${html(brief?.primaryFinding ?? "齿轮箱高速轴轴承")}</b></div>
+        <div><span>风险等级</span><b>一级预警 / 预测维护</b></div>
+        <div><span>运行策略</span><b>${html(workMode)}</b></div>
+        <div><span>备件准备</span><b>${html(parts)}</b></div>
+      </section>
+      <figure class="ai-evidence-figure">
+        <figcaption>
+          <strong>多源证据可信度</strong>
+          <span>SCADA、振动、油温三项同向，结构监测用于反证排查</span>
+        </figcaption>
+        ${evidenceRows.map((row) => {
+          const confidence = Math.max(0, Math.min(100, Number(row.confidence) * 100));
+          return `
+            <div class="ai-evidence-bar">
+              <span>${html(row.source)}</span>
+              <div><i style="width: ${confidence.toFixed(0)}%"></i></div>
+              <b>${confidence.toFixed(0)}%</b>
+            </div>
+          `;
+        }).join("")}
+      </figure>
+      <section class="ai-report-section">
+        <h4>模型解释</h4>
+        <p>${html(answer)}</p>
+      </section>
+      <section class="ai-report-section">
+        <h4>工程处置</h4>
+        <p>${html(brief?.recommendedAction ?? "生成现场复核工单")}；现场复核前保持限载策略，复核内容包含油液取样、内窥检查和振动复测。</p>
+      </section>
+      <section class="ai-report-boundary">
+        <span>边界说明</span>
+        <p>本报告基于当前诊断包和接入样例数据生成，用于辅助值班研判；停机、检修和安全操作仍需现场工程师按规程确认。</p>
+      </section>
+    </article>
+  `;
+}
+
 function buildAiVoiceAnswerSummary(): string {
   const brief = activeWorkflowCase.modules.brief.aiBrief;
   if (!brief) return "AI 答复：当前诊断包未就绪。";
@@ -840,15 +950,15 @@ async function requestAiDiagnosisReport(
       method: "POST",
     });
     const result = await response.json() as AiDiagnosisResponse;
-    const sourceLabel = result.source === "llm" ? "MiMo 模型" : "规则兜底";
-    setAiReportText(`${sourceLabel}：${result.answer || "未返回有效报告"}`);
+    setAiReportHtml(renderAiGeneratedReport(result, question));
     if (options.speak) speakAiAnswerSummary();
     return result;
   } catch {
     const fallback = `规则兜底：${brief.conclusion} 建议动作：${brief.recommendedAction}`;
-    setAiReportText(fallback);
+    const result = { answer: fallback, source: "fallback" };
+    setAiReportHtml(renderAiGeneratedReport(result, question));
     if (options.speak) speakAiAnswerSummary();
-    return { answer: fallback, source: "fallback" };
+    return result;
   }
 }
 
@@ -879,6 +989,8 @@ function startVoiceAiQuestion(): void {
     if (handled) return;
     handled = true;
     activeSpeechRecognition = undefined;
+    const input = getAiQuestionInput();
+    if (input) input.value = question;
     setAiReportText(`已听到：${question}\nAI 正在生成回答...`);
     void requestAiDiagnosisReport(question, { speak: true });
   };
@@ -911,6 +1023,14 @@ function startVoiceAiQuestion(): void {
   }
 }
 
+function submitTypedAiQuestion(): void {
+  const input = getAiQuestionInput();
+  const question = input?.value.trim() || "下一步工单应该怎么安排？";
+  if (input) input.value = question;
+  setBimStatus(`AI 已收到追问：${question}`);
+  void requestAiDiagnosisReport(question, { speak: true });
+}
+
 function closeDiagnosis(): void {
   dashboardShell.dataset.mode = "intro";
   setActiveModule("none");
@@ -934,6 +1054,7 @@ function closeDiagnosis(): void {
 void createWindFarmScene({
   container: sceneRoot,
   config: firstSliceSceneConfig,
+  onIntroComplete: triggerIntroAiAlert,
   onTurbineSelected: openDiagnosis,
 }).then((scene) => {
   document.querySelector("#close-bim")?.addEventListener("click", () => {
@@ -943,12 +1064,13 @@ void createWindFarmScene({
 
   document.querySelector<HTMLButtonElement>("#ai-duty-open")?.addEventListener("click", () => {
     scene.focusTurbine(activeWorkflowCase.turbineId);
+    scene.showTurbineAlert(activeWorkflowCase.turbineId);
   });
 
   window.setTimeout(() => {
     if (hasPlayedIntroBroadcast || dashboardShell.dataset.mode === "bim") return;
-    hasPlayedIntroBroadcast = true;
-    speakAiDutyBrief(false);
+    scene.showTurbineAlert(activeWorkflowCase.turbineId);
+    triggerIntroAiAlert(getDutyTurbine());
   }, 5200);
 });
 
@@ -1001,6 +1123,17 @@ function bindWorkflowSurfaceEvents(): void {
 
   workflowModuleDrawer.querySelector<HTMLButtonElement>("[data-ai-voice-question]")?.addEventListener("click", () => {
     startVoiceAiQuestion();
+  });
+
+  workflowModuleDrawer.querySelector<HTMLButtonElement>("[data-ai-send-question]")?.addEventListener("click", () => {
+    submitTypedAiQuestion();
+  });
+
+  workflowModuleDrawer.querySelector<HTMLInputElement>("#ai-question-input")?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submitTypedAiQuestion();
+    }
   });
 
   workflowModuleDrawer.querySelector<HTMLButtonElement>("[data-create-workorder]")?.addEventListener("click", () => {
