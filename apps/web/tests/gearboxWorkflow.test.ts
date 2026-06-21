@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { gearboxWorkflowCase } from "../src/workflow/gearboxWorkflow";
+import {
+  buildGearboxWorkflowCase,
+  gearboxCaseInputs,
+  gearboxWorkflowCase,
+  getGearboxCaseDiagnostics,
+} from "../src/workflow/gearboxWorkflow";
 
 describe("gearbox workflow case", () => {
   it("keeps the operator flow in evidence-to-work-order order", () => {
@@ -21,7 +26,7 @@ describe("gearbox workflow case", () => {
       .join(" ");
 
     expect(alerts.evidenceRows).toHaveLength(3);
-    expect(evidenceText).toContain("功率残差");
+    expect(evidenceText).toContain("功率缺口");
     expect(evidenceText).toContain("齿轮啮合侧频");
     expect(evidenceText).toContain("油温");
     expect(evidenceText).toContain("SCADA");
@@ -53,5 +58,23 @@ describe("gearbox workflow case", () => {
     expect(ticket?.steps).toHaveLength(4);
     expect(ticket?.steps.join(" ")).toContain("油液取样");
     expect(gearboxWorkflowCase.statuses.ticketClosed).toContain("回写");
+  });
+
+  it("derives dashboard values from the diagnostic input data", () => {
+    const diagnostics = getGearboxCaseDiagnostics(gearboxCaseInputs);
+    const caseFromInputs = buildGearboxWorkflowCase(gearboxCaseInputs);
+    const focusSample = gearboxCaseInputs.scadaSamples[gearboxCaseInputs.focusScadaSampleIndex];
+    const expectedShortfall = ((focusSample.expectedKw - focusSample.powerKw) / focusSample.expectedKw) * 100;
+    const boltPreloadAverage =
+      caseFromInputs.modules.bolts.boltChart!.channels.reduce((sum, channel) => sum + channel.preloadKn, 0) /
+      caseFromInputs.modules.bolts.boltChart!.channels.length;
+
+    expect(diagnostics.focusShortfallPct).toBeCloseTo(expectedShortfall, 1);
+    expect(caseFromInputs.modules.scada.metrics).toContainEqual({ label: "有功功率", value: `${focusSample.powerKw} kW` });
+    expect(caseFromInputs.modules.alerts.evidenceRows?.[0].window).toContain(`${diagnostics.scadaAbnormalSamples} 个异常`);
+    expect(caseFromInputs.modules.bolts.metrics).toContainEqual({
+      label: "叶根平均预紧力",
+      value: `${boltPreloadAverage.toFixed(1)} kN`,
+    });
   });
 });
