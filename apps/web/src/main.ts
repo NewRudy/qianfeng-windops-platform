@@ -72,6 +72,24 @@ type WorkflowStage = {
   title: string;
 };
 
+type ManagementPageKey =
+  | "event"
+  | "scada"
+  | "cms"
+  | "structure"
+  | "fusion"
+  | "workorders"
+  | "maintenance"
+  | "knowledge";
+
+type ManagementPage = {
+  key: ManagementPageKey;
+  label: string;
+  module: WorkflowModuleKey;
+  subtitle: string;
+  title: string;
+};
+
 const workflowStages: WorkflowStage[] = [
   {
     description: "确认当前预警是否成立，明确等级、疑似部件和复核边界。",
@@ -111,8 +129,85 @@ const workflowStages: WorkflowStage[] = [
   },
 ];
 
+const managementPages: ManagementPage[] = [
+  {
+    key: "event",
+    label: "事件工作台",
+    module: "brief",
+    subtitle: "围绕当前告警组织证据、定位、工单和复盘状态。",
+    title: "当前事件处置",
+  },
+  {
+    key: "scada",
+    label: "SCADA",
+    module: "scada",
+    subtitle: "调整时间窗、基线和残差阈值后重新计算运行异常。",
+    title: "SCADA 运行分析",
+  },
+  {
+    key: "cms",
+    label: "CMS",
+    module: "cms",
+    subtitle: "复核频谱、包络谱峰值和转速工况，输出部件侧证据。",
+    title: "CMS 振动分析",
+  },
+  {
+    key: "structure",
+    label: "结构监测",
+    module: "bolts",
+    subtitle: "查看叶根螺栓、塔筒频率和结构侧反证。",
+    title: "螺栓与结构监测",
+  },
+  {
+    key: "fusion",
+    label: "融合诊断",
+    module: "fusion",
+    subtitle: "把多源证据输入融合判据，明确支持项和反证项。",
+    title: "多源融合诊断",
+  },
+  {
+    key: "workorders",
+    label: "工单中心",
+    module: "workorder",
+    subtitle: "管理待签核、已派发、执行中、验收和复盘回写记录。",
+    title: "运维工单记录",
+  },
+  {
+    key: "maintenance",
+    label: "维护计划",
+    module: "maintenance",
+    subtitle: "管理预测维护策略、作业窗口、备件和班组资源。",
+    title: "预测维护计划",
+  },
+  {
+    key: "knowledge",
+    label: "知识图谱",
+    module: "alerts",
+    subtitle: "查看机组、部件、故障模式、证据和处置规则的关系。",
+    title: "风机故障知识图谱",
+  },
+];
+
+const managementPageByKey = new Map(managementPages.map((page) => [page.key, page]));
+
 function getWorkflowStageForModule(moduleName: string | undefined): WorkflowStage {
   return workflowStages.find((stage) => stage.modules.includes(moduleName as WorkflowModuleKey)) ?? workflowStages[0];
+}
+
+function getManagementPageForModule(moduleName: string | undefined): ManagementPageKey {
+  const moduleToPage: Partial<Record<WorkflowModuleKey, ManagementPageKey>> = {
+    alerts: "knowledge",
+    bolts: "structure",
+    brief: "event",
+    cms: "cms",
+    fusion: "fusion",
+    health: "event",
+    inspection: "knowledge",
+    maintenance: "maintenance",
+    scada: "scada",
+    workorder: "workorders",
+  };
+  return moduleToPage[moduleName as WorkflowModuleKey] ?? "event";
 }
 
 function renderWorkflowCommandCard(): string {
@@ -151,6 +246,353 @@ function renderWorkflowStageTabs(): string {
       <small>${html(stage.description)}</small>
     </button>
   `).join("");
+}
+
+function renderManagementNav(): string {
+  return `
+    <nav class="management-nav" aria-label="管理端功能模块">
+      ${managementPages.map((page) => `
+        <button type="button" data-manager-page-button="${html(page.key)}">
+          <span>${html(page.label)}</span>
+        </button>
+      `).join("")}
+    </nav>
+  `;
+}
+
+function renderManagementConsole(): string {
+  return `
+    <section class="management-console" aria-label="管理端页面">
+      ${renderManagementNav()}
+      <section class="management-pages">
+        ${renderEventWorkbenchPage()}
+        ${renderScadaManagementPage()}
+        ${renderCmsManagementPage()}
+        ${renderStructureManagementPage()}
+        ${renderFusionManagementPage()}
+        ${renderWorkOrderManagementPage()}
+        ${renderMaintenanceManagementPage()}
+        ${renderKnowledgeGraphPage()}
+      </section>
+    </section>
+  `;
+}
+
+function renderManagementPageFrame(pageKey: ManagementPageKey, body: string): string {
+  const page = managementPageByKey.get(pageKey) ?? managementPages[0];
+  return `
+    <article class="management-page" data-management-page="${html(page.key)}">
+      <header class="management-page-header">
+        <div>
+          <span>${html(page.label)}</span>
+          <h3>${html(page.title)}</h3>
+          <p>${html(page.subtitle)}</p>
+        </div>
+        <button type="button" data-open-module="${html(page.module)}">打开关联证据</button>
+      </header>
+      ${body}
+    </article>
+  `;
+}
+
+function renderRecordTable(rows: Array<{ code: string; meta: string; result: string; status: string }>): string {
+  return `
+    <section class="record-list" aria-label="业务记录">
+      ${rows.map((row) => `
+        <article>
+          <span>${html(row.status)}</span>
+          <strong>${html(row.code)}</strong>
+          <p>${html(row.result)}</p>
+          <small>${html(row.meta)}</small>
+        </article>
+      `).join("")}
+    </section>
+  `;
+}
+
+function renderParameterPanel(
+  pageKey: ManagementPageKey,
+  params: Array<{ label: string; value: string; type?: "number" | "select"; options?: string[] }>,
+): string {
+  return `
+    <section class="parameter-panel" aria-label="模型参数">
+      <header>
+        <span>模型参数</span>
+        <strong>本页参数只影响本次复算记录</strong>
+      </header>
+      <div>
+        ${params.map((param, index) => {
+          if (param.type === "select") {
+            return `
+              <label>
+                <span>${html(param.label)}</span>
+                <select data-analysis-param="${html(pageKey)}-${index}">
+                  ${(param.options ?? [param.value]).map((option) => `<option${option === param.value ? " selected" : ""}>${html(option)}</option>`).join("")}
+                </select>
+              </label>
+            `;
+          }
+          return `
+            <label>
+              <span>${html(param.label)}</span>
+              <input type="${param.type ?? "text"}" value="${html(param.value)}" data-analysis-param="${html(pageKey)}-${index}" />
+            </label>
+          `;
+        }).join("")}
+      </div>
+      <footer>
+        <button type="button" data-run-analysis="${html(pageKey)}">重新计算</button>
+        <button type="button" data-adopt-evidence="${html(pageKey)}">采纳为当前事件证据</button>
+      </footer>
+      <p class="analysis-result" data-analysis-result="${html(pageKey)}">等待参数确认，尚未形成新的复算记录。</p>
+    </section>
+  `;
+}
+
+function renderEventWorkbenchPage(): string {
+  const brief = activeWorkflowCase.modules.brief.aiBrief;
+  const ticket = activeWorkflowCase.modules.workorder.ticket;
+  const rows = [
+    {
+      code: activeWorkflowCase.eventCode,
+      meta: `${activeWorkflowCase.turbineId} / ${activeWorkflowCase.component}`,
+      result: brief?.primaryFinding ?? "等待告警研判",
+      status: "处置中",
+    },
+    {
+      code: ticket?.draftCode ?? "WO-待创建",
+      meta: ticket?.assignee ?? "传动链专业班组",
+      result: ticket?.initialState ?? "等待生成工单草案",
+      status: "工单",
+    },
+  ];
+  return renderManagementPageFrame("event", `
+    <section class="event-workbench-grid">
+      <article class="event-primary-card">
+        <span>当前告警</span>
+        <strong>${html(activeWorkflowCase.turbineId)} · ${html(brief?.primaryFinding ?? activeWorkflowCase.component)}</strong>
+        <p>${html(brief?.conclusion ?? "等待当前事件研判。")}</p>
+      </article>
+      <article class="event-primary-card">
+        <span>下一步</span>
+        <strong>${html(brief?.primaryAction.label ?? "复核证据")}</strong>
+        <p>${html(brief?.operatorFocus.why ?? "先确认多源证据是否支持同一故障假设。")}</p>
+      </article>
+    </section>
+    ${renderRecordTable(rows)}
+    <section class="quick-module-grid">
+      ${managementPages.filter((page) => page.key !== "event").map((page) => `
+        <button type="button" data-manager-page-button="${html(page.key)}">
+          <span>${html(page.label)}</span>
+          <strong>${html(page.title)}</strong>
+          <small>${html(page.subtitle)}</small>
+        </button>
+      `).join("")}
+    </section>
+  `);
+}
+
+function renderScadaManagementPage(): string {
+  const module = activeWorkflowCase.modules.scada;
+  const chart = module.scadaChart;
+  const abnormalCount = chart?.points.filter((point) => point.abnormal).length ?? 0;
+  return renderManagementPageFrame("scada", `
+    ${renderRecordTable([
+      {
+        code: "SCADA-RUN-240615-01",
+        meta: chart?.sampleWindow ?? "10 min SCADA",
+        result: module.decision?.result ?? "等待复算",
+        status: `${abnormalCount} 个异常窗`,
+      },
+      {
+        code: "SCADA-HIS-240612-03",
+        meta: "同机型功率曲线对标",
+        result: "历史复核记录，未升级为主故障证据",
+        status: "已归档",
+      },
+    ])}
+    ${renderParameterPanel("scada", [
+      { label: "时间窗", value: "最近 6 个 10 min 窗口", type: "select", options: ["最近 6 个 10 min 窗口", "最近 12 个 10 min 窗口", "告警前后 2 h"] },
+      { label: "功率残差阈值 %", value: "8", type: "number" },
+      { label: "基线模型", value: "OpenOA 同场基线", type: "select", options: ["OpenOA 同场基线", "同机型分位数曲线", "上月健康曲线"] },
+    ])}
+    ${renderScadaChart(chart)}
+  `);
+}
+
+function renderCmsManagementPage(): string {
+  const module = activeWorkflowCase.modules.cms;
+  const warningPeak = module.cmsChart?.peaks.find((peak) => peak.status === "warning");
+  return renderManagementPageFrame("cms", `
+    ${renderRecordTable([
+      {
+        code: "CMS-ENV-240615-02",
+        meta: module.cmsChart?.sampleWindow ?? "CMS 高频采样",
+        result: module.decision?.result ?? "等待复算",
+        status: warningPeak ? "侧频关注" : "待复核",
+      },
+      {
+        code: "CMS-HIS-240601-01",
+        meta: "高速轴侧频历史对比",
+        result: "趋势较月初抬升，需结合 SCADA 工况过滤",
+        status: "趋势记录",
+      },
+    ])}
+    ${renderParameterPanel("cms", [
+      { label: "频谱类型", value: "包络谱", type: "select", options: ["包络谱", "阶次谱", "原始频谱"] },
+      { label: "侧频阈值倍数", value: "1.2", type: "number" },
+      { label: "转速工况过滤", value: "额定转速附近", type: "select", options: ["额定转速附近", "全工况", "剔除启停段"] },
+    ])}
+    ${renderCmsChart(module.cmsChart)}
+  `);
+}
+
+function renderStructureManagementPage(): string {
+  const module = activeWorkflowCase.modules.bolts;
+  const warningChannels = module.boltChart?.channels.filter((channel) => channel.status === "warning").length ?? 0;
+  return renderManagementPageFrame("structure", `
+    ${renderRecordTable([
+      {
+        code: "BOLT-RING-240615-01",
+        meta: module.boltChart?.title ?? "叶根螺栓预紧力",
+        result: module.decision?.result ?? "等待复核",
+        status: `${warningChannels} 路关注`,
+      },
+      {
+        code: "TOWER-FREQ-240615-01",
+        meta: "塔筒一阶频率 / 山地阵风载荷",
+        result: "作为载荷放大因素跟踪，暂不改写主疑似部件",
+        status: "反证项",
+      },
+    ])}
+    ${renderParameterPanel("structure", [
+      { label: "温漂补偿", value: "启用", type: "select", options: ["启用", "关闭"] },
+      { label: "预紧力松弛阈值 %", value: "8", type: "number" },
+      { label: "结构侧角色", value: "反证项", type: "select", options: ["反证项", "主风险", "持续跟踪"] },
+    ])}
+    ${renderBoltChart(module.boltChart)}
+  `);
+}
+
+function renderFusionManagementPage(): string {
+  const module = activeWorkflowCase.modules.fusion;
+  return renderManagementPageFrame("fusion", `
+    ${renderRecordTable([
+      {
+        code: "FUSION-GATE-240615-01",
+        meta: "SCADA / CMS / 油温 / 结构反证",
+        result: module.decision?.result ?? "等待融合",
+        status: "当前版本",
+      },
+    ])}
+    ${renderParameterPanel("fusion", [
+      { label: "融合策略", value: "三主证据同向", type: "select", options: ["三主证据同向", "二主证据 + 一反证通过", "专家复核模式"] },
+      { label: "最低置信度 %", value: "80", type: "number" },
+      { label: "结构反证权重", value: "中", type: "select", options: ["低", "中", "高"] },
+    ])}
+    ${renderEvidenceReviewPath(module.fusionSignals, module.modelGates)}
+    <div class="fusion-source-grid">${renderFusionSignals(module.fusionSignals)}</div>
+  `);
+}
+
+function renderWorkOrderManagementPage(): string {
+  const ticket = activeWorkflowCase.modules.workorder.ticket;
+  return renderManagementPageFrame("workorders", `
+    ${renderRecordTable([
+      {
+        code: ticket?.draftCode ?? "WO-待创建",
+        meta: `${ticket?.asset ?? activeWorkflowCase.turbineId} / ${ticket?.dueWindow ?? "48-72 h"}`,
+        result: ticket?.initialState ?? "等待生成工单草案",
+        status: "待签核",
+      },
+      {
+        code: "WO-HS-20240612-018",
+        meta: "HS-WTG-03 / 振动复测",
+        result: "现场复测完成，等待复盘标签确认",
+        status: "待验收",
+      },
+      {
+        code: "WO-HS-20240528-011",
+        meta: "HS-WTG-01 / 叶根螺栓复核",
+        result: "已关闭并进入相似案例库",
+        status: "已关闭",
+      },
+    ])}
+    <section class="workorder-page-actions">
+      <button type="button" data-open-module="workorder">进入当前工单确认门</button>
+      <button type="button" data-run-analysis="workorders">刷新工单门控</button>
+    </section>
+    <p class="analysis-result" data-analysis-result="workorders">当前工单尚未派发；需完成作业窗口、安全许可、备件和复盘责任签核。</p>
+    ${renderWorkOrderWritebackSummary(ticket)}
+  `);
+}
+
+function renderMaintenanceManagementPage(): string {
+  const module = activeWorkflowCase.modules.maintenance;
+  const ticket = activeWorkflowCase.modules.workorder.ticket;
+  return renderManagementPageFrame("maintenance", `
+    ${renderRecordTable([
+      {
+        code: "PM-PLAN-240615-01",
+        meta: ticket?.dueWindow ?? "48-72 h / 低风速窗口优先",
+        result: module.decision?.result ?? "等待策略",
+        status: "待确认",
+      },
+      {
+        code: "PM-WEEK-240624",
+        meta: "下周预测维护排程",
+        result: "2 台传动链复测，1 台结构侧持续跟踪",
+        status: "计划中",
+      },
+    ])}
+    ${renderParameterPanel("maintenance", [
+      { label: "策略", value: "限功率 + 现场复核", type: "select", options: ["限功率 + 现场复核", "计划停机检修", "继续跟踪观察"] },
+      { label: "最低风速窗口 h", value: "6", type: "number" },
+      { label: "备件状态", value: "可调拨", type: "select", options: ["可调拨", "待采购", "需跨场借用"] },
+    ])}
+    ${renderMaintenanceReadinessCard(ticket, activeWorkflowCase.modules.inspection.inspectionItems)}
+  `);
+}
+
+function renderKnowledgeGraphPage(): string {
+  const nodes = [
+    { id: "turbine", label: activeWorkflowCase.turbineId, type: "机组" },
+    { id: "gearbox", label: "齿轮箱高速轴轴承", type: "部件" },
+    { id: "fault", label: "早期磨损", type: "故障模式" },
+    { id: "scada", label: "功率残差", type: "SCADA证据" },
+    { id: "cms", label: "GMF侧频", type: "CMS证据" },
+    { id: "bolt", label: "结构反证", type: "螺栓/结构" },
+    { id: "workorder", label: "现场复核工单", type: "处置动作" },
+  ];
+  const edges = [
+    "机组-包含-齿轮箱",
+    "齿轮箱-可能发生-早期磨损",
+    "功率残差-支持-早期磨损",
+    "GMF侧频-定位-传动链",
+    "结构反证-排除-叶根主故障",
+    "早期磨损-生成-现场复核工单",
+  ];
+  return renderManagementPageFrame("knowledge", `
+    <section class="knowledge-graph">
+      <div class="knowledge-node-map" aria-label="知识图谱节点">
+        ${nodes.map((node, index) => `
+          <button type="button" data-kg-node="${html(node.id)}" style="--x: ${16 + (index % 3) * 32}%; --y: ${18 + Math.floor(index / 3) * 30}%;">
+            <span>${html(node.type)}</span>
+            <strong>${html(node.label)}</strong>
+          </button>
+        `).join("")}
+      </div>
+      <article class="knowledge-detail">
+        <span>节点说明</span>
+        <strong data-kg-detail-title>齿轮箱高速轴轴承</strong>
+        <p data-kg-detail>该部件连接 SCADA 功率残差、CMS 侧频和油温证据，是当前事件的主疑似对象；螺栓与结构监测作为反证项参与融合判据。</p>
+      </article>
+    </section>
+    <section class="knowledge-edge-list">
+      <span>关键关系</span>
+      <ul>${edges.map((edge) => `<li>${html(edge)}</li>`).join("")}</ul>
+    </section>
+  `);
 }
 
 function html(value: string | number): string {
@@ -1173,6 +1615,11 @@ const eventStageOrder: EventTimelineStage[] = [
   "review-writeback",
 ];
 
+renderWorkflowSurfaces();
+setActiveModule("brief");
+setEventTimelineStage("ai-alert");
+setActiveComponent("gearbox");
+
 function setBimStatus(status: string): void {
   if (bimStatus) bimStatus.textContent = status;
 }
@@ -1222,6 +1669,25 @@ function openWorkflowModule(moduleName: WorkflowModuleKey, status?: string): voi
   if (status) setBimStatus(status);
 }
 
+function isManagementPageKey(value: string | undefined): value is ManagementPageKey {
+  return Boolean(value && managementPageByKey.has(value as ManagementPageKey));
+}
+
+function setActiveManagementPage(pageKey: ManagementPageKey): void {
+  const nextPage = isManagementPageKey(pageKey) ? pageKey : "event";
+  dashboardShell.dataset.managerPage = nextPage;
+  workflowModuleDrawer.querySelectorAll<HTMLButtonElement>("[data-manager-page-button]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.managerPageButton === nextPage);
+  });
+}
+
+function openManagementPage(pageKey: ManagementPageKey, status?: string): void {
+  const page = managementPageByKey.get(pageKey) ?? managementPages[0];
+  setActiveModule(page.module);
+  setActiveManagementPage(page.key);
+  if (status) setBimStatus(status);
+}
+
 function isGearboxPart(partName: string): boolean {
   return activeWorkflowCase.partNamePattern.test(partName);
 }
@@ -1250,6 +1716,7 @@ function setActiveModule(moduleName: string): void {
   dashboardShell.dataset.activeModule = moduleName;
   const stage = getWorkflowStageForModule(moduleName);
   dashboardShell.dataset.activeStage = moduleName === "none" ? "none" : stage.key;
+  if (moduleName !== "none") setActiveManagementPage(getManagementPageForModule(moduleName));
 
   document.querySelectorAll<HTMLButtonElement>(".module-tab").forEach((tab) => {
     const tabStage = tab.dataset.stage;
@@ -1306,10 +1773,15 @@ function renderWorkflowSurfaces(): void {
   workflowComponentStrip.innerHTML = activeWorkflowCase.componentRisks.map(renderComponentButton).join("");
   workflowModuleDrawer.innerHTML = [
     renderWorkflowCommandCard(),
-    ...activeWorkflowCase.moduleOrder.map((moduleKey) => renderModulePanel(moduleKey, activeWorkflowCase.modules[moduleKey], activeWorkflowCase)),
+    renderManagementConsole(),
+    `<details class="linked-evidence-drawer">
+      <summary>展开当前页面的关联证据抽屉</summary>
+      ${activeWorkflowCase.moduleOrder.map((moduleKey) => renderModulePanel(moduleKey, activeWorkflowCase.modules[moduleKey], activeWorkflowCase)).join("")}
+    </details>`,
   ].join("");
   bindWorkflowSurfaceEvents();
   updateWorkflowCommandCard(dashboardShell.dataset.activeModule ?? "brief");
+  setActiveManagementPage((dashboardShell.dataset.managerPage as ManagementPageKey | undefined) ?? "event");
   void refreshAgentStatus();
 }
 
@@ -2506,8 +2978,11 @@ void createWindFarmScene({
   });
 
   document.querySelector<HTMLButtonElement>("#ai-duty-open")?.addEventListener("click", () => {
+    const turbine = getDutyTurbine();
     scene.focusTurbine(activeWorkflowCase.turbineId);
     scene.showTurbineAlert(activeWorkflowCase.turbineId);
+    openDiagnosis(turbine, "brief");
+    openManagementPage("event", "已进入当前事件工作台");
   });
 
   window.setTimeout(() => {
@@ -2791,7 +3266,139 @@ function bindAgentResultEvents(container: HTMLElement): void {
   });
 }
 
+function getAnalysisParamValue(pageKey: ManagementPageKey, index: number): string {
+  const input = workflowModuleDrawer.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-analysis-param="${pageKey}-${index}"]`);
+  return input?.value?.trim() ?? "";
+}
+
+function buildAnalysisRunSummary(pageKey: ManagementPageKey): string {
+  if (pageKey === "scada") {
+    const threshold = Number(getAnalysisParamValue("scada", 1) || "8");
+    const chart = activeWorkflowCase.modules.scada.scadaChart;
+    const abnormalCount = chart?.points.filter((point) => point.residualPct >= threshold).length ?? 0;
+    return `已按 ${getAnalysisParamValue("scada", 0)}、${getAnalysisParamValue("scada", 2)} 复算：功率残差阈值 ${threshold}% 下，异常窗口 ${abnormalCount}/${chart?.points.length ?? 0}，结论 ${activeWorkflowCase.modules.scada.decision?.result ?? "等待人工复核"}。`;
+  }
+
+  if (pageKey === "cms") {
+    const threshold = Number(getAnalysisParamValue("cms", 1) || "1.2");
+    const chart = activeWorkflowCase.modules.cms.cmsChart;
+    const peakCount = chart?.peaks.filter((peak) => peak.amplitude >= threshold).length ?? 0;
+    return `已按 ${getAnalysisParamValue("cms", 0)} 与 ${getAnalysisParamValue("cms", 2)} 复算：超过 ${threshold} mm/s 的峰值 ${peakCount} 个，结论 ${activeWorkflowCase.modules.cms.decision?.result ?? "等待人工复核"}。`;
+  }
+
+  if (pageKey === "structure") {
+    const threshold = Number(getAnalysisParamValue("structure", 1) || "8");
+    const chart = activeWorkflowCase.modules.bolts.boltChart;
+    const warningCount = chart?.channels.filter((channel) => channel.relaxationPct >= threshold).length ?? 0;
+    return `已按温漂补偿=${getAnalysisParamValue("structure", 0)} 复算：松弛阈值 ${threshold}% 下，关注通道 ${warningCount}/${chart?.channels.length ?? 0}，结构侧角色为 ${getAnalysisParamValue("structure", 2)}。`;
+  }
+
+  if (pageKey === "fusion") {
+    const passCount = activeWorkflowCase.modules.fusion.modelGates?.filter((gate) => gate.status === "pass").length ?? 0;
+    return `已按“${getAnalysisParamValue("fusion", 0)}”复算融合门控：通过 ${passCount}/${activeWorkflowCase.modules.fusion.modelGates?.length ?? 0} 层，最低置信度 ${getAnalysisParamValue("fusion", 1)}%，结论 ${activeWorkflowCase.modules.fusion.decision?.result ?? "等待融合"}。`;
+  }
+
+  if (pageKey === "maintenance") {
+    return `已按策略“${getAnalysisParamValue("maintenance", 0)}”刷新维护计划：最低低风速窗口 ${getAnalysisParamValue("maintenance", 1)} h，备件状态 ${getAnalysisParamValue("maintenance", 2)}，仍需人工确认窗口、许可、资源与回写责任。`;
+  }
+
+  if (pageKey === "workorders") {
+    const snapshot = readWorkOrderClosureSnapshot();
+    return `已刷新工单门控：人工签核 ${snapshot.confirmedChecks.length}/${snapshot.totalChecks}，现场回写 ${snapshot.completedWritebacks.length}/${snapshot.totalWritebacks}；未满足门控前不能派发或关闭。`;
+  }
+
+  return "已刷新当前页面记录。";
+}
+
+function runManagementAnalysis(pageKey: ManagementPageKey): void {
+  const result = workflowModuleDrawer.querySelector<HTMLElement>(`[data-analysis-result="${pageKey}"]`);
+  if (!result) return;
+  result.textContent = buildAnalysisRunSummary(pageKey);
+  result.dataset.state = "computed";
+  setBimStatus(`${managementPageByKey.get(pageKey)?.label ?? "管理端"}已完成本地复算`);
+}
+
+function adoptManagementEvidence(pageKey: ManagementPageKey): void {
+  const result = workflowModuleDrawer.querySelector<HTMLElement>(`[data-analysis-result="${pageKey}"]`);
+  if (!result) return;
+  result.textContent = `${buildAnalysisRunSummary(pageKey)} 已采纳为 ${activeWorkflowCase.eventCode} 的当前证据记录，等待人工复核签字。`;
+  result.dataset.state = "adopted";
+  setEventTimelineStage(pageKey === "workorders" ? "workorder-draft" : "evidence-review");
+  setBimStatus(`${managementPageByKey.get(pageKey)?.label ?? "证据"}已采纳到当前事件`);
+}
+
+function updateKnowledgeGraphDetail(nodeId: string): void {
+  const detailMap: Record<string, { body: string; title: string }> = {
+    bolt: {
+      body: "叶根螺栓和塔筒结构监测用于判断山地阵风和结构松弛是否足以解释异常；当前结论是反证项，不改写齿轮箱主疑似。",
+      title: "结构反证",
+    },
+    cms: {
+      body: "CMS 侧频和包络谱峰值用于定位传动链部件；当前 GMF 侧频支持齿轮箱高速轴轴承早期磨损假设。",
+      title: "CMS 证据",
+    },
+    fault: {
+      body: "早期磨损是当前事件的故障假设，需要由 SCADA、CMS、油温和结构反证共同支持，不能由单一阈值直接确认。",
+      title: "早期磨损",
+    },
+    gearbox: {
+      body: "齿轮箱高速轴轴承是当前主疑似对象，关联功率残差、CMS 侧频、油温偏高和现场内窥复核工单。",
+      title: "齿轮箱高速轴轴承",
+    },
+    scada: {
+      body: "SCADA 功率残差用于判断运行性能是否偏离同场基线；需要排除限电、人为降载和通信异常。",
+      title: "功率残差",
+    },
+    turbine: {
+      body: "当前事件对象，连接 GIS 场景、BIM 部件、监测证据、工单和复盘样本。",
+      title: activeWorkflowCase.turbineId,
+    },
+    workorder: {
+      body: "现场复核工单承接告警研判结果，但派发、停机、登塔和关闭必须由值班长与现场工程师确认。",
+      title: "现场复核工单",
+    },
+  };
+  const detail = detailMap[nodeId] ?? detailMap.gearbox;
+  const title = workflowModuleDrawer.querySelector<HTMLElement>("[data-kg-detail-title]");
+  const body = workflowModuleDrawer.querySelector<HTMLElement>("[data-kg-detail]");
+  if (title) title.textContent = detail.title;
+  if (body) body.textContent = detail.body;
+  workflowModuleDrawer.querySelectorAll<HTMLElement>("[data-kg-node]").forEach((item) => {
+    item.classList.toggle("active", item.dataset.kgNode === nodeId);
+  });
+}
+
 function bindWorkflowSurfaceEvents(): void {
+  workflowModuleDrawer.querySelectorAll<HTMLButtonElement>("[data-manager-page-button]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const pageKey = button.dataset.managerPageButton;
+      if (!isManagementPageKey(pageKey)) return;
+      openManagementPage(pageKey, `已打开${managementPageByKey.get(pageKey)?.label ?? "管理端页面"}`);
+    });
+  });
+
+  workflowModuleDrawer.querySelectorAll<HTMLButtonElement>("[data-run-analysis]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const pageKey = button.dataset.runAnalysis;
+      if (!isManagementPageKey(pageKey)) return;
+      runManagementAnalysis(pageKey);
+    });
+  });
+
+  workflowModuleDrawer.querySelectorAll<HTMLButtonElement>("[data-adopt-evidence]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const pageKey = button.dataset.adoptEvidence;
+      if (!isManagementPageKey(pageKey)) return;
+      adoptManagementEvidence(pageKey);
+    });
+  });
+
+  workflowModuleDrawer.querySelectorAll<HTMLButtonElement>("[data-kg-node]").forEach((button) => {
+    button.addEventListener("click", () => {
+      updateKnowledgeGraphDetail(button.dataset.kgNode ?? "gearbox");
+    });
+  });
+
   workflowComponentStrip.querySelectorAll<HTMLButtonElement>(".component").forEach((button) => {
     button.addEventListener("click", () => {
       const componentName = button.dataset.component ?? "";
