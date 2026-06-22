@@ -1434,6 +1434,27 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
     : result.source === "llm"
       ? "MiMo 大模型 + 诊断工具"
       : "本地诊断工具兜底";
+  const reportSectionBody = (keyword: string): string =>
+    result.reportSections.find((section) => section.title.includes(keyword))?.body ?? "";
+  const judgementChain = [
+    {
+      body: reportSectionBody("输入") || "SCADA、CMS、螺栓/结构与气象证据包。",
+      label: "输入数据",
+    },
+    {
+      body: reportSectionBody("模型") || "规则判据、机理反证与 AI 归纳只用于辅助研判。",
+      label: "模型判据",
+    },
+    {
+      body: result.operatorFocus.decision,
+      label: "输出结论",
+    },
+    {
+      body: reportSectionBody("人工") || result.operatorFocus.humanCheck,
+      label: "人工确认",
+    },
+  ];
+
   return `
     <article class="ai-domain-report agent-report">
       <header>
@@ -1445,6 +1466,15 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
       <section class="agent-answer-card">
         <span>AI 答复</span>
         <p>${html(result.answerText)}</p>
+      </section>
+
+      <section class="agent-judgement-strip" aria-label="AI 研判链">
+        ${judgementChain.map((item) => `
+          <article>
+            <span>${html(item.label)}</span>
+            <p>${html(item.body)}</p>
+          </article>
+        `).join("")}
       </section>
 
       <section class="agent-duty-focus">

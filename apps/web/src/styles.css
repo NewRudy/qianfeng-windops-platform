@@ -1822,6 +1822,56 @@ button {
   white-space: pre-line;
 }
 
+.agent-judgement-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.agent-judgement-strip article {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  min-height: 88px;
+  padding: 9px 10px;
+  border: 1px solid rgba(91, 224, 246, 0.16);
+  background: rgba(2, 18, 28, 0.62);
+}
+
+.agent-judgement-strip article:not(:last-child)::after {
+  content: ">";
+  position: absolute;
+  top: 14px;
+  right: -7px;
+  z-index: 1;
+  width: 13px;
+  height: 13px;
+  border: 1px solid rgba(91, 224, 246, 0.2);
+  background: #02121c;
+  color: rgba(246, 197, 104, 0.9);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 12px;
+  text-align: center;
+}
+
+.agent-judgement-strip span {
+  color: rgba(91, 224, 246, 0.72);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.agent-judgement-strip p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  margin: 0;
+  color: rgba(226, 246, 250, 0.78);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .agent-duty-focus,
 .agent-detail-group {
   padding: 10px;
@@ -3402,8 +3452,16 @@ button {
   }
 
   .ai-duty-console-grid,
+  .agent-judgement-strip,
   .ai-question-console {
     grid-template-columns: 1fr;
+  }
+
+  .agent-judgement-strip article:not(:last-child)::after {
+    top: auto;
+    right: 12px;
+    bottom: -7px;
+    transform: rotate(90deg);
   }
 
   .bim-toolbar {
