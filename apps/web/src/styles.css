@@ -1799,6 +1799,7 @@ button {
 }
 
 .agent-answer-card,
+.agent-closure-card,
 .agent-workorder-card,
 .agent-tool-trace,
 .agent-report-sections article {
@@ -1820,6 +1821,88 @@ button {
   font-size: 13px;
   line-height: 1.62;
   white-space: pre-line;
+}
+
+.agent-closure-card {
+  display: grid;
+  gap: 9px;
+  border-color: rgba(86, 240, 111, 0.18);
+  background:
+    linear-gradient(135deg, rgba(86, 240, 111, 0.07), rgba(1, 14, 22, 0.74)),
+    rgba(1, 14, 22, 0.72);
+}
+
+.agent-closure-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.agent-closure-card > header span,
+.agent-closure-metrics span {
+  color: rgba(91, 224, 246, 0.76);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.agent-closure-card > header strong {
+  color: #a8ffb8;
+  font-size: 13px;
+}
+
+.agent-closure-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.agent-closure-metrics article {
+  padding: 8px;
+  border: 1px solid rgba(91, 224, 246, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.agent-closure-metrics strong {
+  display: block;
+  margin-top: 4px;
+  color: #ffffff;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.agent-closure-lists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.agent-closure-lists section {
+  padding: 8px;
+  border: 1px solid rgba(91, 224, 246, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.agent-closure-lists h4 {
+  margin: 0 0 6px;
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.agent-closure-lists ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-closure-lists li,
+.agent-closure-card > p {
+  margin: 0;
+  color: rgba(222, 246, 249, 0.74);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .agent-judgement-strip {

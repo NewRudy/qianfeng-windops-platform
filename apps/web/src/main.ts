@@ -1440,6 +1440,97 @@ function confidenceWidth(confidence: number): string {
   return `${Math.max(0, Math.min(100, confidence)).toFixed(0)}%`;
 }
 
+function readWorkOrderClosureSnapshot() {
+  const ticket = activeWorkflowCase.modules.workorder.ticket;
+  const confirmationChecks = ticket?.confirmationChecks ?? [];
+  const writebackItems = ticket?.writebackItems ?? [];
+  const workOrderState = document.querySelector<HTMLElement>("#workorder-state")?.textContent?.trim() ?? ticket?.initialState ?? "待生成";
+  const confirmedChecks = confirmationChecks.filter((item) => {
+    const input = document.querySelector<HTMLInputElement>(`[data-workorder-confirm="${item.id}"]`);
+    return Boolean(input?.checked);
+  });
+  const writebackStates = writebackItems.map((item, index) => {
+    const input = document.querySelector<HTMLInputElement>(`[data-workorder-writeback="${index}"]`);
+    return {
+      checked: Boolean(input?.checked),
+      disabled: Boolean(input?.disabled),
+      item,
+    };
+  });
+  const completedWritebacks = writebackStates.filter((item) => item.checked);
+  const pendingWritebacks = writebackStates.filter((item) => !item.checked);
+  const pendingChecks = confirmationChecks.filter((item) => !confirmedChecks.includes(item));
+  const summaryState = document.querySelector<HTMLElement>("[data-writeback-summary-state]")?.textContent?.trim() ?? "待现场完成后回写";
+  const isClosed = workOrderState.includes("现场复核完成");
+
+  return {
+    completedWritebacks,
+    confirmedChecks,
+    isClosed,
+    pendingChecks,
+    pendingWritebacks,
+    summaryState,
+    totalChecks: confirmationChecks.length,
+    totalWritebacks: writebackItems.length,
+    workOrderState,
+  };
+}
+
+function renderAgentClosureStatusContent(): string {
+  const snapshot = readWorkOrderClosureSnapshot();
+  const sampleItems = snapshot.completedWritebacks
+    .map(({ item }) => `<li>${html(item.label)} 已进入复盘样本</li>`)
+    .join("") || "<li>等待现场回写，暂不进入 AI 样本。</li>";
+  const pendingItems = [
+    ...snapshot.pendingChecks.map((item) => `${item.label}（${item.owner}）`),
+    ...snapshot.pendingWritebacks.map(({ item, disabled }) => `${item.label}${disabled ? "（派发后回写）" : "（待现场回写）"}`),
+  ];
+  const humanReviewItems = pendingItems.map((item) => `<li>${html(item)}</li>`).join("")
+    || "<li>签核、回写和关闭门控已完成，等待复盘审核。</li>";
+
+  return `
+    <header>
+      <span>工单闭环状态</span>
+      <strong>${html(snapshot.isClosed ? "复盘样本已回写" : snapshot.summaryState)}</strong>
+    </header>
+    <div class="agent-closure-metrics">
+      <article>
+        <span>工单状态</span>
+        <strong>${html(snapshot.workOrderState)}</strong>
+      </article>
+      <article>
+        <span>人工签核</span>
+        <strong>${snapshot.confirmedChecks.length}/${snapshot.totalChecks}</strong>
+      </article>
+      <article>
+        <span>现场回写</span>
+        <strong>${snapshot.completedWritebacks.length}/${snapshot.totalWritebacks}</strong>
+      </article>
+    </div>
+    <div class="agent-closure-lists">
+      <section>
+        <h4>已进入复盘样本</h4>
+        <ul>${sampleItems}</ul>
+      </section>
+      <section>
+        <h4>仍需人工复核</h4>
+        <ul>${humanReviewItems}</ul>
+      </section>
+    </div>
+    <p>AI 报告只引用已确认的结构化证据和现场回写状态；未回写项不会被当成已验证事实。</p>
+  `;
+}
+
+function renderAgentClosureStatusCard(): string {
+  return `<section class="agent-closure-card" data-agent-closure-card>${renderAgentClosureStatusContent()}</section>`;
+}
+
+function updateAgentClosureStatusCard(): void {
+  workflowModuleDrawer.querySelectorAll<HTMLElement>("[data-agent-closure-card]").forEach((card) => {
+    card.innerHTML = renderAgentClosureStatusContent();
+  });
+}
+
 function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string): string {
   const sourceLabel = result.status === "pending"
     ? "本地证据包已就绪，等待大模型"
@@ -1479,6 +1570,8 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
         <span>AI 答复</span>
         <p>${html(result.answerText)}</p>
       </section>
+
+      ${renderAgentClosureStatusCard()}
 
       <section class="agent-judgement-strip" aria-label="AI 研判链">
         ${judgementChain.map((item) => `
@@ -2022,6 +2115,7 @@ function openGeneratedWorkOrder(status = activeWorkflowCase.statuses.ticketCreat
   openWorkflowModule("workorder", status);
   updateWorkOrderConfirmationState();
   updateWorkOrderWritebackGateState();
+  updateAgentClosureStatusCard();
 }
 
 function areWorkOrderConfirmationsReady(): boolean {
@@ -2041,6 +2135,7 @@ function updateWorkOrderConfirmationState(): void {
     if (state) state.textContent = isConfirmed ? "已签核" : "待签核";
   });
   dispatchButton.disabled = !areWorkOrderConfirmationsReady();
+  updateAgentClosureStatusCard();
 }
 
 function dispatchWorkOrder(): void {
@@ -2065,6 +2160,7 @@ function dispatchWorkOrder(): void {
     input.disabled = false;
   });
   updateWorkOrderWritebackGateState();
+  updateAgentClosureStatusCard();
   setEventTimelineStage("workorder-draft");
   setBimStatus("工单已通过人工确认并派发，等待现场复核回写");
 }
@@ -2123,6 +2219,7 @@ function updateWorkOrderWritebackGateState(): void {
         : "回写完成后，事件会进入复盘样本，AI 诊断记录才允许闭环。";
   }
   if (closeButton) closeButton.disabled = !ready;
+  updateAgentClosureStatusCard();
 }
 
 function finalizeWorkOrderWritebackSummary(): void {
@@ -2138,6 +2235,7 @@ function finalizeWorkOrderWritebackSummary(): void {
   if (summaryState) summaryState.textContent = ticket?.closedState ?? "现场复核完成";
   if (summaryNote) summaryNote.textContent = activeWorkflowCase.statuses.ticketClosed;
   if (closeButton) closeButton.disabled = true;
+  updateAgentClosureStatusCard();
 }
 
 function bindAgentResultEvents(container: HTMLElement): void {
