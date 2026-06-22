@@ -1528,9 +1528,48 @@ function renderAgentClosureStatusCard(): string {
   return `<section class="agent-closure-card" data-agent-closure-card>${renderAgentClosureStatusContent()}</section>`;
 }
 
+function renderAgentClosureSummaryContent(): string {
+  const snapshot = readWorkOrderClosureSnapshot();
+  const nextGate = snapshot.isClosed
+    ? "复盘审核"
+    : snapshot.workOrderState.includes("已派发")
+      ? (snapshot.pendingWritebacks.length > 0 ? "现场回写门" : "关闭确认门")
+      : "工单确认门";
+
+  return `
+    <header>
+      <span>工单状态摘要</span>
+      <strong>${html(snapshot.isClosed ? "已回写复盘样本" : snapshot.workOrderState)}</strong>
+    </header>
+    <div class="agent-closure-summary-row">
+      <article>
+        <span>人工签核</span>
+        <strong>${snapshot.confirmedChecks.length}/${snapshot.totalChecks}</strong>
+      </article>
+      <article>
+        <span>现场回写</span>
+        <strong>${snapshot.completedWritebacks.length}/${snapshot.totalWritebacks}</strong>
+      </article>
+      <article>
+        <span>下一门控</span>
+        <strong>${html(nextGate)}</strong>
+      </article>
+    </div>
+    <p>完整派发、回写和关闭门控已收起；当前问题先处理上方值班焦点。需要安排现场动作时，再打开工单确认门。</p>
+    <button type="button" data-agent-open-module="workorder">打开工单确认门</button>
+  `;
+}
+
+function renderAgentClosureSummaryCard(): string {
+  return `<section class="agent-closure-summary" data-agent-closure-summary>${renderAgentClosureSummaryContent()}</section>`;
+}
+
 function updateAgentClosureStatusCard(): void {
   workflowModuleDrawer.querySelectorAll<HTMLElement>("[data-agent-closure-card]").forEach((card) => {
     card.innerHTML = renderAgentClosureStatusContent();
+  });
+  workflowModuleDrawer.querySelectorAll<HTMLElement>("[data-agent-closure-summary]").forEach((card) => {
+    card.innerHTML = renderAgentClosureSummaryContent();
   });
 }
 
@@ -1616,6 +1655,7 @@ function buildClosureStatusAiResponse(question: string): AiDiagnosisResponse {
 }
 
 function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string): string {
+  const showWorkOrderDetails = result.intent === "workorder";
   const sourceLabel = result.status === "pending"
     ? "本地证据包已就绪，等待大模型"
     : result.source === "llm"
@@ -1655,7 +1695,7 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
         <p>${html(result.answerText)}</p>
       </section>
 
-      ${renderAgentClosureStatusCard()}
+      ${showWorkOrderDetails ? renderAgentClosureStatusCard() : renderAgentClosureSummaryCard()}
 
       <section class="agent-judgement-strip" aria-label="AI 研判链">
         ${judgementChain.map((item) => `
@@ -1749,7 +1789,7 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
         </section>
       </details>
 
-      ${result.workOrderDraft ? `
+      ${showWorkOrderDetails && result.workOrderDraft ? `
         <section class="agent-workorder-card">
           <header>
             <span>${html(result.workOrderDraft.status)}</span>
