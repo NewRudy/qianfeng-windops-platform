@@ -39,6 +39,7 @@ describe("WindOps diagnostic agent", () => {
       "get_current_event",
       "get_evidence_bundle",
       "run_diagnostic_rules",
+      "query_knowledge_graph",
       "prepare_visual_refs",
       "draft_work_order",
     ]);
@@ -139,7 +140,7 @@ describe("WindOps diagnostic agent", () => {
     expect(result.operatorFocus.recommendedModule).toBe("alerts");
     expect(result.evidenceCards).toHaveLength(4);
     expect(result.evidenceCards.map((card) => card.gate.role)).toContain("counter");
-    expect(result.toolTrace).toHaveLength(5);
+    expect(result.toolTrace.map((item) => item.tool)).toContain("query_knowledge_graph");
   });
 
   it("builds a grounded prompt with the selected intent and trusted evidence", () => {
@@ -150,6 +151,8 @@ describe("WindOps diagnostic agent", () => {
     expect(prompt).toContain("HS-WTG-02");
     expect(prompt).toContain("SCADA");
     expect(prompt).toContain("结构反证");
+    expect(prompt).toContain("知识图谱上下文");
+    expect(prompt).toContain("图谱检索");
     expect(prompt).toContain("待人工确认");
     expect(prompt).toContain("工单确认门");
     expect(prompt).toContain("复盘回写责任");

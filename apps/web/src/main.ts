@@ -11,6 +11,12 @@ import {
   type HealthDataSource,
 } from "./workflow/healthAssessment";
 import {
+  buildWindOpsKnowledgeGraph,
+  type KnowledgeDecisionPath,
+  type KnowledgeGraphEdge,
+  type KnowledgeGraphNode,
+} from "./workflow/knowledgeGraph";
+import {
   buildGearboxWorkflowCase,
   gearboxCaseCatalog,
   gearboxWorkflowCase,
@@ -700,44 +706,95 @@ function renderMaintenanceManagementPage(): string {
 }
 
 function renderKnowledgeGraphPage(): string {
-  const nodes = [
-    { id: "turbine", label: activeWorkflowCase.turbineId, type: "机组" },
-    { id: "gearbox", label: "齿轮箱高速轴轴承", type: "部件" },
-    { id: "fault", label: "早期磨损", type: "故障模式" },
-    { id: "scada", label: "功率残差", type: "SCADA证据" },
-    { id: "cms", label: "GMF侧频", type: "CMS证据" },
-    { id: "bolt", label: "结构反证", type: "螺栓/结构" },
-    { id: "workorder", label: "现场复核工单", type: "处置动作" },
-  ];
-  const edges = [
-    "机组-包含-齿轮箱",
-    "齿轮箱-可能发生-早期磨损",
-    "功率残差-支持-早期磨损",
-    "GMF侧频-定位-传动链",
-    "结构反证-排除-叶根主故障",
-    "早期磨损-生成-现场复核工单",
-  ];
+  const graph = buildWindOpsKnowledgeGraph(activeWorkflowCase);
+  const primaryNode = graph.nodes.find((node) => node.id === "gearbox-bearing") ?? graph.nodes[0];
   return renderManagementPageFrame("knowledge", `
+    <section class="knowledge-summary-card">
+      <span>图谱作用</span>
+      <strong>让 AI 回答可追溯到关系链</strong>
+      <p>${html(graph.summary)}</p>
+    </section>
     <section class="knowledge-graph">
       <div class="knowledge-node-map" aria-label="知识图谱节点">
-        ${nodes.map((node, index) => `
-          <button type="button" data-kg-node="${html(node.id)}" style="--x: ${16 + (index % 3) * 32}%; --y: ${18 + Math.floor(index / 3) * 30}%;">
-            <span>${html(node.type)}</span>
+        ${graph.nodes.map((node) => `
+          <button type="button" data-kg-node="${html(node.id)}" data-kg-status="${html(node.status)}" style="--x: ${node.position.x}%; --y: ${node.position.y}%;">
+            <span>${html(`${node.type} · ${knowledgeStatusLabel(node.status)}`)}</span>
             <strong>${html(node.label)}</strong>
           </button>
         `).join("")}
       </div>
       <article class="knowledge-detail">
         <span>节点说明</span>
-        <strong data-kg-detail-title>齿轮箱高速轴轴承</strong>
-        <p data-kg-detail>该部件连接 SCADA 功率残差、CMS 侧频和油温证据，是当前事件的主疑似对象；螺栓与结构监测作为反证项参与融合判据。</p>
+        <strong data-kg-detail-title>${html(primaryNode.label)}</strong>
+        <p data-kg-detail>${html(primaryNode.summary)}</p>
+        <small data-kg-detail-evidence>${html(primaryNode.evidence ?? "点击节点查看它在 AI 决策链中的角色。")}</small>
       </article>
     </section>
     <section class="knowledge-edge-list">
       <span>关键关系</span>
-      <ul>${edges.map((edge) => `<li>${html(edge)}</li>`).join("")}</ul>
+      <ul>${graph.edges.map(renderKnowledgeEdge).join("")}</ul>
+    </section>
+    <section class="knowledge-decision-paths">
+      <span>AI 决策路径</span>
+      ${graph.decisionPaths.map(renderKnowledgeDecisionPath).join("")}
     </section>
   `);
+}
+
+function knowledgeStatusLabel(status: KnowledgeGraphNode["status"]): string {
+  if (status === "alarm") return "告警";
+  if (status === "watch") return "关注";
+  if (status === "review") return "需确认";
+  return "正常";
+}
+
+function knowledgeRoleLabel(role: KnowledgeGraphEdge["role"]): string {
+  const labels: Record<KnowledgeGraphEdge["role"], string> = {
+    action: "处置",
+    amplify: "增强",
+    boundary: "边界",
+    counter: "反证",
+    localize: "定位",
+    support: "支持",
+    writeback: "回写",
+  };
+  return labels[role];
+}
+
+function renderKnowledgeEdge(edge: KnowledgeGraphEdge): string {
+  return `
+    <li data-kg-edge-role="${html(edge.role)}">
+      <strong>${html(`${edge.label} / ${knowledgeRoleLabel(edge.role)}`)}</strong>
+      <span>${html(edge.explanation)}</span>
+    </li>
+  `;
+}
+
+function renderKnowledgeDecisionPath(path: KnowledgeDecisionPath): string {
+  return `
+    <article>
+      <header>
+        <span>${html(path.question)}</span>
+        <strong>${html(path.title)}</strong>
+      </header>
+      <p>${html(path.answer)}</p>
+      <ol>
+        ${path.steps.map((step, index) => `
+          <li>
+            <span>${String(index + 1).padStart(2, "0")}</span>
+            <div>
+              <strong>${html(step.title)}</strong>
+              <p>${html(step.conclusion)}</p>
+              <small>${html(step.humanBoundary)}</small>
+            </div>
+          </li>
+        `).join("")}
+      </ol>
+      <button type="button" data-manager-page-button="${html(getManagementPageForModule(path.recommendedModule))}">
+        打开${html(moduleText(path.recommendedModule))}
+      </button>
+    </article>
+  `;
 }
 
 function html(value: string | number): string {
@@ -3581,41 +3638,14 @@ async function adoptManagementEvidence(pageKey: ManagementPageKey): Promise<void
 }
 
 function updateKnowledgeGraphDetail(nodeId: string): void {
-  const detailMap: Record<string, { body: string; title: string }> = {
-    bolt: {
-      body: "叶根螺栓和塔筒结构监测用于判断山地阵风和结构松弛是否足以解释异常；当前结论是反证项，不改写齿轮箱主疑似。",
-      title: "结构反证",
-    },
-    cms: {
-      body: "CMS 侧频和包络谱峰值用于定位传动链部件；当前 GMF 侧频支持齿轮箱高速轴轴承早期磨损假设。",
-      title: "CMS 证据",
-    },
-    fault: {
-      body: "早期磨损是当前事件的故障假设，需要由 SCADA、CMS、油温和结构反证共同支持，不能由单一阈值直接确认。",
-      title: "早期磨损",
-    },
-    gearbox: {
-      body: "齿轮箱高速轴轴承是当前主疑似对象，关联功率残差、CMS 侧频、油温偏高和现场内窥复核工单。",
-      title: "齿轮箱高速轴轴承",
-    },
-    scada: {
-      body: "SCADA 功率残差用于判断运行性能是否偏离同场基线；需要排除限电、人为降载和通信异常。",
-      title: "功率残差",
-    },
-    turbine: {
-      body: "当前事件对象，连接 GIS 场景、BIM 部件、监测证据、工单和复盘样本。",
-      title: activeWorkflowCase.turbineId,
-    },
-    workorder: {
-      body: "现场复核工单承接告警研判结果，但派发、停机、登塔和关闭必须由值班长与现场工程师确认。",
-      title: "现场复核工单",
-    },
-  };
-  const detail = detailMap[nodeId] ?? detailMap.gearbox;
+  const graph = buildWindOpsKnowledgeGraph(activeWorkflowCase);
+  const detail = graph.nodes.find((node) => node.id === nodeId) ?? graph.nodes.find((node) => node.id === "gearbox-bearing") ?? graph.nodes[0];
   const title = workflowModuleDrawer.querySelector<HTMLElement>("[data-kg-detail-title]");
   const body = workflowModuleDrawer.querySelector<HTMLElement>("[data-kg-detail]");
-  if (title) title.textContent = detail.title;
-  if (body) body.textContent = detail.body;
+  const evidence = workflowModuleDrawer.querySelector<HTMLElement>("[data-kg-detail-evidence]");
+  if (title) title.textContent = detail.label;
+  if (body) body.textContent = detail.summary;
+  if (evidence) evidence.textContent = detail.evidence ?? `${detail.type} / ${knowledgeStatusLabel(detail.status)}`;
   workflowModuleDrawer.querySelectorAll<HTMLElement>("[data-kg-node]").forEach((item) => {
     item.classList.toggle("active", item.dataset.kgNode === nodeId);
   });

@@ -11,6 +11,7 @@ import {
   type GearboxWorkflowCase,
   type WorkflowModuleKey,
 } from "../src/workflow/gearboxWorkflow";
+import { buildAgentKnowledgeContext } from "../src/workflow/knowledgeGraph";
 
 export type AgentIntent =
   | "counter_evidence"
@@ -302,6 +303,12 @@ export function buildAgentToolTrace(workflowCase: GearboxWorkflowCase): AgentToo
       tool: "run_diagnostic_rules",
     },
     {
+      label: "检索故障知识图谱",
+      output: "返回机组-部件-故障模式-证据-反证-工单-人工边界关系链",
+      status: "ok",
+      tool: "query_knowledge_graph",
+    },
+    {
       label: "准备可视化联动",
       output: "返回 SCADA、CMS、螺栓图表入口和 BIM 部件高亮",
       status: "ok",
@@ -447,7 +454,7 @@ export function buildAgentReportSections(intent: AgentIntent, workflowCase: Gear
     },
     {
       title: "机理解释",
-      body: "SCADA 功率残差说明同风速下能量转换效率下降；CMS 齿轮啮合频率及边带抬升把风险定位到传动链；油温偏高增强润滑/摩擦异常判断；螺栓监测用于排除结构主故障并追踪山地阵风载荷。",
+      body: `${buildAgentKnowledgeContext(intent, workflowCase)}\nSCADA 功率残差说明同风速下能量转换效率下降；CMS 齿轮啮合频率及边带抬升把风险定位到传动链；油温偏高增强润滑/摩擦异常判断；螺栓监测用于排除结构主故障并追踪山地阵风载荷。`,
     },
     {
       title: intent === "workorder" ? "工单草案" : "处置建议",
@@ -465,6 +472,7 @@ export function buildAgentPrompt(intent: AgentIntent, question: string, workflow
   const ticket = workflowCase.modules.workorder.ticket;
   const confirmationChecks = ticket?.confirmationChecks.map((item) => `${item.label}/${item.owner}:${item.detail}`).join("；");
   const acceptanceCriteria = ticket?.acceptanceCriteria.join("；");
+  const knowledgeContext = buildAgentKnowledgeContext(intent, workflowCase);
   return [
     "你是黔风智维平台的风电运维 AI 值班诊断员。",
     "请只基于下列工具输出回答，不编造真实接入、自动停机、准确率或企业客户。",
@@ -478,6 +486,7 @@ export function buildAgentPrompt(intent: AgentIntent, question: string, workflow
     `诊断结论：${brief?.conclusion ?? ""}`,
     `建议动作：${brief?.recommendedAction ?? ""}`,
     `证据卡：${evidence.map((item) => `${item.source}:${item.value}:${item.gate.label}:${item.gate.decision}:${item.interpretation}`).join("；")}`,
+    `知识图谱上下文：${knowledgeContext}`,
     `工单确认门：${confirmationChecks ?? "低风速窗口、安全许可、备件工器具、复盘回写责任"}`,
     `工单验收标准：${acceptanceCriteria ?? "现场复核材料上传并完成样本回写"}`,
   ].join("\n");
