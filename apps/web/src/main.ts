@@ -1531,6 +1531,87 @@ function updateAgentClosureStatusCard(): void {
   });
 }
 
+function isClosureStatusQuestion(question: string): boolean {
+  return /(还差|缺什么|能不能|能否|可以.*吗|能.*吗|派发|派单|关闭|闭环|回写|签核|确认门|现场复核|复盘样本)/.test(question);
+}
+
+function buildClosureStatusAnswer(question: string): string {
+  const snapshot = readWorkOrderClosureSnapshot();
+  const pendingCheckText = snapshot.pendingChecks.map((item) => `${item.label}（${item.owner}）`);
+  const pendingWritebackText = snapshot.pendingWritebacks.map(({ item, disabled }) =>
+    `${item.label}${disabled ? "（派发后才能回写）" : "（待现场回写确认）"}`);
+  const pendingAll = [...pendingCheckText, ...pendingWritebackText];
+
+  if (/派发|派单/.test(question)) {
+    if (snapshot.workOrderState.includes("已派发") || snapshot.isClosed) {
+      return `当前工单状态为“${snapshot.workOrderState}”，不需要重复派发。下一步看现场回写和复盘关闭状态；AI 只提示门控结果，派发动作必须由值班人员确认。`;
+    }
+    if (snapshot.pendingChecks.length > 0) {
+      return `现在还不能派发工单。派发前还有 ${snapshot.pendingChecks.length} 项人工签核未完成：${pendingCheckText.join("；")}。这些确认完成后，系统才会解锁派发按钮。`;
+    }
+    return "派发前 4 项人工签核已经完成，可以由值班人员确认是否派发工单。AI 不能替代值长派发，也不能自动停机或登塔。";
+  }
+
+  if (/关闭|闭环|现场复核/.test(question)) {
+    if (snapshot.isClosed) {
+      return "本次工单已标记现场复核完成，4 项现场回写已进入复盘样本。后续只保留复盘审核和模型样本校准，不需要再次关闭。";
+    }
+    if (!snapshot.workOrderState.includes("已派发")) {
+      return `现在不能关闭工单。当前状态为“${snapshot.workOrderState}”，需要先完成派发前签核并由人工派发，之后才能进行现场回写和关闭。`;
+    }
+    if (snapshot.pendingWritebacks.length > 0) {
+      return `现在还不能关闭工单。现场回写还有 ${snapshot.pendingWritebacks.length} 项未完成：${pendingWritebackText.join("；")}。全部回写后，关闭按钮才会解锁。`;
+    }
+    return "4 项现场回写已经确认，可以由运维主管人工关闭本次工单。AI 只说明闭环条件已满足，最终关闭仍需人工确认。";
+  }
+
+  if (pendingAll.length === 0) {
+    return `当前闭环状态为“${snapshot.workOrderState}”：签核 ${snapshot.confirmedChecks.length}/${snapshot.totalChecks}，回写 ${snapshot.completedWritebacks.length}/${snapshot.totalWritebacks}，没有未完成门控项。仍需人工完成复盘审核。`;
+  }
+
+  return `当前还差 ${pendingAll.length} 项：${pendingAll.join("；")}。系统只把已签核、已回写的内容纳入 AI 报告，未确认项不会被当成已验证事实。`;
+}
+
+function buildClosureStatusAiResponse(question: string): AiDiagnosisResponse {
+  const result = buildLocalAiDiagnosisResponse(question, "fallback", "AI 已读取当前工单门控状态。");
+  const snapshot = readWorkOrderClosureSnapshot();
+  const answerText = buildClosureStatusAnswer(question);
+  return {
+    ...result,
+    answerText,
+    intent: "workorder",
+    operatorFocus: {
+      decision: snapshot.isClosed ? "工单已进入复盘样本" : snapshot.summaryState,
+      humanCheck: "派发、关闭、停机、登塔和检修动作必须由值班人员与现场工程师确认。",
+      primaryQuestion: snapshot.pendingWritebacks.length > 0 ? "先完成现场回写" : "查看工单确认门",
+      recommendedModule: "workorder",
+      why: "用户问的是当前工单能否进入下一步，这必须读取系统门控状态，而不是重新解释故障原因。",
+    },
+    reportSections: [
+      {
+        body: `人工签核 ${snapshot.confirmedChecks.length}/${snapshot.totalChecks}，现场回写 ${snapshot.completedWritebacks.length}/${snapshot.totalWritebacks}，工单状态：${snapshot.workOrderState}。`,
+        title: "输入数据",
+      },
+      {
+        body: "读取工单签核门、派发状态、现场回写门和复盘样本状态；不把未回写证据当成已验证事实。",
+        title: "模型判据",
+      },
+      {
+        body: answerText,
+        title: "人工确认",
+      },
+    ],
+    riskBoundary: "AI 只解释当前门控状态和下一步人工动作；不能自动派发、关闭、停机、登塔或检修。",
+    title: `${activeWorkflowCase.turbineId} 工单闭环问答`,
+    toolTrace: [
+      { label: "读取工单状态", output: snapshot.workOrderState, status: "ok", tool: "read_workorder_state" },
+      { label: "读取人工签核门", output: `${snapshot.confirmedChecks.length}/${snapshot.totalChecks}`, status: "ok", tool: "read_confirmation_gates" },
+      { label: "读取现场回写门", output: `${snapshot.completedWritebacks.length}/${snapshot.totalWritebacks}`, status: "ok", tool: "read_writeback_gates" },
+    ],
+    voiceText: answerText.replace(/\n/g, " "),
+  };
+}
+
 function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string): string {
   const sourceLabel = result.status === "pending"
     ? "本地证据包已就绪，等待大模型"
@@ -1950,6 +2031,14 @@ async function requestAiDiagnosisReport(
   const brief = activeWorkflowCase.modules.brief.aiBrief;
   if (!brief) return;
 
+  if (isClosureStatusQuestion(question)) {
+    const result = buildClosureStatusAiResponse(question);
+    setAiReportHtml(renderAiGeneratedReport(result, question));
+    setBimStatus("AI 已基于当前工单门控状态生成回答");
+    if (options.speak) speakAiAnswerSummary(result.voiceText);
+    return result;
+  }
+
   const requestCaseId = activeCaseId;
   setAiReportHtml(renderAiGeneratedReport(buildLocalAiDiagnosisResponse(question, "pending"), question));
   setBimStatus("AI 已先展开本地证据包，等待大模型答复");
@@ -2091,12 +2180,38 @@ void createWindFarmScene({
   }, 5200);
 });
 
+function getCurrentWorkOrderState(): string {
+  const ticket = activeWorkflowCase.modules.workorder.ticket;
+  return document.querySelector<HTMLElement>("#workorder-state")?.textContent?.trim() ?? ticket?.initialState ?? "待生成";
+}
+
+function isGeneratedWorkOrderState(state = getCurrentWorkOrderState()): boolean {
+  return state !== "待生成";
+}
+
+function isDispatchedWorkOrderState(state = getCurrentWorkOrderState()): boolean {
+  return state.includes("已派发") || state.includes("现场复核完成");
+}
+
+function isClosedWorkOrderState(state = getCurrentWorkOrderState()): boolean {
+  return state.includes("现场复核完成");
+}
+
 function openGeneratedWorkOrder(status = activeWorkflowCase.statuses.ticketCreated): void {
   const ticket = activeWorkflowCase.modules.workorder.ticket;
   const state = document.querySelector<HTMLElement>("#workorder-state");
   const code = document.querySelector<HTMLElement>("#workorder-code");
   const dispatchButton = document.querySelector<HTMLButtonElement>("[data-dispatch-workorder]");
   const closeButton = document.querySelector<HTMLButtonElement>("[data-close-workorder]");
+  const currentState = getCurrentWorkOrderState();
+  if (isGeneratedWorkOrderState(currentState)) {
+    openWorkflowModule("workorder", status);
+    updateWorkOrderConfirmationState();
+    updateWorkOrderWritebackGateState();
+    updateAgentClosureStatusCard();
+    return;
+  }
+
   if (state) state.textContent = ticket?.generatedState ?? "已生成";
   if (code) code.textContent = ticket?.finalCode ?? "WO-GX-20260621-02";
   document.querySelectorAll<HTMLInputElement>("[data-workorder-confirm]").forEach((input) => {
@@ -2126,6 +2241,9 @@ function areWorkOrderConfirmationsReady(): boolean {
 function updateWorkOrderConfirmationState(): void {
   const dispatchButton = document.querySelector<HTMLButtonElement>("[data-dispatch-workorder]");
   if (!dispatchButton) return;
+  const ticket = activeWorkflowCase.modules.workorder.ticket;
+  const currentState = getCurrentWorkOrderState();
+  const isDispatched = isDispatchedWorkOrderState(currentState);
   const checks = Array.from(document.querySelectorAll<HTMLInputElement>("[data-workorder-confirm]"));
   checks.forEach((input) => {
     const card = input.closest<HTMLElement>(".workorder-confirm");
@@ -2134,7 +2252,15 @@ function updateWorkOrderConfirmationState(): void {
     if (card) card.dataset.state = isConfirmed ? "confirmed" : "pending";
     if (state) state.textContent = isConfirmed ? "已签核" : "待签核";
   });
-  dispatchButton.disabled = !areWorkOrderConfirmationsReady();
+  if (isDispatched) {
+    dispatchButton.disabled = true;
+    dispatchButton.textContent = currentState.includes("现场复核完成")
+      ? (ticket?.closedActionLabel ?? "现场复核已完成")
+      : "工单已派发";
+  } else {
+    dispatchButton.disabled = !areWorkOrderConfirmationsReady();
+    dispatchButton.textContent = ticket?.dispatchActionLabel ?? "确认派发工单";
+  }
   updateAgentClosureStatusCard();
 }
 
@@ -2183,6 +2309,7 @@ function updateWorkOrderWritebackGateState(): void {
   const closeButton = document.querySelector<HTMLButtonElement>("[data-close-workorder]");
   const summaryState = document.querySelector<HTMLElement>("[data-writeback-summary-state]");
   const summaryNote = document.querySelector<HTMLElement>("[data-writeback-summary-note]");
+  const isClosed = isClosedWorkOrderState();
   const isEnabled = checks.some((input) => !input.disabled);
   const completedCount = checks.filter((input) => input.checked).length;
   const ready = areWorkOrderWritebacksReady();
@@ -2205,20 +2332,27 @@ function updateWorkOrderWritebackGateState(): void {
   });
 
   if (summaryState) {
-    summaryState.textContent = ready
+    summaryState.textContent = isClosed
+      ? (ticket?.closedState ?? "现场复核完成")
+      : ready
       ? "回写已确认，可关闭工单"
       : isEnabled
         ? `现场回写待确认 ${checks.length - completedCount} 项`
         : "待现场完成后回写";
   }
   if (summaryNote) {
-    summaryNote.textContent = ready
+    summaryNote.textContent = isClosed
+      ? activeWorkflowCase.statuses.ticketClosed
+      : ready
       ? "油液、内窥照片、CMS 复测和 AI 样本标签均已回写，允许人工关闭本次事件。"
       : isEnabled
         ? "现场复核完成后逐项回写证据；未完成回写前，AI 诊断记录不能闭环。"
         : "回写完成后，事件会进入复盘样本，AI 诊断记录才允许闭环。";
   }
-  if (closeButton) closeButton.disabled = !ready;
+  if (closeButton) {
+    closeButton.disabled = isClosed || !ready;
+    if (isClosed) closeButton.textContent = ticket?.closedActionLabel ?? "现场复核已完成";
+  }
   updateAgentClosureStatusCard();
 }
 
