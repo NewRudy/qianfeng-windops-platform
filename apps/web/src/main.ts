@@ -1549,6 +1549,13 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
           `).join("")}
         </section>
 
+        <section class="agent-handoff-card">
+          <span>定位后动作</span>
+          <strong>先打开工单人工确认门，不自动派发</strong>
+          <p>齿轮箱部件定位只说明疑似对象已收窄；低风速窗口、安全许可、备件工器具和复盘回写责任确认后，才允许派发现场工单。</p>
+          <button type="button" data-agent-create-workorder>打开工单确认门</button>
+        </section>
+
         <section class="agent-report-sections">
           ${result.reportSections.map((section) => `
             <article>
@@ -2091,8 +2098,10 @@ function bindAgentResultEvents(container: HTMLElement): void {
     });
   });
 
-  container.querySelector<HTMLButtonElement>("[data-agent-create-workorder]")?.addEventListener("click", () => {
-    openGeneratedWorkOrder("AI 已打开工单草案：等待现场工程师确认");
+  container.querySelectorAll<HTMLButtonElement>("[data-agent-create-workorder]").forEach((button) => {
+    button.addEventListener("click", () => {
+      openGeneratedWorkOrder("AI 已从 BIM 定位进入工单确认门：等待值长与现场工程师确认");
+    });
   });
 }
 
