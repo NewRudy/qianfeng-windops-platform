@@ -1614,36 +1614,51 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 14px;
 }
 
 .ai-question-chips button {
   min-height: 30px;
-  padding: 0 10px;
+  padding: 0 12px;
   font-size: 12px;
 }
 
 .ai-generated-report {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 14px;
-  padding: 12px;
-  border: 1px solid rgba(91, 224, 246, 0.16);
-  background: rgba(255, 255, 255, 0.046);
+  padding: 14px;
+  border: 1px solid rgba(91, 224, 246, 0.2);
+  background:
+    linear-gradient(135deg, rgba(6, 37, 52, 0.72), rgba(2, 11, 20, 0.7)),
+    rgba(255, 255, 255, 0.04);
 }
 
 .ai-generated-report header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
 }
 
-.ai-generated-report span {
+.ai-generated-report header > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.ai-generated-report span,
+.ai-evidence-scope span,
+.ai-recommended-questions span,
+.ai-assistant-guardrail span {
   color: rgba(91, 224, 246, 0.78);
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0;
+}
+
+.ai-generated-report header strong {
+  color: #eefcff;
+  font-size: 15px;
+  line-height: 1.35;
 }
 
 .ai-report-actions {
@@ -1660,6 +1675,65 @@ button {
   color: #fff4dd;
   font-size: 12px;
   font-weight: 900;
+}
+
+.ai-duty-console-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(210px, 0.75fr);
+  gap: 10px;
+}
+
+.ai-recommended-questions,
+.ai-assistant-guardrail,
+.ai-evidence-scope {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(91, 224, 246, 0.12);
+  background: rgba(2, 15, 24, 0.46);
+}
+
+.ai-assistant-guardrail {
+  border-color: rgba(246, 197, 104, 0.24);
+  background: rgba(54, 32, 10, 0.28);
+}
+
+.ai-assistant-guardrail p {
+  margin: 0;
+  color: rgba(255, 242, 214, 0.86);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.ai-evidence-scope ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-evidence-scope li {
+  position: relative;
+  padding-left: 12px;
+  color: rgba(228, 249, 252, 0.8);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.ai-evidence-scope li::before {
+  position: absolute;
+  top: 0.58em;
+  left: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #5be0f6;
+  box-shadow: 0 0 12px rgba(91, 224, 246, 0.65);
+  content: "";
 }
 
 .ai-question-console {
@@ -3298,6 +3372,11 @@ button {
     min-height: auto;
     max-height: 34vh;
     overflow: auto;
+  }
+
+  .ai-duty-console-grid,
+  .ai-question-console {
+    grid-template-columns: 1fr;
   }
 
   .bim-toolbar {

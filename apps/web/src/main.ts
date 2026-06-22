@@ -580,6 +580,7 @@ function renderAiBrief(module: WorkflowModule): string {
   if (!brief) return "";
   const primaryAction = brief.primaryAction;
   const dutyFocus = brief.operatorFocus;
+  const evidenceScope = brief.evidence.slice(0, 4);
 
   return `
     <section class="ai-duty-assistant ${html(brief.riskLevel)}">
@@ -660,22 +661,40 @@ function renderAiBrief(module: WorkflowModule): string {
         </ol>
       </details>
     </section>
-    <div class="ai-question-chips" aria-label="常用追问">
-      ${brief.operatorQuestions.map((question) => `<button type="button" data-ai-question="${html(question)}">${html(question)}</button>`).join("")}
-    </div>
-    <section class="ai-generated-report" aria-live="polite">
+    <section class="ai-generated-report ai-duty-console" aria-live="polite">
       <header>
-        <span>AI 对话与报告</span>
+        <div>
+          <span>AI 值班问答</span>
+          <strong>围绕当前预警追问，不做泛聊</strong>
+        </div>
         <div class="ai-report-actions">
           <button type="button" data-ai-voice-question>语音问AI</button>
           <button type="button" data-ai-generate-report>生成AI报告</button>
         </div>
       </header>
+      <div class="ai-duty-console-grid">
+        <section class="ai-recommended-questions" aria-label="推荐追问">
+          <span>推荐追问</span>
+          <div class="ai-question-chips">
+            ${brief.operatorQuestions.map((question) => `<button type="button" data-ai-question="${html(question)}">${html(question)}</button>`).join("")}
+          </div>
+        </section>
+        <section class="ai-assistant-guardrail">
+          <span>人工边界</span>
+          <p>${html(dutyFocus.humanCheck)}</p>
+        </section>
+      </div>
+      <section class="ai-evidence-scope" aria-label="AI 已读取的证据范围">
+        <span>证据范围</span>
+        <ul>
+          ${evidenceScope.map((item) => `<li>${html(item)}</li>`).join("")}
+        </ul>
+      </section>
       <div class="ai-question-console">
         <input id="ai-question-input" type="text" placeholder="例如：为什么不是螺栓问题？下一步怎么处理？" />
         <button type="button" data-ai-send-question>发送问题</button>
       </div>
-      <div id="ai-generated-report-text" class="ai-report-body">你可以直接追问当前事件。AI 会先读取结构化证据包，再调用后端模型生成可追溯答复；停机、登塔、检修仍必须人工确认。</div>
+      <div id="ai-generated-report-text" class="ai-report-body">AI 已载入当前事件的 SCADA、CMS、油温、螺栓/结构证据包。请选择上方追问或输入问题；回答会标注证据来源和人工确认边界。</div>
     </section>
   `;
 }
