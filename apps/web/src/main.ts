@@ -419,11 +419,13 @@ function renderWorkOrderWritebackSummary(ticket?: WorkflowModule["ticket"]): str
         <strong data-writeback-summary-state>待现场完成后回写</strong>
       </header>
       <div>
-        ${ticket.writebackItems.map((item) => `
-          <article data-writeback-summary-item="pending">
+        ${ticket.writebackItems.map((item, index) => `
+          <label class="workorder-writeback-gate" data-writeback-summary-item="pending">
+            <input type="checkbox" data-workorder-writeback="${index}" disabled />
             <span>${html(item.label)}</span>
             <strong>${html(item.value)}</strong>
-          </article>
+            <em data-workorder-writeback-state>待派发</em>
+          </label>
         `).join("")}
       </div>
       <p data-writeback-summary-note>回写完成后，事件会进入复盘样本，AI 诊断记录才允许闭环。</p>
@@ -2012,9 +2014,14 @@ function openGeneratedWorkOrder(status = activeWorkflowCase.statuses.ticketCreat
     dispatchButton.textContent = ticket?.dispatchActionLabel ?? "确认派发工单";
   }
   if (closeButton) closeButton.disabled = true;
+  document.querySelectorAll<HTMLInputElement>("[data-workorder-writeback]").forEach((input) => {
+    input.checked = false;
+    input.disabled = true;
+  });
   setEventTimelineStage("human-confirm");
   openWorkflowModule("workorder", status);
   updateWorkOrderConfirmationState();
+  updateWorkOrderWritebackGateState();
 }
 
 function areWorkOrderConfirmationsReady(): boolean {
@@ -2053,36 +2060,84 @@ function dispatchWorkOrder(): void {
     dispatchButton.textContent = "工单已派发";
     dispatchButton.disabled = true;
   }
-  if (closeButton) closeButton.disabled = false;
+  if (closeButton) closeButton.disabled = true;
+  document.querySelectorAll<HTMLInputElement>("[data-workorder-writeback]").forEach((input) => {
+    input.disabled = false;
+  });
+  updateWorkOrderWritebackGateState();
   setEventTimelineStage("workorder-draft");
   setBimStatus("工单已通过人工确认并派发，等待现场复核回写");
 }
 
-function updateWorkOrderWritebackSummary(): void {
+const writebackCompletedValues = [
+  "铁谱/颗粒度报告已上传",
+  "高速轴轴承与齿面照片已归档",
+  "复测频谱已形成对比结论",
+  "已写入 AI 诊断样本",
+];
+
+function areWorkOrderWritebacksReady(): boolean {
+  const checks = Array.from(document.querySelectorAll<HTMLInputElement>("[data-workorder-writeback]"));
+  return checks.length > 0 && checks.every((input) => input.checked);
+}
+
+function updateWorkOrderWritebackGateState(): void {
+  const ticket = activeWorkflowCase.modules.workorder.ticket;
+  const checks = Array.from(document.querySelectorAll<HTMLInputElement>("[data-workorder-writeback]"));
+  const closeButton = document.querySelector<HTMLButtonElement>("[data-close-workorder]");
+  const summaryState = document.querySelector<HTMLElement>("[data-writeback-summary-state]");
+  const summaryNote = document.querySelector<HTMLElement>("[data-writeback-summary-note]");
+  const isEnabled = checks.some((input) => !input.disabled);
+  const completedCount = checks.filter((input) => input.checked).length;
+  const ready = areWorkOrderWritebacksReady();
+
+  checks.forEach((input, index) => {
+    const item = input.closest<HTMLElement>("[data-writeback-summary-item]");
+    const stateText = item?.querySelector<HTMLElement>("[data-workorder-writeback-state]");
+    const valueText = item?.querySelector<HTMLElement>("strong");
+    const detailItem = document.querySelectorAll<HTMLElement>("[data-writeback-item]")[index];
+    const detailText = detailItem?.querySelector<HTMLElement>("small");
+    const sourceValue = ticket?.writebackItems[index]?.value ?? "待现场回写";
+    const doneValue = writebackCompletedValues[index] ?? "已回写";
+    const isDone = input.checked;
+
+    if (item) item.dataset.writebackSummaryItem = isDone ? "done" : "pending";
+    if (stateText) stateText.textContent = isDone ? "已回写" : isEnabled ? "待回写" : "待派发";
+    if (valueText) valueText.textContent = isDone ? doneValue : sourceValue;
+    if (detailItem) detailItem.dataset.status = isDone ? "done" : "pending";
+    if (detailText) detailText.textContent = isDone ? doneValue : sourceValue;
+  });
+
+  if (summaryState) {
+    summaryState.textContent = ready
+      ? "回写已确认，可关闭工单"
+      : isEnabled
+        ? `现场回写待确认 ${checks.length - completedCount} 项`
+        : "待现场完成后回写";
+  }
+  if (summaryNote) {
+    summaryNote.textContent = ready
+      ? "油液、内窥照片、CMS 复测和 AI 样本标签均已回写，允许人工关闭本次事件。"
+      : isEnabled
+        ? "现场复核完成后逐项回写证据；未完成回写前，AI 诊断记录不能闭环。"
+        : "回写完成后，事件会进入复盘样本，AI 诊断记录才允许闭环。";
+  }
+  if (closeButton) closeButton.disabled = !ready;
+}
+
+function finalizeWorkOrderWritebackSummary(): void {
   const ticket = activeWorkflowCase.modules.workorder.ticket;
   const summaryState = document.querySelector<HTMLElement>("[data-writeback-summary-state]");
   const summaryNote = document.querySelector<HTMLElement>("[data-writeback-summary-note]");
-  const completedValues = [
-    "铁谱/颗粒度报告已上传",
-    "高速轴轴承与齿面照片已归档",
-    "复测频谱已形成对比结论",
-    "已写入 AI 诊断样本",
-  ];
+  const closeButton = document.querySelector<HTMLButtonElement>("[data-close-workorder]");
 
+  document.querySelectorAll<HTMLInputElement>("[data-workorder-writeback]").forEach((input) => {
+    input.disabled = true;
+  });
+  updateWorkOrderWritebackGateState();
   if (summaryState) summaryState.textContent = ticket?.closedState ?? "现场复核完成";
   if (summaryNote) summaryNote.textContent = activeWorkflowCase.statuses.ticketClosed;
-
-  document.querySelectorAll<HTMLElement>("[data-writeback-summary-item]").forEach((item, index) => {
-    item.dataset.writebackSummaryItem = "done";
-    const statusText = item.querySelector("strong");
-    if (statusText) statusText.textContent = completedValues[index] ?? "已回写";
-  });
-
-  document.querySelectorAll<HTMLElement>("[data-writeback-item]").forEach((item, index) => {
-    item.dataset.status = "done";
-    const statusText = item.querySelector("small");
-    if (statusText) statusText.textContent = completedValues[index] ?? statusText.textContent?.replace(/^待/, "已") ?? "已回写";
-  });
+  if (closeButton) closeButton.disabled = true;
 }
 
 function bindAgentResultEvents(container: HTMLElement): void {
@@ -2208,18 +2263,28 @@ function bindWorkflowSurfaceEvents(): void {
     dispatchWorkOrder();
   });
 
+  workflowModuleDrawer.querySelectorAll<HTMLInputElement>("[data-workorder-writeback]").forEach((input) => {
+    input.addEventListener("change", () => {
+      updateWorkOrderWritebackGateState();
+    });
+  });
+
   workflowModuleDrawer.querySelector<HTMLButtonElement>("[data-close-workorder]")?.addEventListener("click", () => {
     const ticket = activeWorkflowCase.modules.workorder.ticket;
     const button = document.querySelector<HTMLButtonElement>("[data-close-workorder]");
     const state = document.querySelector<HTMLElement>("#workorder-state");
     const code = document.querySelector<HTMLElement>("#workorder-code");
+    if (!areWorkOrderWritebacksReady()) {
+      setBimStatus("现场复核回写仍有未完成项，暂不能关闭工单");
+      return;
+    }
     if (state) state.textContent = ticket?.closedState ?? "现场复核完成";
     if (code) code.textContent = ticket?.finalCode ?? "WO-GX-20260621-02";
     if (button) {
       button.textContent = ticket?.closedActionLabel ?? "现场复核已完成";
       button.disabled = true;
     }
-    updateWorkOrderWritebackSummary();
+    finalizeWorkOrderWritebackSummary();
     setEventTimelineStage("review-writeback");
     setBimStatus(activeWorkflowCase.statuses.ticketClosed);
   });
