@@ -1274,7 +1274,7 @@ type AiDiagnosisResponse = {
   }>;
   riskBoundary: string;
   source: "fallback" | "llm";
-  status: "fallback" | "ok";
+  status: "fallback" | "ok" | "pending";
   title: string;
   toolTrace: Array<{
     label: string;
@@ -1429,7 +1429,11 @@ function confidenceWidth(confidence: number): string {
 }
 
 function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string): string {
-  const sourceLabel = result.source === "llm" ? "MiMo 大模型 + 诊断工具" : "本地诊断工具兜底";
+  const sourceLabel = result.status === "pending"
+    ? "本地证据包已就绪，等待大模型"
+    : result.source === "llm"
+      ? "MiMo 大模型 + 诊断工具"
+      : "本地诊断工具兜底";
   return `
     <article class="ai-domain-report agent-report">
       <header>
@@ -1592,6 +1596,138 @@ function buildAiVoiceAnswerSummary(): string {
   return `AI 答复：${shortTurbineName(activeWorkflowCase.turbineId)}${finding}。${action}，复核前按限载策略运行。`;
 }
 
+function inferAgentIntent(question: string): string {
+  if (/螺栓|叶根|反证|不是/.test(question)) return "counter_evidence";
+  if (/证据|图表|来源|传感器/.test(question)) return "evidence_chain";
+  if (/报告|摘要/.test(question)) return "report";
+  if (/工单|派单|安排/.test(question)) return "workorder";
+  if (/维护|处理|下一步|停机|检修/.test(question)) return "maintenance_plan";
+  return "explain_alarm";
+}
+
+function confidenceToPercent(value: string): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 80;
+  return numeric <= 1 ? Math.round(numeric * 100) : Math.round(numeric);
+}
+
+function evidenceModuleFromSource(source: string): WorkflowModuleKey {
+  if (/CMS|振动/.test(source)) return "cms";
+  if (/螺栓|结构/.test(source)) return "bolts";
+  return "scada";
+}
+
+function buildLocalWorkOrderDraft(): AiDiagnosisResponse["workOrderDraft"] {
+  const ticket = activeWorkflowCase.modules.workorder.ticket;
+  if (!ticket) return undefined;
+
+  return {
+    acceptanceCriteria: ticket.acceptanceCriteria,
+    asset: ticket.asset,
+    assignee: ticket.assignee,
+    code: ticket.draftCode,
+    confirmationChecks: ticket.confirmationChecks,
+    dueWindow: ticket.dueWindow,
+    priority: ticket.priority,
+    safetyRequirement: ticket.safetyRequirement,
+    status: ticket.initialState,
+    steps: ticket.steps,
+    writebackItems: ticket.writebackItems,
+  };
+}
+
+function buildLocalAiDiagnosisResponse(
+  question: string,
+  status: "pending" | "fallback",
+  reason = "已先展开本地结构化证据包，后端大模型答复生成中。",
+): AiDiagnosisResponse {
+  const brief = activeWorkflowCase.modules.brief.aiBrief;
+  const alerts = activeWorkflowCase.modules.alerts;
+  const fusion = activeWorkflowCase.modules.fusion;
+  const intent = inferAgentIntent(question);
+  const includeWorkOrder = ["maintenance_plan", "workorder"].includes(intent);
+
+  return {
+    answerText: brief
+      ? `${reason} 当前判断：${brief.primaryFinding}。${brief.conclusion} 建议先完成融合判据和人工复核。`
+      : `${reason} 当前诊断包未就绪，请重新进入 AI 诊断包。`,
+    bimHighlights: activeWorkflowCase.componentRisks.map((item) => ({
+      label: item.title,
+      part: item.part,
+      reason: `${item.status} / ${moduleText(item.module)}`,
+      severity: item.component === "gearbox" ? "alarm" : "watch",
+    })),
+    chartRefs: [
+      {
+        focus: fusion.decision?.result ?? "查看融合判据",
+        label: "融合判据",
+        module: "fusion",
+        reason: fusion.decision?.evidence ?? "先确认多源证据是否同向。",
+      },
+      {
+        focus: activeWorkflowCase.modules.scada.decision?.result ?? "查看运行残差",
+        label: "SCADA",
+        module: "scada",
+        reason: activeWorkflowCase.modules.scada.decision?.confirm ?? "确认非限电、非通信异常。",
+      },
+      {
+        focus: activeWorkflowCase.modules.cms.decision?.result ?? "查看振动证据",
+        label: "CMS",
+        module: "cms",
+        reason: activeWorkflowCase.modules.cms.decision?.confirm ?? "确认采样质量和转速工况。",
+      },
+      {
+        focus: activeWorkflowCase.modules.bolts.decision?.result ?? "查看结构反证",
+        label: "螺栓/结构",
+        module: "bolts",
+        reason: activeWorkflowCase.modules.bolts.decision?.confirm ?? "确认结构侧是否改写主故障。",
+      },
+    ],
+    evidenceCards: (alerts.evidenceRows ?? []).map((row) => ({
+      confidence: confidenceToPercent(row.confidence),
+      interpretation: `${row.model}；${row.threshold}；${row.window}`,
+      module: evidenceModuleFromSource(row.source),
+      severity: row.source.includes("SCADA") || row.source.includes("CMS") ? "alarm" : "watch",
+      source: row.source,
+      title: row.label,
+      value: row.value,
+    })),
+    intent,
+    operatorFocus: brief?.operatorFocus ?? {
+      decision: "等待诊断包",
+      humanCheck: "诊断包恢复前不得形成工程处置结论。",
+      primaryQuestion: "重新进入 AI 诊断包",
+      recommendedModule: "brief",
+      why: "当前没有可追踪证据包。",
+    },
+    reportSections: [
+      {
+        body: fusion.decision?.input ?? "等待多源证据接入。",
+        title: "输入数据",
+      },
+      {
+        body: fusion.decision?.model ?? "等待模型判据。",
+        title: "模型判据",
+      },
+      {
+        body: fusion.decision?.confirm ?? "停机、登塔、检修和派单必须人工确认。",
+        title: "人工确认",
+      },
+    ],
+    riskBoundary: "本地证据包只用于等待大模型期间的值班复核；停机、登塔、检修和派单必须人工确认。",
+    source: "fallback",
+    status,
+    title: `${activeWorkflowCase.turbineId} AI 值班诊断`,
+    toolTrace: [
+      { label: "读取当前事件", output: activeWorkflowCase.eventCode, status: "ok", tool: "frontend_event_context" },
+      { label: "展开结构化证据", output: `${alerts.evidenceRows?.length ?? 0} 张证据卡`, status: "ok", tool: "frontend_evidence_bundle" },
+      { label: "请求后端 Agent", output: status === "pending" ? "等待大模型答复" : reason, status: "review", tool: "agent_ask" },
+    ],
+    voiceText: buildAiVoiceAnswerSummary(),
+    workOrderDraft: includeWorkOrder ? buildLocalWorkOrderDraft() : undefined,
+  };
+}
+
 function speakAiAnswerSummary(text?: string): void {
   speakText(text || buildAiVoiceAnswerSummary(), {
     onError: () => setBimStatus("AI 已生成文字答复，浏览器语音未启动"),
@@ -1607,7 +1743,9 @@ async function requestAiDiagnosisReport(
   const brief = activeWorkflowCase.modules.brief.aiBrief;
   if (!brief) return;
 
-  setAiReportText("AI 正在读取诊断包并生成报告...");
+  const requestCaseId = activeCaseId;
+  setAiReportHtml(renderAiGeneratedReport(buildLocalAiDiagnosisResponse(question, "pending"), question));
+  setBimStatus("AI 已先展开本地证据包，等待大模型答复");
   setEventTimelineStage("evidence-review");
   try {
     const response = await fetch("/api/agent/ask", {
@@ -1619,33 +1757,15 @@ async function requestAiDiagnosisReport(
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
+    if (!response.ok) throw new Error("Agent request failed");
     const result = await response.json() as AiDiagnosisResponse;
+    if (requestCaseId !== activeCaseId) return result;
     setAiReportHtml(renderAiGeneratedReport(result, question));
     if (options.speak) speakAiAnswerSummary(result.voiceText);
     return result;
   } catch {
-    const result: AiDiagnosisResponse = {
-      answerText: `规则兜底：${brief.conclusion} 建议动作：${brief.recommendedAction}`,
-      bimHighlights: [],
-      chartRefs: [],
-      evidenceCards: [],
-      intent: "explain_alarm",
-      operatorFocus: {
-        decision: "后端不可达",
-        humanCheck: "恢复后端前不得把 AI 文字当成工程处置依据。",
-        primaryQuestion: "查看 AI 诊断包",
-        recommendedModule: "brief",
-        why: "当前只保留本地规则包，无法调用后端 Agent 汇总工具轨迹。",
-      },
-      reportSections: [{ title: "规则兜底", body: brief.conclusion }],
-      riskBoundary: "AI 服务暂不可用，当前只展示本地规则诊断包；现场操作必须人工确认。",
-      source: "fallback",
-      status: "fallback",
-      title: `${activeWorkflowCase.turbineId} AI 值班诊断`,
-      toolTrace: [{ label: "请求后端 Agent", output: "网络不可达，使用本地规则包", status: "review", tool: "frontend_fallback" }],
-      voiceText: buildAiVoiceAnswerSummary(),
-      workOrderDraft: undefined,
-    };
+    const result = buildLocalAiDiagnosisResponse(question, "fallback", "后端 Agent 暂未返回，已保留本地规则诊断包。");
+    if (requestCaseId !== activeCaseId) return result;
     setAiReportHtml(renderAiGeneratedReport(result, question));
     if (options.speak) speakAiAnswerSummary();
     return result;
