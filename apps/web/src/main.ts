@@ -1323,6 +1323,7 @@ type AiDiagnosisResponse = {
 };
 
 type AgentOperatorFocus = AiDiagnosisResponse["operatorFocus"];
+type AiAnswerRuntime = Pick<AiDiagnosisResponse, "answerText" | "operatorFocus" | "source" | "status">;
 
 function shortTurbineName(turbineId: string): string {
   const numericId = turbineId.match(/(\d+)$/)?.[1];
@@ -1915,10 +1916,67 @@ function buildStageAwareOperatorFocus(intent: string, fallback: AgentOperatorFoc
   return fallback;
 }
 
-function withStageAwareOperatorFocus(result: AiDiagnosisResponse, question: string): AiDiagnosisResponse {
+function buildStageAwareAnswerText(
+  intent: string,
+  result: AiAnswerRuntime,
+  reason = "已先展开本地结构化证据包。",
+): string {
+  const brief = activeWorkflowCase.modules.brief.aiBrief;
+  if (!brief) return `${reason} 当前诊断包未就绪，请重新进入 AI 诊断包。`;
+
+  const alerts = activeWorkflowCase.modules.alerts.decision;
+  const cms = activeWorkflowCase.modules.cms.decision;
+  const scada = activeWorkflowCase.modules.scada.decision;
+  const bolts = activeWorkflowCase.modules.bolts.decision;
+  const maintenance = activeWorkflowCase.modules.maintenance.decision;
+  const snapshot = readWorkOrderClosureSnapshot();
+
+  if (result.source === "llm" && result.status === "ok") {
+    const focus = buildStageAwareOperatorFocus(intent, result.operatorFocus);
+    const nextStep = `下一步：${focus.primaryQuestion}。${focus.why} ${focus.humanCheck}`;
+    return result.answerText.includes(focus.primaryQuestion)
+      ? result.answerText
+      : `${result.answerText}\n\n${nextStep}`;
+  }
+
+  if (intent === "workorder") {
+    if (snapshot.isClosed) {
+      return `${reason} 事件已进入复盘样本，当前不应重复派单。下一步由运维主管复核现场回写、故障标签和模型样本标注，确认后才把本次事件写入复盘库。`;
+    }
+    if (snapshot.workOrderState.includes("已派发")) {
+      const pending = snapshot.pendingWritebacks.length > 0
+        ? snapshot.pendingWritebacks.join("、")
+        : "关闭确认";
+      return `${reason} 工单已经派发，下一步不是继续生成建议，而是现场回写门：${pending}。回写完成前不能关闭工单，AI 只提示缺口，关闭动作必须人工确认。`;
+    }
+    return `${reason} 现场安排先进入工单确认门：低风速窗口、安全许可、备件工器具、复盘责任 ${snapshot.totalChecks} 项签核，目前已确认 ${snapshot.confirmedChecks.length} 项。签核未齐前不能派发，AI 不自动下发检修命令。`;
+  }
+
+  if (intent === "evidence_chain" || intent === "report") {
+    return `${reason} 证据链按同一事件窗口复核：SCADA 看功率残差和油温趋势，CMS 看高速轴侧频/齿轮啮合频率，螺栓与结构监测作为反证项，山地气象用于解释阵风载荷。下一步先运行融合判据，确认多源数据是否同向；数据质量未确认前，AI 结论不能进入派单。`;
+  }
+
+  if (intent === "counter_evidence") {
+    return `${reason} 先看反证：${bolts?.result ?? "螺栓/结构侧未触发主故障改写"}。如果预紧力衰减、塔筒一阶频率漂移或阵风载荷能解释异常，就需要调整主疑似；如果不能解释，则维持齿轮箱风险判断，只把结构侧作为载荷放大因素跟踪。`;
+  }
+
+  if (intent === "maintenance_plan") {
+    return `${reason} 处置策略按预测维护执行，不直接跳到停机检修。建议先按 ${maintenance?.result ?? "低风速窗口复测与限载观察"} 组织：限功率运行、油液取样/内窥检查、CMS 复测和备件准备；若复测证据继续恶化，再由值长人工升级检修级别。`;
+  }
+
+  return `${reason} 这不是单阈值报警，而是融合判据升级：${scada?.result ?? "SCADA 运行残差异常"}、${cms?.result ?? "CMS 振动特征异常"} 与油温趋势共同指向齿轮箱，${bolts?.result ?? "结构侧暂不改写主疑似"}。下一步打开告警研判，确认 ${alerts?.result ?? brief.primaryFinding} 后再进入隐患排查和工单确认。`;
+}
+
+function withStageAwareAgentGuidance(result: AiDiagnosisResponse, question: string): AiDiagnosisResponse {
+  const intent = inferAgentIntent(question);
+  const operatorFocus = buildStageAwareOperatorFocus(intent, result.operatorFocus);
+  const answerText = result.source === "llm" && result.status === "ok"
+    ? buildStageAwareAnswerText(intent, result)
+    : result.answerText;
   return {
     ...result,
-    operatorFocus: buildStageAwareOperatorFocus(inferAgentIntent(question), result.operatorFocus),
+    answerText,
+    operatorFocus,
   };
 }
 
@@ -2027,9 +2085,18 @@ function buildLocalAiDiagnosisResponse(
   }
 
   return {
-    answerText: brief
-      ? `${reason} 当前判断：${brief.primaryFinding}。${brief.conclusion} 建议先完成融合判据和人工复核。`
-      : `${reason} 当前诊断包未就绪，请重新进入 AI 诊断包。`,
+    answerText: buildStageAwareAnswerText(intent, {
+      answerText: "",
+      operatorFocus: brief?.operatorFocus ?? {
+        decision: "等待诊断包",
+        humanCheck: "诊断包恢复前不得形成工程处置结论。",
+        primaryQuestion: "重新进入 AI 诊断包",
+        recommendedModule: "brief",
+        why: "当前没有可追踪证据包。",
+      },
+      source: "fallback",
+      status,
+    }, reason),
     bimHighlights: activeWorkflowCase.componentRisks.map((item) => ({
       label: item.title,
       part: item.part,
@@ -2123,7 +2190,7 @@ async function requestAiDiagnosisReport(
   }
 
   const requestCaseId = activeCaseId;
-  const pendingResult = withStageAwareOperatorFocus(buildLocalAiDiagnosisResponse(question, "pending"), question);
+  const pendingResult = withStageAwareAgentGuidance(buildLocalAiDiagnosisResponse(question, "pending"), question);
   setAiReportHtml(renderAiGeneratedReport(pendingResult, question));
   setBimStatus("AI 已先展开本地证据包，等待大模型答复");
   setEventTimelineStage("evidence-review");
@@ -2140,12 +2207,12 @@ async function requestAiDiagnosisReport(
     if (!response.ok) throw new Error("Agent request failed");
     const result = await response.json() as AiDiagnosisResponse;
     if (requestCaseId !== activeCaseId) return result;
-    const focusedResult = withStageAwareOperatorFocus(result, question);
+    const focusedResult = withStageAwareAgentGuidance(result, question);
     setAiReportHtml(renderAiGeneratedReport(focusedResult, question));
     if (options.speak) speakAiAnswerSummary(focusedResult.voiceText);
     return focusedResult;
   } catch {
-    const result = withStageAwareOperatorFocus(
+    const result = withStageAwareAgentGuidance(
       buildLocalAiDiagnosisResponse(question, "fallback", "后端 Agent 暂未返回，已保留本地规则诊断包。"),
       question,
     );
