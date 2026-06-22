@@ -1307,6 +1307,28 @@ button {
   border-top: 1px solid rgba(246, 197, 104, 0.13);
 }
 
+.stage-focus-card .stage-next-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: auto;
+  margin-top: 0;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.stage-next-action span {
+  color: rgba(91, 224, 246, 0.78);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.stage-next-action strong {
+  color: #fff7e7;
+  font-size: 13px;
+}
+
 .bim-localization-card {
   display: grid;
   gap: 8px;

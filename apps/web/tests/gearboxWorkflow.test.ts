@@ -163,6 +163,24 @@ describe("gearbox workflow case", () => {
     expect(gearboxWorkflowCase.modules.maintenance.action?.module).toBe("workorder");
   });
 
+  it("keeps staged modules actionable from input through human confirmation", () => {
+    const stagedModules = ["fusion", "scada", "cms", "bolts", "alerts", "inspection", "maintenance"] as const;
+
+    stagedModules.forEach((moduleKey) => {
+      const module = gearboxWorkflowCase.modules[moduleKey];
+      expect(module.decision?.input).toBeTruthy();
+      expect(module.decision?.model).toBeTruthy();
+      expect(module.decision?.result).toBeTruthy();
+      expect(module.decision?.confirm).toMatch(/确认|才/);
+      expect(module.action?.label).toBeTruthy();
+      expect(gearboxWorkflowCase.moduleOrder).toContain(module.action?.module);
+    });
+
+    expect(gearboxWorkflowCase.modules.workorder.decision?.input).toContain("安全许可");
+    expect(gearboxWorkflowCase.modules.workorder.decision?.result).toContain("工单");
+    expect(gearboxWorkflowCase.modules.workorder.decision?.confirm).toContain("确认后才执行");
+  });
+
   it("defines professional chart axes for SCADA, CMS, and bolt monitoring", () => {
     const scadaChart = gearboxWorkflowCase.modules.scada.scadaChart;
     const cmsChart = gearboxWorkflowCase.modules.cms.cmsChart;

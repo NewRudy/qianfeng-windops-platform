@@ -466,6 +466,17 @@ function renderAction(action?: WorkflowAction, extraAttribute = ""): string {
   return `<button class="module-action${primaryClass}" type="button" data-open-module="${html(action.module)}"${extraAttribute}>${html(action.label)}</button>`;
 }
 
+function renderStageAction(action?: WorkflowAction, extraAttribute = ""): string {
+  if (!action) return "";
+  const primaryClass = action.primary ? " primary" : "";
+  return `
+    <button class="module-action stage-next-action${primaryClass}" type="button" data-open-module="${html(action.module)}"${extraAttribute}>
+      <span>下一步</span>
+      <strong>${html(action.label)}</strong>
+    </button>
+  `;
+}
+
 function renderDecisionCard(decision?: WorkflowDecision): string {
   if (!decision) return "";
 
@@ -494,24 +505,32 @@ function renderModuleEvidenceNote(body?: string): string {
   return `<p class="module-evidence-note">${html(body)}</p>`;
 }
 
-function renderEvidenceReviewCard(decision?: WorkflowDecision): string {
+function renderStageFocusCard(
+  decision?: WorkflowDecision,
+  action?: WorkflowAction,
+  options: { actionAttribute?: string; context?: string; mode?: "evidence" | "operation" } = {},
+): string {
   if (!decision) return "";
+  const mode = options.mode ?? "evidence";
+  const cardClass = mode === "operation" ? "operation-review-card operation" : "evidence-review-card evidence";
+  const context = options.context ?? (mode === "operation" ? "操作复核" : "证据复核");
 
   return `
-    <article class="evidence-review-card">
+    <article class="stage-focus-card ${cardClass}">
       <header>
-        <span>证据复核</span>
+        <span>${html(context)}</span>
         <strong>${html(decision.operation)}</strong>
       </header>
-      <dl>
-        <div><dt>看什么</dt><dd>${html(decision.input)}</dd></div>
-        <div><dt>判据</dt><dd>${html(decision.model)}</dd></div>
-        <div><dt>结论</dt><dd>${html(decision.result)}</dd></div>
+      <dl class="stage-focus-grid">
+        <div><dt>输入数据</dt><dd>${html(decision.input)}</dd></div>
+        <div><dt>调用判据</dt><dd>${html(decision.model)}</dd></div>
+        <div><dt>输出结论</dt><dd>${html(decision.result)}</dd></div>
       </dl>
-      <footer>
+      <footer class="stage-human-gate">
         <span>人工确认</span>
         <p>${html(decision.confirm)}</p>
       </footer>
+      ${renderStageAction(action, options.actionAttribute ?? "")}
       <details>
         <summary>展开证据依据</summary>
         <p>${html(decision.evidence)}</p>
@@ -520,26 +539,17 @@ function renderEvidenceReviewCard(decision?: WorkflowDecision): string {
   `;
 }
 
-function renderOperationReviewCard(decision?: WorkflowDecision, context?: string): string {
-  if (!decision) return "";
+function renderEvidenceReviewCard(decision?: WorkflowDecision, action?: WorkflowAction): string {
+  return renderStageFocusCard(decision, action, { mode: "evidence" });
+}
 
-  return `
-    <article class="operation-review-card">
-      <header>
-        <span>${context ? html(context) : "操作复核"}</span>
-        <strong>${html(decision.operation)}</strong>
-      </header>
-      <dl>
-        <div><dt>为什么</dt><dd>${html(decision.evidence)}</dd></div>
-        <div><dt>判据</dt><dd>${html(decision.model)}</dd></div>
-        <div><dt>结论</dt><dd>${html(decision.result)}</dd></div>
-      </dl>
-      <footer>
-        <span>人工确认</span>
-        <p>${html(decision.confirm)}</p>
-      </footer>
-    </article>
-  `;
+function renderOperationReviewCard(
+  decision?: WorkflowDecision,
+  context?: string,
+  action?: WorkflowAction,
+  actionAttribute = "",
+): string {
+  return renderStageFocusCard(decision, action, { actionAttribute, context, mode: "operation" });
 }
 
 function renderEventTimeline(steps: EventTimelineStep[]): string {
@@ -713,14 +723,13 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-scada">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        ${renderEvidenceReviewCard(module.decision)}
+        ${renderEvidenceReviewCard(module.decision, module.action)}
         <dl>${renderMetrics(module.metrics)}</dl>
         <details class="module-evidence-stack">
           <summary>展开 SCADA 图表与工程解释</summary>
           ${renderModuleEvidenceNote(module.body)}
           ${renderScadaChart(module.scadaChart)}
         </details>
-        ${renderAction(module.action)}
       </section>
     `;
   }
@@ -730,7 +739,7 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-fusion">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        ${renderEvidenceReviewCard(module.decision)}
+        ${renderEvidenceReviewCard(module.decision, module.action)}
         <dl>${renderMetrics(module.metrics)}</dl>
         <details class="module-evidence-stack">
           <summary>展开多源证据与模型门控</summary>
@@ -739,7 +748,6 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
           <div class="fusion-source-grid">${renderFusionSignals(module.fusionSignals)}</div>
           <ol class="model-gate-list">${renderModelGates(module.modelGates)}</ol>
         </details>
-        ${renderAction(module.action)}
       </section>
     `;
   }
@@ -749,14 +757,13 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-cms">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        ${renderEvidenceReviewCard(module.decision)}
+        ${renderEvidenceReviewCard(module.decision, module.action)}
         <dl>${renderMetrics(module.metrics)}</dl>
         <details class="module-evidence-stack">
           <summary>展开 CMS 频谱与工程解释</summary>
           ${renderModuleEvidenceNote(module.body)}
           ${renderCmsChart(module.cmsChart)}
         </details>
-        ${renderAction(module.action)}
       </section>
     `;
   }
@@ -766,14 +773,13 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-bolts">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        ${renderEvidenceReviewCard(module.decision)}
+        ${renderEvidenceReviewCard(module.decision, module.action)}
         <dl>${renderMetrics(module.metrics)}</dl>
         <details class="module-evidence-stack">
           <summary>展开螺栓/结构证据与工程解释</summary>
           ${renderModuleEvidenceNote(module.body)}
           ${renderBoltChart(module.boltChart)}
         </details>
-        ${renderAction(module.action)}
       </section>
     `;
   }
@@ -783,14 +789,13 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-alerts">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        ${renderOperationReviewCard(module.decision, `${workflowCase.turbineId} ${workflowCase.eventCode}`)}
+        ${renderOperationReviewCard(module.decision, `${workflowCase.turbineId} ${workflowCase.eventCode}`, module.action)}
         ${renderBimLocalizationCard(workflowCase.componentRisks)}
         <details class="module-evidence-stack">
           <summary>展开告警证据链与事件说明</summary>
           ${renderModuleEvidenceNote(module.body)}
           <ul class="event-list">${renderEvidenceRows(module.evidenceRows)}</ul>
         </details>
-        ${renderAction(module.action)}
       </section>
     `;
   }
@@ -800,7 +805,7 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-inspection">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        ${renderOperationReviewCard(module.decision)}
+        ${renderOperationReviewCard(module.decision, undefined, module.action)}
         <dl>${renderMetrics(module.metrics)}</dl>
         ${renderInspectionOutcomeBoard(module.inspectionItems)}
         <details class="module-evidence-stack">
@@ -808,7 +813,6 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
           ${renderModuleEvidenceNote(module.body)}
           <ol class="inspection-list">${renderInspectionItems(module.inspectionItems)}</ol>
         </details>
-        ${renderAction(module.action)}
       </section>
     `;
   }
@@ -818,14 +822,13 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
       <section class="module-panel module-maintenance">
         <div class="module-kicker">${html(module.kicker)}</div>
         <h3>${html(module.title)}</h3>
-        ${renderOperationReviewCard(module.decision)}
+        ${renderOperationReviewCard(module.decision, undefined, module.action, " data-create-workorder")}
         <dl>${renderMetrics(module.metrics)}</dl>
         ${renderMaintenanceReadinessCard(workflowCase.modules.workorder.ticket, workflowCase.modules.inspection.inspectionItems)}
         <details class="module-evidence-stack">
           <summary>展开维护策略说明</summary>
           ${renderModuleEvidenceNote(module.body)}
         </details>
-        ${renderAction(module.action, " data-create-workorder")}
       </section>
     `;
   }
