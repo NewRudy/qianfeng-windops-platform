@@ -1740,9 +1740,25 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
               <section class="agent-evidence-gate ${html(card.gate.role)}">
                 <span>${html(card.gate.label)}</span>
                 <strong>${html(card.gate.decision)}</strong>
-                <p>${html(card.gate.humanCheck)}</p>
               </section>
-              <p>${html(card.interpretation)}</p>
+              <section class="agent-evidence-review-chain" aria-label="证据复核步骤">
+                <article>
+                  <span>输入数据</span>
+                  <strong>${html(card.value)}</strong>
+                </article>
+                <article>
+                  <span>模型判据</span>
+                  <p>${html(card.interpretation)}</p>
+                </article>
+                <article>
+                  <span>输出结论</span>
+                  <p>${html(card.gate.decision)}</p>
+                </article>
+                <article>
+                  <span>人工确认</span>
+                  <p>${html(card.gate.humanCheck)}</p>
+                </article>
+              </section>
               <div><i style="width: ${confidenceWidth(card.confidence)}"></i><b>${html(card.confidence)}%</b></div>
             </button>
           `).join("")}

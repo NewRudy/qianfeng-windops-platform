@@ -2261,6 +2261,36 @@ button {
   line-height: 1.45;
 }
 
+.agent-evidence-review-chain {
+  display: grid;
+  gap: 5px;
+}
+
+.agent-evidence-review-chain article {
+  display: grid;
+  grid-template-columns: 62px 1fr;
+  gap: 7px;
+  align-items: start;
+  padding: 6px 7px;
+  border: 1px solid rgba(91, 224, 246, 0.1);
+  background: rgba(1, 12, 20, 0.52);
+}
+
+.agent-evidence-review-chain span {
+  color: rgba(246, 197, 104, 0.86);
+  font-size: 10px;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+.agent-evidence-review-chain strong,
+.agent-evidence-review-chain p {
+  margin: 0;
+  color: rgba(235, 250, 252, 0.82);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
 .agent-evidence-card div {
   display: grid;
   grid-template-columns: 1fr auto;
