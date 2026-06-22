@@ -1322,6 +1322,8 @@ type AiDiagnosisResponse = {
   };
 };
 
+type AgentOperatorFocus = AiDiagnosisResponse["operatorFocus"];
+
 function shortTurbineName(turbineId: string): string {
   const numericId = turbineId.match(/(\d+)$/)?.[1];
   return numericId ? `${Number(numericId)}号机` : turbineId;
@@ -1839,6 +1841,87 @@ function inferAgentIntent(question: string): string {
   return "explain_alarm";
 }
 
+function buildStageAwareOperatorFocus(intent: string, fallback: AgentOperatorFocus): AgentOperatorFocus {
+  const snapshot = readWorkOrderClosureSnapshot();
+
+  if (intent === "workorder") {
+    if (snapshot.isClosed) {
+      return {
+        decision: "本次事件已进入复盘样本",
+        humanCheck: "复盘审核和模型样本标注仍需运维主管确认，AI 不能自动关闭事件。",
+        primaryQuestion: "查看复盘回写",
+        recommendedModule: "workorder",
+        why: "用户问的是工单安排，系统先展示闭环状态，避免重复派发或重复关闭。",
+      };
+    }
+    if (snapshot.workOrderState.includes("已派发")) {
+      return {
+        decision: snapshot.summaryState,
+        humanCheck: "现场回写、关闭工单和复盘入库必须由现场工程师与运维主管确认。",
+        primaryQuestion: snapshot.pendingWritebacks.length > 0 ? "查看现场回写门" : "查看关闭确认门",
+        recommendedModule: "workorder",
+        why: "工单已经派发，下一步不是继续看图表，而是核对现场证据回写是否满足关闭条件。",
+      };
+    }
+    return {
+      decision: `工单派发前签核 ${snapshot.confirmedChecks.length}/${snapshot.totalChecks}`,
+      humanCheck: "低风速窗口、安全许可、备件工器具和复盘责任确认后，才允许值班人员派发。",
+      primaryQuestion: "打开工单确认门",
+      recommendedModule: "workorder",
+      why: "用户问的是现场安排，系统应先进入人工门控，而不是直接给出派发结论。",
+    };
+  }
+
+  if (intent === "counter_evidence") {
+    return {
+      decision: activeWorkflowCase.modules.bolts.decision?.result ?? "先排除螺栓/结构反证",
+      humanCheck: activeWorkflowCase.modules.bolts.decision?.confirm ?? "结构工程师确认后才排除结构主故障。",
+      primaryQuestion: "先看螺栓/结构反证",
+      recommendedModule: "bolts",
+      why: "用户问的是是否可能不是齿轮箱，先看螺栓、塔筒和山地阵风载荷是否能解释异常。",
+    };
+  }
+
+  if (intent === "evidence_chain" || intent === "report") {
+    return {
+      decision: activeWorkflowCase.modules.fusion.decision?.result ?? "先复核多源证据是否同向",
+      humanCheck: activeWorkflowCase.modules.fusion.decision?.confirm ?? "值班员确认数据质量后，AI 结论才进入告警研判。",
+      primaryQuestion: "运行融合判据",
+      recommendedModule: "fusion",
+      why: "用户需要看证据或报告，第一步应先核对 SCADA、CMS、结构监测是否在同一事件窗口内相互支持。",
+    };
+  }
+
+  if (intent === "maintenance_plan") {
+    return {
+      decision: activeWorkflowCase.modules.maintenance.decision?.result ?? "先形成预测维护策略",
+      humanCheck: activeWorkflowCase.modules.maintenance.decision?.confirm ?? "维护策略必须经过值长、检修班组和安全许可确认。",
+      primaryQuestion: "查看维护策略",
+      recommendedModule: "maintenance",
+      why: "用户问的是处置策略，系统应先展示低风速窗口、备件和风险收益，再进入工单确认。",
+    };
+  }
+
+  if (intent === "explain_alarm") {
+    return {
+      decision: activeWorkflowCase.modules.alerts.decision?.result ?? "先看告警成立条件",
+      humanCheck: activeWorkflowCase.modules.alerts.decision?.confirm ?? "告警确认后才允许进入工单草案，不能由 AI 自动派发。",
+      primaryQuestion: "打开告警研判",
+      recommendedModule: "alerts",
+      why: "用户问的是为什么报警，先看融合结论如何进入告警等级，避免直接跳到派单。",
+    };
+  }
+
+  return fallback;
+}
+
+function withStageAwareOperatorFocus(result: AiDiagnosisResponse, question: string): AiDiagnosisResponse {
+  return {
+    ...result,
+    operatorFocus: buildStageAwareOperatorFocus(inferAgentIntent(question), result.operatorFocus),
+  };
+}
+
 function confidenceToPercent(value: string): number {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 80;
@@ -2040,7 +2123,8 @@ async function requestAiDiagnosisReport(
   }
 
   const requestCaseId = activeCaseId;
-  setAiReportHtml(renderAiGeneratedReport(buildLocalAiDiagnosisResponse(question, "pending"), question));
+  const pendingResult = withStageAwareOperatorFocus(buildLocalAiDiagnosisResponse(question, "pending"), question);
+  setAiReportHtml(renderAiGeneratedReport(pendingResult, question));
   setBimStatus("AI 已先展开本地证据包，等待大模型答复");
   setEventTimelineStage("evidence-review");
   try {
@@ -2056,11 +2140,15 @@ async function requestAiDiagnosisReport(
     if (!response.ok) throw new Error("Agent request failed");
     const result = await response.json() as AiDiagnosisResponse;
     if (requestCaseId !== activeCaseId) return result;
-    setAiReportHtml(renderAiGeneratedReport(result, question));
-    if (options.speak) speakAiAnswerSummary(result.voiceText);
-    return result;
+    const focusedResult = withStageAwareOperatorFocus(result, question);
+    setAiReportHtml(renderAiGeneratedReport(focusedResult, question));
+    if (options.speak) speakAiAnswerSummary(focusedResult.voiceText);
+    return focusedResult;
   } catch {
-    const result = buildLocalAiDiagnosisResponse(question, "fallback", "后端 Agent 暂未返回，已保留本地规则诊断包。");
+    const result = withStageAwareOperatorFocus(
+      buildLocalAiDiagnosisResponse(question, "fallback", "后端 Agent 暂未返回，已保留本地规则诊断包。"),
+      question,
+    );
     if (requestCaseId !== activeCaseId) return result;
     setAiReportHtml(renderAiGeneratedReport(result, question));
     if (options.speak) speakAiAnswerSummary();
