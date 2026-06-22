@@ -1896,6 +1896,54 @@ function getAiDutyEventText(): string {
   return `${shortTurbineName(activeWorkflowCase.turbineId)}齿轮箱出现一级预警。已锁定多源证据，进入告警研判查看证据链与工单。`;
 }
 
+function renderGlobalAiOrb(): string {
+  const brief = activeWorkflowCase.modules.brief.aiBrief;
+  const quickQuestions = [
+    "为什么判定为齿轮箱风险？",
+    "下一步先看哪张证据？",
+    "把风险定位到 BIM 部件",
+    "工单现在能派发吗？",
+  ];
+
+  return `
+    <aside class="global-ai-shell" data-open="false" data-orb-state="idle" data-agent-status="checking" aria-label="AI 值班员">
+      <button id="global-ai-orb" class="global-ai-orb" type="button" aria-expanded="false" aria-controls="global-ai-panel">
+        <span class="global-ai-orb-core">AI</span>
+        <span class="global-ai-orb-ring" aria-hidden="true"></span>
+        <small>值班员</small>
+      </button>
+      <section id="global-ai-panel" class="global-ai-panel" aria-live="polite">
+        <header>
+          <div>
+            <span>AI 值班员</span>
+            <strong id="global-ai-finding">${html(brief?.primaryFinding ?? "等待诊断事件")}</strong>
+          </div>
+          <button id="global-ai-close" type="button" aria-label="收起 AI 值班员">收起</button>
+        </header>
+        <p id="global-ai-context">我会跟随当前预警读取 SCADA、CMS、结构监测、知识图谱和工单上下文；停机、登塔、派发仍需人工确认。</p>
+        <section class="global-ai-status-line">
+          <span id="global-ai-asset">${html(activeWorkflowCase.turbineId)}</span>
+          <strong id="global-ai-status">正在检测后端智能</strong>
+        </section>
+        <div class="global-ai-quick-actions" aria-label="AI 快捷动作">
+          <button type="button" data-global-ai-open-page="fusion">看证据复核</button>
+          <button type="button" data-global-ai-focus-part="gearbox">定位齿轮箱</button>
+          <button type="button" data-global-ai-workorder>工单确认门</button>
+        </div>
+        <section class="global-ai-question-chips" aria-label="推荐追问">
+          ${quickQuestions.map((question) => `<button type="button" data-global-ai-question="${html(question)}">${html(question)}</button>`).join("")}
+        </section>
+        <div class="global-ai-input-row">
+          <input id="global-ai-input" type="text" placeholder="问 AI：为什么报警？下一步看哪里？工单能不能派发？" />
+          <button type="button" data-global-ai-send>发送</button>
+          <button type="button" data-global-ai-voice>语音</button>
+        </div>
+        <div id="global-ai-answer" class="global-ai-answer">点击 AI 值班球可以直接提问。我会把回答落到当前事件，并给出可点击的证据、BIM 定位或工单动作。</div>
+      </section>
+    </aside>
+  `;
+}
+
 root.innerHTML = `
   <main class="shell" data-mode="intro" data-ai-event="standby">
     <section class="scene-wrap">
@@ -1972,6 +2020,7 @@ root.innerHTML = `
           ${renderWorkflowStageTabs()}
         </nav>
       </section>
+      ${renderGlobalAiOrb()}
     </section>
   </main>
 `;
@@ -1986,10 +2035,31 @@ const caseSelector = document.querySelector<HTMLSelectElement>("#case-selector")
 const aiDutyTitle = document.querySelector<HTMLElement>("#ai-duty-title");
 const aiDutyText = document.querySelector<HTMLElement>("#ai-duty-text");
 const aiDutyStatus = document.querySelector<HTMLElement>("#ai-duty-status");
+const globalAiShell = document.querySelector<HTMLElement>(".global-ai-shell");
+const globalAiOrb = document.querySelector<HTMLButtonElement>("#global-ai-orb");
+const globalAiPanel = document.querySelector<HTMLElement>("#global-ai-panel");
+const globalAiInput = document.querySelector<HTMLInputElement>("#global-ai-input");
+const globalAiAnswer = document.querySelector<HTMLElement>("#global-ai-answer");
+const globalAiStatus = document.querySelector<HTMLElement>("#global-ai-status");
+const globalAiFinding = document.querySelector<HTMLElement>("#global-ai-finding");
+const globalAiAsset = document.querySelector<HTMLElement>("#global-ai-asset");
+const globalAiContext = document.querySelector<HTMLElement>("#global-ai-context");
 
-if (!shell || !sceneRoot || !bimModelRoot || !componentStrip || !moduleDrawer || !caseSelector) {
+if (!shell || !sceneRoot || !bimModelRoot || !componentStrip || !moduleDrawer || !caseSelector || !globalAiShell || !globalAiOrb || !globalAiPanel || !globalAiInput || !globalAiAnswer) {
   throw new Error("Missing dashboard shell, Cesium root, BIM root, or workflow controls");
 }
+
+const globalAiUi = {
+  answer: globalAiAnswer,
+  asset: globalAiAsset,
+  context: globalAiContext,
+  finding: globalAiFinding,
+  input: globalAiInput,
+  orb: globalAiOrb,
+  panel: globalAiPanel,
+  shell: globalAiShell,
+  status: globalAiStatus,
+};
 
 const dashboardShell = shell;
 const bimModelContainer = bimModelRoot;
@@ -2011,6 +2081,8 @@ const eventStageOrder: EventTimelineStage[] = [
 ];
 
 renderWorkflowSurfaces();
+bindGlobalAiOrbEvents();
+updateGlobalAiContext();
 setActiveModule("brief");
 setEventTimelineStage("ai-alert");
 setActiveComponent("gearbox");
@@ -2187,6 +2259,7 @@ function updateAiDutyCard(): void {
   if (aiDutyTitle) aiDutyTitle.textContent = brief?.primaryFinding ?? "等待诊断事件";
   if (aiDutyText) aiDutyText.textContent = getAiDutyEventText();
   if (aiDutyStatus) aiDutyStatus.textContent = "已生成值班播报，可语音复述或进入告警研判";
+  updateGlobalAiContext();
 }
 
 function triggerIntroAiAlert(turbine: TurbineAsset): void {
@@ -2196,6 +2269,7 @@ function triggerIntroAiAlert(turbine: TurbineAsset): void {
   dashboardShell.dataset.aiEvent = "active";
   setEventTimelineStage("ai-alert");
   updateAiDutyCard();
+  setGlobalAiState("alert", `${shortTurbineName(activeWorkflowCase.turbineId)}出现预警`);
   if (aiDutyStatus) aiDutyStatus.textContent = "巡航发现异常，已生成值班提醒";
   speakAiDutyBrief(false);
 }
@@ -2228,6 +2302,7 @@ function selectWorkflowCase(caseId: string): void {
   renderWorkflowSurfaces();
   setSelectedTurbineTitle(activeWorkflowCase.turbineId);
   updateAiDutyCard();
+  updateGlobalAiContext();
   setEventTimelineStage("ai-alert");
   openWorkflowModule(activeModule, `已切换案例：${nextCase.title}`);
   setActiveComponent("gearbox");
@@ -2406,6 +2481,7 @@ function speakAiDutyBrief(userInitiated = true): void {
 function setAiReportText(text: string): void {
   const report = workflowModuleDrawer.querySelector<HTMLElement>("#ai-generated-report-text");
   if (report) report.textContent = text;
+  setGlobalAiAnswerText(text);
 }
 
 function setAiReportHtml(markup: string): void {
@@ -2414,6 +2490,7 @@ function setAiReportHtml(markup: string): void {
     report.innerHTML = markup;
     bindAgentResultEvents(report);
   }
+  setGlobalAiAnswerHtml(markup);
 }
 
 function setAgentStatus(text: string, mode: "checking" | "configured" | "fallback" = "checking"): void {
@@ -2421,6 +2498,7 @@ function setAgentStatus(text: string, mode: "checking" | "configured" | "fallbac
     item.textContent = text;
     item.dataset.mode = mode;
   });
+  setGlobalAiStatus(text, mode);
 }
 
 async function refreshAgentStatus(): Promise<void> {
@@ -2440,6 +2518,69 @@ async function refreshAgentStatus(): Promise<void> {
 
 function getAiQuestionInput(): HTMLInputElement | null {
   return workflowModuleDrawer.querySelector<HTMLInputElement>("#ai-question-input");
+}
+
+function getGlobalAiQuestionInput(): HTMLInputElement | null {
+  return globalAiUi.input;
+}
+
+function setGlobalAiOpen(open: boolean): void {
+  globalAiUi.shell.dataset.open = open ? "true" : "false";
+  globalAiUi.orb.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function setGlobalAiState(state: "alert" | "fallback" | "idle" | "listening" | "ready" | "thinking", status?: string): void {
+  globalAiUi.shell.dataset.orbState = state;
+  if (status) setGlobalAiStatus(status);
+}
+
+function setGlobalAiStatus(text: string, mode?: "checking" | "configured" | "fallback"): void {
+  if (globalAiUi.status) globalAiUi.status.textContent = text;
+  if (mode) globalAiUi.shell.dataset.agentStatus = mode;
+}
+
+function setGlobalAiAnswerText(text: string): void {
+  globalAiUi.answer.textContent = text;
+}
+
+function setGlobalAiAnswerHtml(markup: string): void {
+  globalAiUi.answer.innerHTML = markup;
+  bindAgentResultEvents(globalAiUi.answer);
+}
+
+function updateGlobalAiContext(): void {
+  const brief = activeWorkflowCase.modules.brief.aiBrief;
+  if (globalAiUi.finding) globalAiUi.finding.textContent = brief?.primaryFinding ?? "等待诊断事件";
+  if (globalAiUi.asset) globalAiUi.asset.textContent = activeWorkflowCase.turbineId;
+  if (globalAiUi.context) {
+    globalAiUi.context.textContent = brief
+      ? `当前跟随 ${activeWorkflowCase.turbineId}：${brief.conclusion}。我会基于证据、知识链和工单门控回答，不替代人工停机、登塔和派发。`
+      : "我会跟随当前预警读取 SCADA、CMS、结构监测、知识图谱和工单上下文；停机、登塔、派发仍需人工确认。";
+  }
+}
+
+function syncAiQuestionInputs(question: string): void {
+  const input = getAiQuestionInput();
+  if (input) input.value = question;
+  const globalInput = getGlobalAiQuestionInput();
+  if (globalInput) globalInput.value = question;
+}
+
+function ensureBimMode(moduleName: WorkflowModuleKey = "brief"): void {
+  hasPlayedIntroBroadcast = true;
+  if (dashboardShell.dataset.mode === "bim") return;
+  openDiagnosis(getDutyTurbine(), moduleName);
+}
+
+function submitAiQuestion(question: string, options: { speak?: boolean } = {}): void {
+  const normalizedQuestion = question.trim() || "下一步应该先看哪张证据？";
+  hasPlayedIntroBroadcast = true;
+  syncAiQuestionInputs(normalizedQuestion);
+  setGlobalAiOpen(true);
+  setGlobalAiState("thinking", "正在读取事件证据并调用智能研判");
+  setAiReportText(`已收到：${normalizedQuestion}\nAI 正在读取当前事件、证据链和工单门控...`);
+  setBimStatus(`AI 已收到追问：${normalizedQuestion}`);
+  void requestAiDiagnosisReport(normalizedQuestion, options);
 }
 
 function moduleText(moduleName: WorkflowModuleKey): string {
@@ -3271,6 +3412,7 @@ async function requestAiDiagnosisReport(
   if (isClosureStatusQuestion(question)) {
     const result = buildClosureStatusAiResponse(question);
     setAiReportHtml(renderAiGeneratedReport(result, question));
+    setGlobalAiState("ready", "已读取工单门控状态");
     setBimStatus("AI 已基于当前工单门控状态生成回答");
     if (options.speak) speakAiAnswerSummary(result.voiceText);
     return result;
@@ -3278,6 +3420,8 @@ async function requestAiDiagnosisReport(
 
   const requestCaseId = activeCaseId;
   const pendingResult = withStageAwareAgentGuidance(buildLocalAiDiagnosisResponse(question, "pending"), question);
+  setGlobalAiOpen(true);
+  setGlobalAiState("thinking", "正在调用后端 Agent");
   setAiReportHtml(renderAiGeneratedReport(pendingResult, question));
   setBimStatus("AI 已先展开本地证据包，等待大模型答复");
   setEventTimelineStage("evidence-review");
@@ -3296,6 +3440,7 @@ async function requestAiDiagnosisReport(
     if (requestCaseId !== activeCaseId) return result;
     const focusedResult = withStageAwareAgentGuidance(result, question);
     setAiReportHtml(renderAiGeneratedReport(focusedResult, question));
+    setGlobalAiState(focusedResult.source === "llm" ? "ready" : "fallback", focusedResult.source === "llm" ? "大模型已完成研判" : "已使用本地规则兜底");
     if (options.speak) speakAiAnswerSummary(focusedResult.voiceText);
     return focusedResult;
   } catch {
@@ -3305,6 +3450,7 @@ async function requestAiDiagnosisReport(
     );
     if (requestCaseId !== activeCaseId) return result;
     setAiReportHtml(renderAiGeneratedReport(result, question));
+    setGlobalAiState("fallback", "后端未返回，已使用本地规则兜底");
     if (options.speak) speakAiAnswerSummary();
     return result;
   }
@@ -3324,6 +3470,8 @@ function startVoiceAiQuestion(): void {
 
   if (!Recognition) {
     setAiReportText(`当前浏览器暂不支持语音识别，已改用快捷追问：${fallbackQuestion}`);
+    setGlobalAiOpen(true);
+    setGlobalAiState("fallback", "当前浏览器不支持语音识别");
     setBimStatus("AI 语音识别不可用，已使用快捷追问继续诊断");
     void requestAiDiagnosisReport(fallbackQuestion, { speak: true });
     return;
@@ -3337,8 +3485,7 @@ function startVoiceAiQuestion(): void {
     if (handled) return;
     handled = true;
     activeSpeechRecognition = undefined;
-    const input = getAiQuestionInput();
-    if (input) input.value = question;
+    syncAiQuestionInputs(question);
     setAiReportText(`已听到：${question}\nAI 正在生成回答...`);
     void requestAiDiagnosisReport(question, { speak: true });
   };
@@ -3360,6 +3507,8 @@ function startVoiceAiQuestion(): void {
   };
 
   activeSpeechRecognition = recognition;
+  setGlobalAiOpen(true);
+  setGlobalAiState("listening", "正在听取语音追问");
   setAiReportText("正在听取语音追问，可以问：为什么报警？下一步怎么处理？");
   setBimStatus("AI 正在听取运维追问");
   try {
@@ -3367,16 +3516,15 @@ function startVoiceAiQuestion(): void {
   } catch {
     activeSpeechRecognition = undefined;
     setAiReportText(`语音识别未能启动，已改用快捷追问：${fallbackQuestion}`);
+    setGlobalAiState("fallback", "语音识别未启动，已改用快捷追问");
     void requestAiDiagnosisReport(fallbackQuestion, { speak: true });
   }
 }
 
 function submitTypedAiQuestion(): void {
   const input = getAiQuestionInput();
-  const question = input?.value.trim() || "下一步工单应该怎么安排？";
-  if (input) input.value = question;
-  setBimStatus(`AI 已收到追问：${question}`);
-  void requestAiDiagnosisReport(question, { speak: true });
+  const question = input?.value.trim() || getGlobalAiQuestionInput()?.value.trim() || "下一步工单应该怎么安排？";
+  submitAiQuestion(question, { speak: true });
 }
 
 function closeDiagnosis(): void {
@@ -3676,6 +3824,7 @@ function bindAgentResultEvents(container: HTMLElement): void {
     button.addEventListener("click", () => {
       const moduleName = getWorkflowModule(button.dataset.agentOpenModule);
       if (!moduleName) return;
+      ensureBimMode(moduleName);
       openWorkflowModule(moduleName, `AI 已打开${moduleText(moduleName)}证据`);
       openManagementWorkspace();
       setEventTimelineStage(moduleName === "workorder" ? "workorder-draft" : "evidence-review");
@@ -3690,6 +3839,7 @@ function bindAgentResultEvents(container: HTMLElement): void {
     button.addEventListener("click", () => {
       const part = button.dataset.agentBimPart as BimPartKey | undefined;
       if (!part) return;
+      ensureBimMode("alerts");
       if (part === "gearbox") {
         activateGearboxWorkflow("alerts");
       }
@@ -3700,8 +3850,71 @@ function bindAgentResultEvents(container: HTMLElement): void {
 
   container.querySelectorAll<HTMLButtonElement>("[data-agent-create-workorder]").forEach((button) => {
     button.addEventListener("click", () => {
+      ensureBimMode("workorder");
       openGeneratedWorkOrder("AI 已从 BIM 定位进入工单确认门：等待值长与现场工程师确认");
     });
+  });
+}
+
+function bindGlobalAiOrbEvents(): void {
+  globalAiUi.orb.addEventListener("click", () => {
+    setGlobalAiOpen(globalAiUi.shell.dataset.open !== "true");
+  });
+
+  document.querySelector<HTMLButtonElement>("#global-ai-close")?.addEventListener("click", () => {
+    setGlobalAiOpen(false);
+  });
+
+  globalAiUi.panel.querySelectorAll<HTMLButtonElement>("[data-global-ai-question]").forEach((button) => {
+    button.addEventListener("click", () => {
+      submitAiQuestion(button.dataset.globalAiQuestion ?? "为什么报警？");
+    });
+  });
+
+  globalAiUi.panel.querySelector<HTMLButtonElement>("[data-global-ai-send]")?.addEventListener("click", () => {
+    submitAiQuestion(globalAiUi.input.value, { speak: true });
+  });
+
+  globalAiUi.input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submitAiQuestion(globalAiUi.input.value, { speak: true });
+    }
+  });
+
+  globalAiUi.panel.querySelector<HTMLButtonElement>("[data-global-ai-voice]")?.addEventListener("click", () => {
+    startVoiceAiQuestion();
+  });
+
+  globalAiUi.panel.querySelectorAll<HTMLButtonElement>("[data-global-ai-open-page]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const pageKey = button.dataset.globalAiOpenPage;
+      if (!isManagementPageKey(pageKey)) return;
+      const page = managementPageByKey.get(pageKey);
+      ensureBimMode(page?.module ?? "fusion");
+      openManagementPage(pageKey, `AI 已打开${page?.label ?? "管理页面"}，请复核输入、模型和结论`);
+      setGlobalAiOpen(true);
+      setGlobalAiState("ready", `已打开${page?.label ?? "管理页面"}`);
+    });
+  });
+
+  globalAiUi.panel.querySelectorAll<HTMLButtonElement>("[data-global-ai-focus-part]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const part = button.dataset.globalAiFocusPart as BimPartKey | undefined;
+      if (!part) return;
+      ensureBimMode("alerts");
+      setEventTimelineStage("bim-location");
+      if (part === "gearbox") activateGearboxWorkflow("alerts");
+      void getBimViewer().focusPart(part);
+      setGlobalAiState("ready", "已进入 BIM 部件定位");
+    });
+  });
+
+  globalAiUi.panel.querySelector<HTMLButtonElement>("[data-global-ai-workorder]")?.addEventListener("click", () => {
+    ensureBimMode("workorder");
+    openGeneratedWorkOrder("AI 已打开工单确认门：请人工核对安全窗口、备件和责任人");
+    openManagementWorkspace();
+    setGlobalAiState("ready", "已打开工单人工确认门");
   });
 }
 
@@ -3994,13 +4207,13 @@ function bindWorkflowSurfaceEvents(): void {
   workflowModuleDrawer.querySelectorAll<HTMLButtonElement>("[data-ai-question]").forEach((button) => {
     button.addEventListener("click", () => {
       const question = button.dataset.aiQuestion ?? "查看证据链";
-      setBimStatus(`AI 已收到追问：${question}；下一步将接入语音问答服务`);
-      void requestAiDiagnosisReport(question);
+      submitAiQuestion(question);
     });
   });
 
   workflowModuleDrawer.querySelectorAll<HTMLButtonElement>("[data-ai-generate-report]").forEach((button) => {
     button.addEventListener("click", () => {
+      setGlobalAiOpen(true);
       void requestAiDiagnosisReport();
     });
   });
