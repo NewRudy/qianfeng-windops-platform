@@ -96,7 +96,7 @@ type ManagementPageKey =
   | "maintenance"
   | "knowledge";
 
-type AnalysisActionPageKey = Exclude<ManagementPageKey, "event" | "knowledge">;
+type AnalysisActionPageKey = "cms" | "fusion" | "health" | "maintenance" | "scada" | "structure";
 
 type ManagementPage = {
   key: ManagementPageKey;
@@ -133,6 +133,18 @@ type AnalysisRunRecord = {
 type AnalysisParameter = {
   label: string;
   value: string;
+};
+
+type WorkbenchActionCopy = {
+  adoptLabel: string;
+  ariaLabel: string;
+  completeLabel: string;
+  eyebrow: string;
+  loadingText: string;
+  pendingText: string;
+  runLabel: string;
+  statusText: string;
+  title: string;
 };
 
 const workflowStages: WorkflowStage[] = [
@@ -186,14 +198,14 @@ const managementPages: ManagementPage[] = [
     key: "health",
     label: "健康管理",
     module: "health",
-    subtitle: "按系统层级、部件权重和数据覆盖口径评估整机健康状态。",
+    subtitle: "健康评分是分层权重与专项筛查，不是单一机理模型。",
     title: "风机健康管理",
   },
   {
     key: "scada",
     label: "SCADA",
     module: "scada",
-    subtitle: "调整时间窗、基线和残差阈值后重新计算运行异常。",
+    subtitle: "用风速-功率基线残差判断运行异常是否成立。",
     title: "SCADA 运行分析",
   },
   {
@@ -228,7 +240,7 @@ const managementPages: ManagementPage[] = [
     key: "maintenance",
     label: "维护计划",
     module: "maintenance",
-    subtitle: "管理预测维护策略、作业窗口、备件和班组资源。",
+    subtitle: "根据诊断结果、低风速窗口、备件和班组资源形成处置策略。",
     title: "预测维护计划",
   },
   {
@@ -318,7 +330,7 @@ function renderManagementConsole(): string {
       <header class="management-workbench-header">
         <div>
           <span>管理工作台</span>
-          <strong>证据复核、模型复算、工单闭环</strong>
+          <strong>数据分析、证据复核、人工签核、复盘回写</strong>
         </div>
         <button type="button" data-close-manager-workspace>返回BIM视图</button>
       </header>
@@ -374,11 +386,12 @@ function renderParameterPanel(
   pageKey: ManagementPageKey,
   params: Array<{ label: string; value: string; type?: "number" | "select"; options?: string[] }>,
 ): string {
+  const copy = getWorkbenchActionCopy(pageKey);
   return `
-    <section class="parameter-panel" aria-label="模型参数">
+    <section class="parameter-panel" aria-label="${html(copy.ariaLabel)}">
       <header>
-        <span>模型参数</span>
-        <strong>本页参数只影响本次复算记录</strong>
+        <span>${html(copy.eyebrow)}</span>
+        <strong>${html(copy.title)}</strong>
       </header>
       <div>
         ${params.map((param, index) => {
@@ -401,12 +414,109 @@ function renderParameterPanel(
         }).join("")}
       </div>
       <footer>
-        <button type="button" data-run-analysis="${html(pageKey)}">重新计算</button>
-        <button type="button" data-adopt-evidence="${html(pageKey)}">采纳为当前事件证据</button>
+        <button type="button" data-run-analysis="${html(pageKey)}">${html(copy.runLabel)}</button>
+        <button type="button" data-adopt-evidence="${html(pageKey)}">${html(copy.adoptLabel)}</button>
       </footer>
-      <section class="analysis-result" data-analysis-result="${html(pageKey)}">等待参数确认，尚未形成新的复算记录。</section>
+      <section class="analysis-result" data-analysis-result="${html(pageKey)}">${html(copy.pendingText)}</section>
     </section>
   `;
+}
+
+function getWorkbenchActionCopy(pageKey: ManagementPageKey): WorkbenchActionCopy {
+  const commonAdopt = "采纳为当前事件证据";
+  const copyByPage: Partial<Record<ManagementPageKey, WorkbenchActionCopy>> = {
+    cms: {
+      adoptLabel: commonAdopt,
+      ariaLabel: "CMS 诊断参数",
+      completeLabel: "CMS 诊断完成",
+      eyebrow: "信号诊断参数",
+      loadingText: "正在请求后端 CMS 频谱诊断...",
+      pendingText: "等待频谱参数确认，尚未形成新的 CMS 诊断记录。",
+      runLabel: "运行 CMS 频谱诊断",
+      statusText: "CMS 振动页已完成频谱诊断",
+      title: "频谱/侧频诊断，不是工单模型",
+    },
+    fusion: {
+      adoptLabel: commonAdopt,
+      ariaLabel: "融合判据参数",
+      completeLabel: "融合判据完成",
+      eyebrow: "融合判据参数",
+      loadingText: "正在运行多源证据门控规则...",
+      pendingText: "等待融合策略确认，尚未形成新的证据门控记录。",
+      runLabel: "运行融合判据",
+      statusText: "融合诊断页已完成证据门控",
+      title: "多源证据门控规则，输出支持项和反证项",
+    },
+    health: {
+      adoptLabel: "纳入当前事件摘要",
+      ariaLabel: "健康评分口径",
+      completeLabel: "健康评分完成",
+      eyebrow: "健康评分口径",
+      loadingText: "正在重算分层健康评分...",
+      pendingText: "等待评分口径确认，尚未形成新的健康评估记录。",
+      runLabel: "重算健康评分",
+      statusText: "健康管理页已完成分层评分",
+      title: "部件权重评分 + 广谱筛查，不是单一机理仿真",
+    },
+    maintenance: {
+      adoptLabel: "提交值长确认",
+      ariaLabel: "维护策略约束",
+      completeLabel: "维护策略生成完成",
+      eyebrow: "策略约束",
+      loadingText: "正在生成维护策略建议...",
+      pendingText: "等待策略约束确认，尚未形成新的维护计划建议。",
+      runLabel: "生成维护策略",
+      statusText: "维护计划页已生成策略建议",
+      title: "排程与资源规则，停机和派工必须人工确认",
+    },
+    scada: {
+      adoptLabel: commonAdopt,
+      ariaLabel: "SCADA 运行分析参数",
+      completeLabel: "SCADA 分析完成",
+      eyebrow: "运行分析参数",
+      loadingText: "正在请求后端 SCADA 残差分析...",
+      pendingText: "等待时间窗和阈值确认，尚未形成新的运行分析记录。",
+      runLabel: "运行 SCADA 残差分析",
+      statusText: "SCADA 页已完成运行侧分析",
+      title: "风速-功率基线残差，用于判断运行异常是否成立",
+    },
+    structure: {
+      adoptLabel: commonAdopt,
+      ariaLabel: "结构判据参数",
+      completeLabel: "结构判据完成",
+      eyebrow: "结构判据参数",
+      loadingText: "正在运行螺栓与结构反证判据...",
+      pendingText: "等待结构阈值确认，尚未形成新的结构监测记录。",
+      runLabel: "运行结构判据",
+      statusText: "结构监测页已完成反证判据",
+      title: "螺栓预紧力/塔筒频率判据，用于结构侧复核",
+    },
+    workorders: {
+      adoptLabel: "人工签核",
+      ariaLabel: "工单签核门控",
+      completeLabel: "工单门控已刷新",
+      eyebrow: "流程门控",
+      loadingText: "正在刷新工单签核状态...",
+      pendingText: "当前工单尚未派发；需完成作业窗口、安全许可、备件和复盘责任签核。",
+      runLabel: "刷新签核状态",
+      statusText: "工单中心已刷新签核门控",
+      title: "工单是流程状态机，不是预测模型",
+    },
+  };
+
+  return (
+    copyByPage[pageKey] ?? {
+      adoptLabel: commonAdopt,
+      ariaLabel: "工作台操作",
+      completeLabel: "操作完成",
+      eyebrow: "工作台操作",
+      loadingText: "正在处理当前操作...",
+      pendingText: "等待操作确认。",
+      runLabel: "执行操作",
+      statusText: "工作台操作已完成",
+      title: "本页为业务操作，不默认代表机理模型",
+    }
+  );
 }
 
 function renderEventWorkbenchPage(): string {
@@ -683,7 +793,7 @@ function renderWorkOrderManagementPage(): string {
     ])}
     <section class="workorder-page-actions">
       <button type="button" data-open-module="workorder">进入当前工单确认门</button>
-      <button type="button" data-run-analysis="workorders">刷新工单门控</button>
+      <button type="button" data-run-analysis="workorders">刷新签核状态</button>
     </section>
     <p class="analysis-result" data-analysis-result="workorders">当前工单尚未派发；需完成作业窗口、安全许可、备件和复盘责任签核。</p>
     ${renderWorkOrderWritebackSummary(ticket)}
@@ -1834,7 +1944,7 @@ root.innerHTML = `
           <div class="bim-stage-hud">
             <span>HS-WTG 单机透视</span>
             <strong id="bim-status">等待进入单机 BIM 诊断</strong>
-            <em>先在 BIM 中定位疑似部件；需要证据、模型复算或工单时进入管理工作台。</em>
+            <em>先在 BIM 中定位疑似部件；需要数据分析、证据复核或工单签核时进入管理工作台。</em>
           </div>
           <div class="bim-stage-actions" aria-label="BIM 模型操作">
             <button id="bim-toggle-decompose" type="button" data-state="composed">拆解模型</button>
@@ -3599,7 +3709,7 @@ function getAnalysisParamValue(pageKey: ManagementPageKey, index: number): strin
 }
 
 function isAnalysisActionPageKey(value: string | undefined): value is AnalysisActionPageKey {
-  return Boolean(value && ["cms", "fusion", "health", "maintenance", "scada", "structure", "workorders"].includes(value));
+  return Boolean(value && ["cms", "fusion", "health", "maintenance", "scada", "structure"].includes(value));
 }
 
 function getAnalysisParameters(pageKey: AnalysisActionPageKey): AnalysisParameter[] {
@@ -3611,8 +3721,9 @@ function getAnalysisParameters(pageKey: AnalysisActionPageKey): AnalysisParamete
   }));
 }
 
-function renderAnalysisRecord(record: AnalysisRunRecord): string {
-  const stateLabel = record.status === "adopted" ? "已采纳为当前事件证据" : "模型复算完成";
+function renderAnalysisRecord(record: AnalysisRunRecord, pageKey: ManagementPageKey): string {
+  const copy = getWorkbenchActionCopy(pageKey);
+  const stateLabel = record.status === "adopted" ? "已写入当前事件" : copy.completeLabel;
   const diagnostics = record.diagnostics?.length
     ? `
       <section class="analysis-diagnostics" aria-label="本次计算指标">
@@ -3699,7 +3810,7 @@ function buildAnalysisRunSummary(pageKey: ManagementPageKey): string {
 
   if (pageKey === "workorders") {
     const snapshot = readWorkOrderClosureSnapshot();
-    return `已刷新工单门控：人工签核 ${snapshot.confirmedChecks.length}/${snapshot.totalChecks}，现场回写 ${snapshot.completedWritebacks.length}/${snapshot.totalWritebacks}；未满足门控前不能派发或关闭。`;
+    return `已刷新工单签核状态：人工签核 ${snapshot.confirmedChecks.length}/${snapshot.totalChecks}，现场回写 ${snapshot.completedWritebacks.length}/${snapshot.totalWritebacks}；未满足门控前不能派发或关闭。`;
   }
 
   return "已刷新当前页面记录。";
@@ -3736,43 +3847,48 @@ async function requestEvidenceAdoption(pageKey: AnalysisActionPageKey, runId?: s
 async function runManagementAnalysis(pageKey: ManagementPageKey): Promise<void> {
   const result = workflowModuleDrawer.querySelector<HTMLElement>(`[data-analysis-result="${pageKey}"]`);
   if (!result) return;
+  const copy = getWorkbenchActionCopy(pageKey);
   if (!isAnalysisActionPageKey(pageKey)) {
     result.textContent = buildAnalysisRunSummary(pageKey);
+    result.dataset.state = "computed";
+    setBimStatus(copy.statusText);
     return;
   }
-  result.textContent = "正在请求后端模型运行记录...";
+  result.textContent = copy.loadingText;
   result.dataset.state = "loading";
   try {
     const record = await requestAnalysisRun(pageKey);
-    result.innerHTML = renderAnalysisRecord(record);
+    result.innerHTML = renderAnalysisRecord(record, pageKey);
     result.dataset.runId = record.id;
     updateManagementChartFromRecord(pageKey, record);
   } catch {
     result.textContent = `${buildAnalysisRunSummary(pageKey)} 后端记录暂不可用，当前仅为本地兜底结果。`;
   }
   result.dataset.state = "computed";
-  setBimStatus(`${managementPageByKey.get(pageKey)?.label ?? "管理端"}已完成模型复算`);
+  setBimStatus(copy.statusText);
 }
 
 async function adoptManagementEvidence(pageKey: ManagementPageKey): Promise<void> {
   const result = workflowModuleDrawer.querySelector<HTMLElement>(`[data-analysis-result="${pageKey}"]`);
   if (!result) return;
+  const copy = getWorkbenchActionCopy(pageKey);
   if (!isAnalysisActionPageKey(pageKey)) {
     result.textContent = `${buildAnalysisRunSummary(pageKey)} 已采纳为 ${activeWorkflowCase.eventCode} 的当前证据记录，等待人工复核签字。`;
+    result.dataset.state = "adopted";
     return;
   }
   result.textContent = "正在写入当前事件证据记录...";
   result.dataset.state = "loading";
   try {
     const record = await requestEvidenceAdoption(pageKey, result.dataset.runId);
-    result.innerHTML = renderAnalysisRecord(record);
+    result.innerHTML = renderAnalysisRecord(record, pageKey);
     result.dataset.runId = record.id;
     updateManagementChartFromRecord(pageKey, record);
   } catch {
     result.textContent = `${buildAnalysisRunSummary(pageKey)} 后端采纳暂不可用，当前仅为本地兜底记录。`;
   }
   result.dataset.state = "adopted";
-  setEventTimelineStage(pageKey === "workorders" ? "workorder-draft" : "evidence-review");
+  setEventTimelineStage("evidence-review");
   setBimStatus(`${managementPageByKey.get(pageKey)?.label ?? "证据"}已采纳到当前事件`);
 }
 
