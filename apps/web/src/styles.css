@@ -1902,6 +1902,14 @@ button {
   font-weight: 900;
 }
 
+.agent-detail-group:not([open]) > :not(summary) {
+  display: none;
+}
+
+.agent-evidence-details summary {
+  color: rgba(246, 197, 104, 0.84);
+}
+
 .agent-detail-group[open] summary {
   padding-bottom: 8px;
   border-bottom: 1px solid rgba(91, 224, 246, 0.14);
@@ -1909,6 +1917,7 @@ button {
 }
 
 .agent-detail-group .agent-link-grid,
+.agent-detail-group .agent-evidence-grid,
 .agent-detail-group .agent-report-sections,
 .agent-detail-group .agent-tool-trace {
   margin-top: 10px;

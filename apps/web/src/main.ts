@@ -1471,19 +1471,22 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
         </button>
       </section>
 
-      <section class="agent-evidence-grid" aria-label="AI 证据卡">
-        ${result.evidenceCards.map((card) => `
-          <button class="agent-evidence-card ${html(card.severity)}" type="button" data-agent-open-module="${html(card.module)}">
-            <span>${html(card.title)} · ${html(card.source)}</span>
-            <strong>${html(card.value)}</strong>
-            <p>${html(card.interpretation)}</p>
-            <div><i style="width: ${confidenceWidth(card.confidence)}"></i><b>${html(card.confidence)}%</b></div>
-          </button>
-        `).join("")}
-      </section>
+      <details class="agent-detail-group agent-evidence-details">
+        <summary>展开证据卡（${result.evidenceCards.length}）</summary>
+        <section class="agent-evidence-grid" aria-label="AI 证据卡">
+          ${result.evidenceCards.map((card) => `
+            <button class="agent-evidence-card ${html(card.severity)}" type="button" data-agent-open-module="${html(card.module)}">
+              <span>${html(card.title)} · ${html(card.source)}</span>
+              <strong>${html(card.value)}</strong>
+              <p>${html(card.interpretation)}</p>
+              <div><i style="width: ${confidenceWidth(card.confidence)}"></i><b>${html(card.confidence)}%</b></div>
+            </button>
+          `).join("")}
+        </section>
+      </details>
 
       <details class="agent-detail-group">
-        <summary>展开图表联动、BIM 定位与报告正文</summary>
+        <summary>展开图表联动、BIM 定位与报告正文（${result.chartRefs.length + result.bimHighlights.length} 个联动）</summary>
         <section class="agent-link-grid" aria-label="AI 图表联动">
           <h4>图表联动</h4>
           ${result.chartRefs.map((ref) => `
