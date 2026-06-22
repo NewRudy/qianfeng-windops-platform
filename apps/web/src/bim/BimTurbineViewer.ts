@@ -203,6 +203,7 @@ export class BimTurbineViewer {
     await this.initialize();
     const targets = this.findPartMeshes(part);
     this.applyHighlight(targets);
+    this.focusCameraOnMeshes(targets, part);
     this.setStatus(targets.length > 0 ? `已定位 ${this.partLabel(part)} 构件` : `${this.partLabel(part)} 未匹配到明确构件，已保留整机视图`);
   }
 
@@ -467,20 +468,91 @@ export class BimTurbineViewer {
       return matchers.some((matcher) => matcher.test(nameChain));
     });
 
-    if (matches.length > 0) return matches.slice(0, 24);
+    if (matches.length > 0) return this.rankPartMeshes(part, matches).slice(0, part === "gearbox" ? 10 : 24);
 
-    const bounds = this.selectableMeshes.map((mesh) => ({
-      mesh,
-      center: new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3()),
-    }));
+    const bounds = this.meshBounds(this.selectableMeshes);
 
     if (part === "tower") return bounds.filter(({ center }) => center.y < -0.25).map(({ mesh }) => mesh).slice(0, 18);
     if (part === "foundation") return bounds.filter(({ center }) => center.y < -1.6).map(({ mesh }) => mesh).slice(0, 18);
     if (part === "blade") return bounds.filter(({ center }) => center.x < -0.35 || center.y > 0.65).map(({ mesh }) => mesh).slice(0, 18);
-    if (part === "nacelle" || part === "gearbox") {
+    if (part === "gearbox") {
+      return this.rankPartMeshes(part, bounds.map(({ mesh }) => mesh)).slice(0, 10);
+    }
+    if (part === "nacelle") {
       return bounds.filter(({ center }) => center.y > 0.1 && center.x > -0.25).map(({ mesh }) => mesh).slice(0, 18);
     }
     return bounds.filter(({ center }) => center.y > 0.1 && center.x < 0.4).map(({ mesh }) => mesh).slice(0, 18);
+  }
+
+  private meshBounds(meshes: BimMesh[]): Array<{
+    box: THREE.Box3;
+    center: THREE.Vector3;
+    mesh: BimMesh;
+    size: THREE.Vector3;
+  }> {
+    return meshes.map((mesh) => {
+      const box = new THREE.Box3().setFromObject(mesh);
+      return {
+        box,
+        center: box.getCenter(new THREE.Vector3()),
+        mesh,
+        size: box.getSize(new THREE.Vector3()),
+      };
+    });
+  }
+
+  private rankPartMeshes(part: BimPartKey, meshes: BimMesh[]): BimMesh[] {
+    if (part !== "gearbox") return meshes;
+
+    const bounds = this.meshBounds(meshes);
+    const whole = new THREE.Box3();
+    bounds.forEach(({ box }) => whole.union(box));
+    const wholeSize = whole.getSize(new THREE.Vector3());
+    const wholeMin = whole.min;
+    const target = new THREE.Vector3(0.47, 0.62, 0.5);
+
+    return bounds
+      .map((item) => {
+        const normalized = new THREE.Vector3(
+          wholeSize.x > 0 ? (item.center.x - wholeMin.x) / wholeSize.x : 0.5,
+          wholeSize.y > 0 ? (item.center.y - wholeMin.y) / wholeSize.y : 0.5,
+          wholeSize.z > 0 ? (item.center.z - wholeMin.z) / wholeSize.z : 0.5,
+        );
+        const volume = Math.max(0.0001, item.size.x * item.size.y * item.size.z);
+        const nameChain = [item.mesh.name, item.mesh.parent?.name, item.mesh.parent?.parent?.name].filter(Boolean).join(" ");
+        const nameBonus = /gearbox|gear box|gear_box|齿轮箱|齿轮/i.test(nameChain) ? -0.8 : 0;
+        const shellPenalty = volume > 0.08 ? 0.45 : 0;
+        return {
+          mesh: item.mesh,
+          score: normalized.distanceTo(target) + shellPenalty + nameBonus,
+        };
+      })
+      .sort((a, b) => a.score - b.score)
+      .map(({ mesh }) => mesh);
+  }
+
+  private focusCameraOnMeshes(meshes: BimMesh[], part: BimPartKey): void {
+    if (!this.camera || !this.controls || meshes.length === 0) return;
+
+    const bounds = new THREE.Box3();
+    meshes.forEach((mesh) => bounds.union(new THREE.Box3().setFromObject(mesh)));
+    const center = bounds.getCenter(new THREE.Vector3());
+    const size = bounds.getSize(new THREE.Vector3());
+    const radius = Math.max(size.x, size.y, size.z, 0.32);
+    const offsetByPart: Record<BimPartKey, THREE.Vector3> = {
+      blade: new THREE.Vector3(1.1, 0.72, 1.18),
+      foundation: new THREE.Vector3(1.05, 0.5, 1.18),
+      gearbox: new THREE.Vector3(1.05, 0.36, 1.0),
+      hub: new THREE.Vector3(1.0, 0.38, 0.95),
+      nacelle: new THREE.Vector3(1.18, 0.42, 1.08),
+      tower: new THREE.Vector3(1.08, 0.58, 1.12),
+    };
+    const offset = offsetByPart[part].clone().normalize().multiplyScalar(Math.max(1.05, radius * 2.9));
+    this.controls.target.copy(center);
+    this.camera.position.copy(center.clone().add(offset));
+    this.camera.near = 0.01;
+    this.camera.updateProjectionMatrix();
+    this.controls.update();
   }
 
   private applyHighlight(meshes: BimMesh[]): void {

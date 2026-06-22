@@ -14,6 +14,7 @@ import {
 import { buildAgentKnowledgeContext } from "../src/workflow/knowledgeGraph";
 
 export type AgentIntent =
+  | "capability"
   | "counter_evidence"
   | "evidence_chain"
   | "explain_alarm"
@@ -138,6 +139,7 @@ export function classifyAgentIntent(question = ""): AgentIntent {
   if (/(工单|派单|巡检单|作业票|谁去|验收|闭环)/.test(text)) return "workorder";
   if (/(报告|汇报|材料|图文|导出|总结)/.test(text)) return "report";
   if (/(怎么处理|怎么办|下一步|处置|维护|检修|备件|停机|限功率)/.test(text)) return "maintenance_plan";
+  if (/(你能|能做什么|怎么用|是不是.*假|真假|真的假的|大模型|智能助手|ai|对话|语音|能力|可用)/i.test(text)) return "capability";
   if (/(不是|排除|反证|螺栓|叶根|塔筒|误报)/.test(text)) return "counter_evidence";
   if (/(证据|依据|数据|图|曲线|频谱|scada|cms|油温)/i.test(text)) return "evidence_chain";
   return "explain_alarm";
@@ -348,6 +350,13 @@ export function buildAgentOperatorFocus(intent: AgentIntent, workflowCase: Gearb
   const baseDecision = brief?.primaryFinding ?? `${workflowCase.component}风险`;
 
   const focusByIntent: Record<AgentIntent, AgentOperatorFocus> = {
+    capability: {
+      decision: "AI 值班员负责研判、解释和安全导航",
+      humanCheck: "AI 不能替代值长完成停机、登塔、检修、派发或关闭工单；这些动作必须人工确认。",
+      primaryQuestion: "试试：帮我定位齿轮箱",
+      recommendedModule: "brief",
+      why: "用户问的是系统智能是否真实可用，先说明 AI 能读哪些证据、能打开哪些工作台、哪些操作不能越权。",
+    },
     counter_evidence: {
       decision: "先确认是不是结构侧误报",
       humanCheck: "结构工程师确认螺栓松弛未形成环向扩展后，才能把齿轮箱作为主闭环。",
@@ -399,6 +408,13 @@ export function buildFallbackAgentAnswer(intent: AgentIntent, workflowCase: Gear
   const brief = workflowCase.modules.brief.aiBrief;
   const maintenance = workflowCase.modules.maintenance;
   const ticket = workflowCase.modules.workorder.ticket;
+  if (intent === "capability") {
+    return [
+      "我不是只会播报固定文案的装饰层。当前我能读取本次预警事件、SCADA/CMS/油温/螺栓结构证据、知识图谱关系链和工单门控状态。",
+      "你可以直接说“帮我定位齿轮箱”“打开 SCADA 证据”“工单能派发吗”，我会在系统里执行安全导航或给出门控判断。",
+      "边界是：我可以生成研判和工单草案，但停机、登塔、派发、关闭工单必须由值班人员和现场工程师人工确认。",
+    ].join("\n");
+  }
   if (intent === "counter_evidence") {
     return [
       `${workflowCase.turbineId} 当前主风险仍指向齿轮箱，不是叶根螺栓主故障。`,
@@ -477,6 +493,7 @@ export function buildAgentPrompt(intent: AgentIntent, question: string, workflow
     "你是黔风智维平台的风电运维 AI 值班诊断员。",
     "请只基于下列工具输出回答，不编造真实接入、自动停机、准确率或企业客户。",
     "回答要像现场工程师能用的结论：先判断，再给证据，再给下一步人工动作。最多 5 句。",
+    "如果用户问你能做什么、是不是假的或怎么使用，请诚实说明：可读取结构化证据、知识图谱和工单门控，可导航页面和定位 BIM，但不能自动执行安全动作。",
     "如果用户问工单，只能生成草案，必须说明待人工确认，并列出派发前确认门。",
     "除非用户明确问工单或处置策略，不要说已经生成工单；严禁说自动生成、自动派发、自动派单、自动停机、自动登塔、立即执行。",
     "",

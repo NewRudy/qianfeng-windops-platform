@@ -47,6 +47,7 @@ if (!root) {
 let activeCaseId = gearboxCaseCatalog[0]?.id ?? "";
 let activeWorkflowCase: GearboxWorkflowCase = gearboxWorkflowCase;
 let activeSpeechRecognition: SpeechRecognitionLike | undefined;
+let latestAiRequestId = 0;
 
 type SpeechRecognitionEventLike = {
   results: {
@@ -2508,7 +2509,6 @@ function setAiReportHtml(markup: string): void {
     report.innerHTML = markup;
     bindAgentResultEvents(report);
   }
-  setGlobalAiAnswerHtml(markup);
 }
 
 function setAgentStatus(text: string, mode: "checking" | "configured" | "fallback" = "checking"): void {
@@ -2685,6 +2685,57 @@ function setGlobalAiAnswerHtml(markup: string): void {
   bindAgentResultEvents(globalAiUi.answer);
 }
 
+function renderGlobalAiAssistantAnswer(
+  result: AiDiagnosisResponse,
+  question: string,
+  actionMessage?: string,
+): string {
+  const sourceLabel = result.status === "pending"
+    ? actionMessage ? "已执行安全导航" : "正在生成"
+    : result.source === "llm"
+      ? "大模型回答"
+      : "本地规则兜底";
+  const recommendedModule = result.operatorFocus.recommendedModule;
+  const recommendedPage = getManagementPageForModule(recommendedModule);
+  const primaryBimPart = result.bimHighlights.find((item) => item.severity === "alarm")?.part ?? "gearbox";
+  const answer = actionMessage
+    ? `${actionMessage}\n${result.operatorFocus.humanCheck}`
+    : result.answerText.trim() || "当前没有生成有效回答，请重新提问。";
+  const statusLine = actionMessage && result.status !== "pending"
+    ? `<p class="global-ai-action-result">${html(actionMessage)}</p>`
+    : "";
+
+  return `
+    <article class="global-ai-chat-answer">
+      <header>
+        <span>${html(sourceLabel)} / ${html(intentText(result.intent))}</span>
+        <strong>${html(result.operatorFocus.decision)}</strong>
+      </header>
+      <section class="global-ai-chat-turn user">
+        <span>你</span>
+        <p>${html(question)}</p>
+      </section>
+      <section class="global-ai-chat-turn assistant">
+        <span>AI 值班员</span>
+        <p>${html(answer)}</p>
+      </section>
+      ${statusLine}
+      <section class="global-ai-chat-next">
+        <span>可继续说</span>
+        <button type="button" data-agent-open-module="${html(recommendedModule)}">${html(result.operatorFocus.primaryQuestion)}</button>
+        <button type="button" data-agent-bim-part="${html(primaryBimPart)}">定位疑似部件</button>
+        <button type="button" data-global-ai-open-page="${html(recommendedPage)}">打开详情页</button>
+      </section>
+      <p class="global-ai-boundary">${html(result.riskBoundary)}</p>
+    </article>
+  `;
+}
+
+function setAiDiagnosisResult(result: AiDiagnosisResponse, question: string, actionMessage?: string): void {
+  setAiReportHtml(renderAiGeneratedReport(result, question));
+  setGlobalAiAnswerHtml(renderGlobalAiAssistantAnswer(result, question, actionMessage));
+}
+
 function updateGlobalAiContext(): void {
   const brief = activeWorkflowCase.modules.brief.aiBrief;
   if (globalAiUi.finding) globalAiUi.finding.textContent = brief?.primaryFinding ?? "等待诊断事件";
@@ -2703,6 +2754,64 @@ function syncAiQuestionInputs(question: string): void {
   if (globalInput) globalInput.value = question;
 }
 
+function inferManagementPageFromQuestion(question: string): ManagementPageKey | undefined {
+  if (/知识图谱|图谱|关系链|因果链/.test(question)) return "knowledge";
+  if (/SCADA|scada|功率|风速|油温|运行数据/.test(question)) return "scada";
+  if (/CMS|cms|振动|频谱|侧频|齿轮啮合/.test(question)) return "cms";
+  if (/螺栓|法兰|塔筒|结构|预应力|钢绞线/.test(question)) return "structure";
+  if (/融合|判据|证据链|证据|依据|为什么/.test(question)) return "fusion";
+  if (/健康|评分|广谱筛查|筛查/.test(question)) return "health";
+  if (/维护|策略|处置|备件|检修|窗口/.test(question)) return "maintenance";
+  if (/工单|派发|派单|闭环|回写|验收/.test(question)) return "workorders";
+  return undefined;
+}
+
+function applyAgentQuestionAction(question: string): string | undefined {
+  const asksToFocusBim =
+    /(定位|聚焦|高亮|闪烁|进入.*BIM|打开.*BIM|看.*BIM|部件定位)/i.test(question) &&
+    /(齿轮箱|齿轮|部件|BIM|模型|告警|疑似)/i.test(question);
+  if (asksToFocusBim) {
+    ensureBimMode("alerts");
+    activateGearboxWorkflow("alerts");
+    setActiveComponent("gearbox");
+    void getBimViewer().focusPart("gearbox");
+    setGlobalAiState("ready", "已进入 BIM 并定位齿轮箱");
+    return "已执行：进入单机 BIM，聚焦齿轮箱疑似部件。";
+  }
+
+  if (/(告警闪烁|报警闪烁|红色闪烁|闪一下|闪烁)/.test(question)) {
+    ensureBimMode("alerts");
+    activateGearboxWorkflow("alerts");
+    if (!warningActive) {
+      warningActive = getBimViewer().toggleWarning();
+      const warningButton = document.querySelector<HTMLButtonElement>("#bim-warning");
+      if (warningButton) warningButton.textContent = warningActive ? "停止告警" : "告警闪烁";
+    }
+    setGlobalAiState("ready", "已开启 BIM 告警闪烁");
+    return "已执行：齿轮箱疑似部件进入告警闪烁态。";
+  }
+
+  if (/(生成|创建|打开|进入|查看|跳到|带我|帮我看|看一下).*(工单|作业票|派发|闭环|回写)/.test(question)) {
+    ensureBimMode("workorder");
+    openGeneratedWorkOrder("AI 已打开工单人工确认门：请核对安全窗口、备件和责任人");
+    openManagementWorkspace();
+    setGlobalAiState("ready", "已打开工单人工确认门");
+    return "已执行：打开工单人工确认门。AI 只生成草案，不自动派发。";
+  }
+
+  const pageKey = inferManagementPageFromQuestion(question);
+  const asksToOpenPage = /(打开|进入|查看|跳到|带我|帮我看|看一下|切到)/.test(question);
+  if (pageKey && asksToOpenPage) {
+    const page = managementPageByKey.get(pageKey);
+    ensureBimMode(page?.module ?? "fusion");
+    openManagementPage(pageKey, `AI 已打开${page?.label ?? "详情页"}，请复核输入数据、模型判据和结论`);
+    setGlobalAiState("ready", `已打开${page?.label ?? "详情页"}`);
+    return `已执行：打开${page?.title ?? "详情页"}。`;
+  }
+
+  return undefined;
+}
+
 function ensureBimMode(moduleName: WorkflowModuleKey = "brief"): void {
   hasPlayedIntroBroadcast = true;
   if (dashboardShell.dataset.mode === "bim") return;
@@ -2717,7 +2826,9 @@ function submitAiQuestion(question: string, options: { speak?: boolean } = {}): 
   setGlobalAiState("thinking", "正在读取事件证据并调用智能研判");
   setAiReportText(`已收到：${normalizedQuestion}\nAI 正在读取当前事件、证据链和工单门控...`);
   setBimStatus(`AI 已收到追问：${normalizedQuestion}`);
-  void requestAiDiagnosisReport(normalizedQuestion, options);
+  const actionMessage = applyAgentQuestionAction(normalizedQuestion);
+  if (actionMessage) setBimStatus(actionMessage);
+  void requestAiDiagnosisReport(normalizedQuestion, { ...options, actionMessage });
 }
 
 function moduleText(moduleName: WorkflowModuleKey): string {
@@ -2738,6 +2849,7 @@ function moduleText(moduleName: WorkflowModuleKey): string {
 
 function intentText(intent: string): string {
   const labels: Record<string, string> = {
+    capability: "能力说明",
     counter_evidence: "反证排查",
     evidence_chain: "证据链",
     explain_alarm: "告警解释",
@@ -2883,6 +2995,8 @@ function updateAgentClosureStatusCard(): void {
 }
 
 function isClosureStatusQuestion(question: string): boolean {
+  const hasWorkOrderContext = /(工单|派发|派单|关闭|闭环|回写|签核|确认门|现场复核|复盘样本)/.test(question);
+  if (!hasWorkOrderContext) return false;
   return /(还差|缺什么|能不能|能否|可以.*吗|能.*吗|派发|派单|关闭|闭环|回写|签核|确认门|现场复核|复盘样本)/.test(question);
 }
 
@@ -3199,6 +3313,7 @@ function buildAiVoiceAnswerSummary(): string {
 }
 
 function inferAgentIntent(question: string): string {
+  if (/(你能|能做什么|怎么用|是不是.*假|真假|真的假的|大模型|智能助手|AI|ai|对话|语音|能力|可用)/.test(question)) return "capability";
   if (/螺栓|叶根|反证|不是/.test(question)) return "counter_evidence";
   if (/证据|图表|来源|传感器/.test(question)) return "evidence_chain";
   if (/报告|摘要/.test(question)) return "report";
@@ -3209,6 +3324,16 @@ function inferAgentIntent(question: string): string {
 
 function buildStageAwareOperatorFocus(intent: string, fallback: AgentOperatorFocus): AgentOperatorFocus {
   const snapshot = readWorkOrderClosureSnapshot();
+
+  if (intent === "capability") {
+    return {
+      decision: "AI 值班员负责研判、解释和安全导航",
+      humanCheck: "停机、登塔、检修、派发和关闭工单必须人工确认，AI 只能辅助研判和打开对应工作面。",
+      primaryQuestion: "试试：帮我定位齿轮箱",
+      recommendedModule: "brief",
+      why: "用户问的是 AI 是否真实可用，系统应先说明可读取的证据、可执行的导航和不可越权的人工边界。",
+    };
+  }
 
   if (intent === "workorder") {
     if (snapshot.isClosed) {
@@ -3327,6 +3452,10 @@ function buildStageAwareAnswerText(
 
   if (intent === "maintenance_plan") {
     return `${reason} 处置策略按预测维护执行，不直接跳到停机检修。建议先按 ${maintenance?.result ?? "低风速窗口复测与限载观察"} 组织：限功率运行、油液取样/内窥检查、CMS 复测和备件准备；若复测证据继续恶化，再由值长人工升级检修级别。`;
+  }
+
+  if (intent === "capability") {
+    return `${reason} 我能读取当前预警、SCADA/CMS/油温/螺栓结构证据、知识图谱关系链和工单门控状态；也能按你的话打开 SCADA、CMS、融合判据、知识图谱、工单页面，或进入 BIM 定位齿轮箱。边界是停机、登塔、检修、派发和关闭工单必须人工确认。`;
   }
 
   return `${reason} 这不是单阈值报警，而是融合判据升级：${scada?.result ?? "SCADA 运行残差异常"}、${cms?.result ?? "CMS 振动特征异常"} 与油温趋势共同指向齿轮箱，${bolts?.result ?? "结构侧暂不改写主疑似"}。下一步打开告警研判，确认 ${alerts?.result ?? brief.primaryFinding} 后再进入隐患排查和工单确认。`;
@@ -3541,14 +3670,16 @@ function speakAiAnswerSummary(text?: string): void {
 
 async function requestAiDiagnosisReport(
   question = "生成当前风险诊断摘要",
-  options: { speak?: boolean } = {},
+  options: { actionMessage?: string; speak?: boolean } = {},
 ): Promise<AiDiagnosisResponse | undefined> {
   const brief = activeWorkflowCase.modules.brief.aiBrief;
   if (!brief) return;
+  const requestId = latestAiRequestId + 1;
+  latestAiRequestId = requestId;
 
   if (isClosureStatusQuestion(question)) {
     const result = buildClosureStatusAiResponse(question);
-    setAiReportHtml(renderAiGeneratedReport(result, question));
+    setAiDiagnosisResult(result, question, options.actionMessage ?? applyAgentQuestionAction(question));
     setGlobalAiState("ready", "已读取工单门控状态");
     setBimStatus("AI 已基于当前工单门控状态生成回答");
     if (options.speak) speakAiAnswerSummary(result.voiceText);
@@ -3559,7 +3690,7 @@ async function requestAiDiagnosisReport(
   const pendingResult = withStageAwareAgentGuidance(buildLocalAiDiagnosisResponse(question, "pending"), question);
   setGlobalAiOpen(true);
   setGlobalAiState("thinking", "正在调用后端 Agent");
-  setAiReportHtml(renderAiGeneratedReport(pendingResult, question));
+  setAiDiagnosisResult(pendingResult, question, options.actionMessage);
   setBimStatus("AI 已先展开本地证据包，等待大模型答复");
   setEventTimelineStage("evidence-review");
   try {
@@ -3574,9 +3705,9 @@ async function requestAiDiagnosisReport(
     });
     if (!response.ok) throw new Error("Agent request failed");
     const result = await response.json() as AiDiagnosisResponse;
-    if (requestCaseId !== activeCaseId) return result;
+    if (requestCaseId !== activeCaseId || requestId !== latestAiRequestId) return result;
     const focusedResult = withStageAwareAgentGuidance(result, question);
-    setAiReportHtml(renderAiGeneratedReport(focusedResult, question));
+    setAiDiagnosisResult(focusedResult, question, options.actionMessage ?? applyAgentQuestionAction(question));
     setGlobalAiState(focusedResult.source === "llm" ? "ready" : "fallback", focusedResult.source === "llm" ? "大模型已完成研判" : "已使用本地规则兜底");
     if (options.speak) speakAiAnswerSummary(focusedResult.voiceText);
     return focusedResult;
@@ -3585,8 +3716,8 @@ async function requestAiDiagnosisReport(
       buildLocalAiDiagnosisResponse(question, "fallback", "后端智能服务暂未返回，已保留本地规则研判。"),
       question,
     );
-    if (requestCaseId !== activeCaseId) return result;
-    setAiReportHtml(renderAiGeneratedReport(result, question));
+    if (requestCaseId !== activeCaseId || requestId !== latestAiRequestId) return result;
+    setAiDiagnosisResult(result, question, options.actionMessage ?? applyAgentQuestionAction(question));
     setGlobalAiState("fallback", "后端未返回，已使用本地规则兜底");
     if (options.speak) speakAiAnswerSummary();
     return result;
@@ -3989,6 +4120,18 @@ function bindAgentResultEvents(container: HTMLElement): void {
     button.addEventListener("click", () => {
       ensureBimMode("workorder");
       openGeneratedWorkOrder("AI 已从 BIM 定位进入工单确认门：等待值长与现场工程师确认");
+    });
+  });
+
+  container.querySelectorAll<HTMLButtonElement>("[data-global-ai-open-page]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const pageKey = button.dataset.globalAiOpenPage;
+      if (!isManagementPageKey(pageKey)) return;
+      const page = managementPageByKey.get(pageKey);
+      ensureBimMode(page?.module ?? "fusion");
+      openManagementPage(pageKey, `AI 已打开${page?.label ?? "详情页"}，请复核输入、模型和结论`);
+      setGlobalAiOpen(true);
+      setGlobalAiState("ready", `已打开${page?.label ?? "详情页"}`);
     });
   });
 }

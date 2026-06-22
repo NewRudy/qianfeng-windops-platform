@@ -17,6 +17,7 @@ describe("WindOps diagnostic agent", () => {
     expect(classifyAgentIntent("下一步怎么处理，需要停机吗")).toBe("maintenance_plan");
     expect(classifyAgentIntent("生成一个详细报告")).toBe("report");
     expect(classifyAgentIntent("生成工单草案")).toBe("workorder");
+    expect(classifyAgentIntent("你这个 AI 是不是假的，能做什么？")).toBe("capability");
   });
 
   it("builds evidence cards from the trusted workflow package", () => {
@@ -74,6 +75,24 @@ describe("WindOps diagnostic agent", () => {
     expect(result.operatorFocus.recommendedModule).toBe("bolts");
     expect(result.workOrderDraft).toBeUndefined();
     expect(result.riskBoundary).toContain("人工确认");
+  });
+
+  it("answers capability questions honestly instead of reusing the alarm script", async () => {
+    const result = await runWindOpsAgent(
+      {
+        caseId: "hs-wtg-02-gearbox-bearing",
+        question: "你这个 AI 是不是假的，能做什么？",
+      },
+      {},
+    );
+
+    expect(result.intent).toBe("capability");
+    expect(result.answerText).toContain("SCADA/CMS/油温/螺栓结构证据");
+    expect(result.answerText).toContain("帮我定位齿轮箱");
+    expect(result.answerText).toContain("人工确认");
+    expect(result.answerText).not.toContain("这不是单个阈值报警");
+    expect(result.operatorFocus.primaryQuestion).toContain("定位齿轮箱");
+    expect(result.workOrderDraft).toBeUndefined();
   });
 
   it("only includes work order draft for maintenance or work order questions", async () => {
