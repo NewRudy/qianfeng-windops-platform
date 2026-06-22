@@ -2825,11 +2825,16 @@ function ensureBimMode(moduleName: WorkflowModuleKey = "brief"): void {
 
 function submitAiQuestion(question: string, options: { speak?: boolean } = {}): void {
   const normalizedQuestion = question.trim() || "下一步应该先看哪张证据？";
+  const intent = inferAgentIntent(normalizedQuestion);
   hasPlayedIntroBroadcast = true;
   syncAiQuestionInputs(normalizedQuestion);
   setGlobalAiOpen(true);
-  setGlobalAiState("thinking", "正在读取事件证据并调用智能研判");
-  setAiReportText(`已收到：${normalizedQuestion}\nAI 正在读取当前事件、证据链和工单门控...`);
+  setGlobalAiState("thinking", intent === "general_chat" ? "正在调用大模型回答" : "正在读取事件证据并调用智能研判");
+  setAiReportText(
+    intent === "general_chat"
+      ? `已收到：${normalizedQuestion}\nAI 正在调用大模型回答普通问题...`
+      : `已收到：${normalizedQuestion}\nAI 正在读取当前事件、证据链和工单门控...`,
+  );
   setBimStatus(`AI 已收到追问：${normalizedQuestion}`);
   const actionMessage = applyAgentQuestionAction(normalizedQuestion);
   if (actionMessage) setBimStatus(actionMessage);
@@ -3477,7 +3482,10 @@ function buildStageAwareAnswerText(
   }
 
   if (intent === "general_chat") {
-    return `${reason} 我正在把这个问题按普通对话交给大模型，不会强行套用风机告警、证据链或工单流程。你也可以继续问当前风机预警、SCADA、CMS、BIM 定位或工单门控。`;
+    if (result.status === "pending") {
+      return "正在调用大模型回答这个普通问题；这里不会强行套用风机告警、证据链或工单流程。";
+    }
+    return `${reason} 普通对话暂时没有拿到大模型回复。你可以稍后重试，也可以切到当前风机预警、SCADA、CMS、BIM 定位或工单门控。`;
   }
 
   return `${reason} 这不是单阈值报警，而是融合判据升级：${scada?.result ?? "SCADA 运行残差异常"}、${cms?.result ?? "CMS 振动特征异常"} 与油温趋势共同指向齿轮箱，${bolts?.result ?? "结构侧暂不改写主疑似"}。下一步打开告警研判，确认 ${alerts?.result ?? brief.primaryFinding} 后再进入隐患排查和工单确认。`;
@@ -3709,12 +3717,13 @@ async function requestAiDiagnosisReport(
   }
 
   const requestCaseId = activeCaseId;
+  const intent = inferAgentIntent(question);
   const pendingResult = withStageAwareAgentGuidance(buildLocalAiDiagnosisResponse(question, "pending"), question);
   setGlobalAiOpen(true);
-  setGlobalAiState("thinking", "正在调用后端 Agent");
+  setGlobalAiState("thinking", intent === "general_chat" ? "正在调用大模型回答" : "正在调用后端 Agent");
   setAiDiagnosisResult(pendingResult, question, options.actionMessage);
-  setBimStatus("AI 已先展开本地证据包，等待大模型答复");
-  setEventTimelineStage("evidence-review");
+  setBimStatus(intent === "general_chat" ? "AI 正在回答普通对话" : "AI 已先展开本地证据包，等待大模型答复");
+  if (intent !== "general_chat") setEventTimelineStage("evidence-review");
   try {
     const response = await fetch("/api/agent/ask", {
       body: JSON.stringify({
@@ -4199,13 +4208,13 @@ function bindGlobalAiOrbEvents(): void {
   });
 
   globalAiUi.panel.querySelector<HTMLButtonElement>("[data-global-ai-send]")?.addEventListener("click", () => {
-    submitAiQuestion(globalAiUi.input.value, { speak: true });
+    submitAiQuestion(globalAiUi.input.value);
   });
 
   globalAiUi.input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
-      submitAiQuestion(globalAiUi.input.value, { speak: true });
+      submitAiQuestion(globalAiUi.input.value);
     }
   });
 
