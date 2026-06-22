@@ -888,6 +888,20 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
           <span>人工确认门</span>
           <strong>4 项确认后才允许派发</strong>
         </header>
+        <section class="workorder-gate-summary" data-workorder-gate-summary>
+          <article>
+            <span>当前阻塞点</span>
+            <strong data-workorder-blocker>等待生成工单草案</strong>
+          </article>
+          <article>
+            <span>下一动作</span>
+            <strong data-workorder-next-action>由 AI 诊断包或预测维护模块生成工单</strong>
+          </article>
+          <article>
+            <span>人工边界</span>
+            <strong data-workorder-human-boundary>AI 只给草案，派发和关闭必须人工确认</strong>
+          </article>
+        </section>
         <div class="workorder-confirm-grid">
           ${(ticket?.confirmationChecks ?? []).map((item) => `
             <label class="workorder-confirm" data-workorder-confirm-card="${html(item.id)}" data-state="pending">
@@ -2449,6 +2463,53 @@ function areWorkOrderConfirmationsReady(): boolean {
   return checks.length > 0 && checks.every((input) => input.checked);
 }
 
+function updateWorkOrderGateSummary(): void {
+  const blocker = document.querySelector<HTMLElement>("[data-workorder-blocker]");
+  const nextAction = document.querySelector<HTMLElement>("[data-workorder-next-action]");
+  const boundary = document.querySelector<HTMLElement>("[data-workorder-human-boundary]");
+  if (!blocker || !nextAction || !boundary) return;
+
+  const state = getCurrentWorkOrderState();
+  const confirmationChecks = Array.from(document.querySelectorAll<HTMLInputElement>("[data-workorder-confirm]"));
+  const pendingConfirmations = confirmationChecks.filter((input) => !input.checked);
+  const writebackChecks = Array.from(document.querySelectorAll<HTMLInputElement>("[data-workorder-writeback]"));
+  const pendingWritebacks = writebackChecks.filter((input) => !input.checked);
+  const enabledWritebacks = writebackChecks.some((input) => !input.disabled);
+
+  if (isClosedWorkOrderState(state)) {
+    blocker.textContent = "工单已关闭，等待复盘审核";
+    nextAction.textContent = "复核样本标签与现场记录";
+    boundary.textContent = "模型样本入库仍需运维主管确认";
+    return;
+  }
+
+  if (isDispatchedWorkOrderState(state)) {
+    blocker.textContent = pendingWritebacks.length > 0
+      ? `现场回写缺 ${pendingWritebacks.length} 项`
+      : "回写已齐，可关闭工单";
+    nextAction.textContent = pendingWritebacks.length > 0
+      ? "上传油液、内窥、CMS 复测和样本标签"
+      : "由运维主管执行关闭确认";
+    boundary.textContent = "未回写项不能作为 AI 样本事实";
+    return;
+  }
+
+  if (isGeneratedWorkOrderState(state)) {
+    blocker.textContent = pendingConfirmations.length > 0
+      ? `派发前签核缺 ${pendingConfirmations.length} 项`
+      : "签核已齐，可人工派发";
+    nextAction.textContent = pendingConfirmations.length > 0
+      ? "逐项确认窗口、许可、备件与复盘责任"
+      : "由值班长确认派发工单";
+    boundary.textContent = "AI 不能自动派发或触发停机登塔";
+    return;
+  }
+
+  blocker.textContent = enabledWritebacks ? "等待现场回写" : "等待生成工单草案";
+  nextAction.textContent = "从 AI 诊断包或预测维护模块进入工单确认门";
+  boundary.textContent = "派发、关闭、停机、登塔必须人工确认";
+}
+
 function updateWorkOrderConfirmationState(): void {
   const dispatchButton = document.querySelector<HTMLButtonElement>("[data-dispatch-workorder]");
   if (!dispatchButton) return;
@@ -2472,6 +2533,7 @@ function updateWorkOrderConfirmationState(): void {
     dispatchButton.disabled = !areWorkOrderConfirmationsReady();
     dispatchButton.textContent = ticket?.dispatchActionLabel ?? "确认派发工单";
   }
+  updateWorkOrderGateSummary();
   updateAgentClosureStatusCard();
 }
 
@@ -2564,6 +2626,7 @@ function updateWorkOrderWritebackGateState(): void {
     closeButton.disabled = isClosed || !ready;
     if (isClosed) closeButton.textContent = ticket?.closedActionLabel ?? "现场复核已完成";
   }
+  updateWorkOrderGateSummary();
   updateAgentClosureStatusCard();
 }
 
