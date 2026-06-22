@@ -859,6 +859,13 @@ function renderKnowledgeGraphPage(): string {
     </section>
     <section class="knowledge-decision-paths">
       <span>AI 决策路径</span>
+      <div class="knowledge-path-action-strip" aria-label="决策路径快捷操作">
+        ${graph.decisionPaths.map((path) => `
+          <button type="button" data-manager-page-button="${html(getManagementPageForModule(path.recommendedModule))}">
+            ${html(`打开${moduleText(path.recommendedModule)}`)}
+          </button>
+        `).join("")}
+      </div>
       ${graph.decisionPaths.map(renderKnowledgeDecisionPath).join("")}
     </section>
   `);
@@ -913,9 +920,6 @@ function renderKnowledgeDecisionPath(path: KnowledgeDecisionPath): string {
           </li>
         `).join("")}
       </ol>
-      <button type="button" data-manager-page-button="${html(getManagementPageForModule(path.recommendedModule))}">
-        打开${html(moduleText(path.recommendedModule))}
-      </button>
     </article>
   `;
 }

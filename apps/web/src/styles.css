@@ -1649,6 +1649,14 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .shell[data-workspace="manager"] .knowledge-decision-paths {
+    grid-template-columns: 1fr;
+  }
+
+  .shell[data-workspace="manager"] .knowledge-path-action-strip {
+    grid-template-columns: 1fr;
+  }
+
   .shell[data-workspace="manager"] .health-component-row {
     grid-template-columns: 1fr;
   }
@@ -2256,17 +2264,31 @@ button {
 }
 
 .knowledge-decision-paths {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  align-items: stretch;
 }
 
 .knowledge-decision-paths > span {
   grid-column: 1 / -1;
 }
 
+.knowledge-path-action-strip {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(91, 224, 246, 0.16);
+  background:
+    linear-gradient(90deg, rgba(91, 224, 246, 0.12), rgba(2, 17, 27, 0.7)),
+    rgba(2, 17, 27, 0.72);
+}
+
 .knowledge-decision-paths article {
   display: grid;
+  grid-template-rows: auto auto 1fr;
   gap: 9px;
-  align-content: start;
+  min-height: 100%;
   padding: 10px;
   border: 1px solid rgba(91, 224, 246, 0.12);
   background: rgba(0, 8, 15, 0.44);
@@ -2318,8 +2340,32 @@ button {
   font-weight: 900;
 }
 
-.knowledge-decision-paths button {
-  justify-self: start;
+.knowledge-path-action-strip button {
+  justify-self: stretch;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(91, 224, 246, 0.64);
+  background:
+    linear-gradient(135deg, rgba(91, 224, 246, 0.28), rgba(6, 48, 65, 0.92)),
+    rgba(5, 30, 42, 0.9);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-align: center;
+  box-shadow:
+    inset 0 0 20px rgba(91, 224, 246, 0.08),
+    0 0 18px rgba(91, 224, 246, 0.16);
+}
+
+.knowledge-path-action-strip button:hover {
+  border-color: rgba(246, 197, 104, 0.78);
+  background:
+    linear-gradient(135deg, rgba(246, 197, 104, 0.28), rgba(6, 48, 65, 0.94)),
+    rgba(5, 30, 42, 0.95);
+  box-shadow:
+    inset 0 0 22px rgba(246, 197, 104, 0.1),
+    0 0 22px rgba(246, 197, 104, 0.18);
 }
 
 .linked-evidence-drawer {
