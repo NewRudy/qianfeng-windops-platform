@@ -18,6 +18,7 @@ describe("WindOps diagnostic agent", () => {
     expect(classifyAgentIntent("生成一个详细报告")).toBe("report");
     expect(classifyAgentIntent("生成工单草案")).toBe("workorder");
     expect(classifyAgentIntent("你这个 AI 是不是假的，能做什么？")).toBe("capability");
+    expect(classifyAgentIntent("你好，1+1 等于几？")).toBe("general_chat");
   });
 
   it("builds evidence cards from the trusted workflow package", () => {
@@ -92,6 +93,35 @@ describe("WindOps diagnostic agent", () => {
     expect(result.answerText).toContain("人工确认");
     expect(result.answerText).not.toContain("这不是单个阈值报警");
     expect(result.operatorFocus.primaryQuestion).toContain("定位齿轮箱");
+    expect(result.workOrderDraft).toBeUndefined();
+  });
+
+  it("uses the model as a normal chat assistant for basic questions", async () => {
+    const fakeFetch = async () =>
+      new Response(JSON.stringify({ content: [{ type: "text", text: "你好，我是黔风智维里的 AI 值班助手。1+1 等于 2。" }] }), {
+        status: 200,
+      });
+
+    const result = await runWindOpsAgent(
+      {
+        caseId: "hs-wtg-02-gearbox-bearing",
+        question: "你好，1+1 等于几？",
+      },
+      {
+        apiKey: "test-key",
+        baseUrl: "https://example.test/anthropic",
+        model: "mimo-v2.5-pro",
+      },
+      fakeFetch,
+    );
+
+    expect(result.status).toBe("ok");
+    expect(result.source).toBe("llm");
+    expect(result.intent).toBe("general_chat");
+    expect(result.answerText).toContain("1+1 等于 2");
+    expect(result.answerText).not.toContain("齿轮箱");
+    expect(result.operatorFocus.decision).toContain("普通对话");
+    expect(result.reportSections.map((section) => section.title)).toEqual(["对话回答", "可切换上下文", "人工边界"]);
     expect(result.workOrderDraft).toBeUndefined();
   });
 

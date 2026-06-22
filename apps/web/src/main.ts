@@ -2698,6 +2698,7 @@ function renderGlobalAiAssistantAnswer(
   const recommendedModule = result.operatorFocus.recommendedModule;
   const recommendedPage = getManagementPageForModule(recommendedModule);
   const primaryBimPart = result.bimHighlights.find((item) => item.severity === "alarm")?.part ?? "gearbox";
+  const isGeneralChat = result.intent === "general_chat";
   const answer = actionMessage
     ? `${actionMessage}\n${result.operatorFocus.humanCheck}`
     : result.answerText.trim() || "当前没有生成有效回答，请重新提问。";
@@ -2722,9 +2723,13 @@ function renderGlobalAiAssistantAnswer(
       ${statusLine}
       <section class="global-ai-chat-next">
         <span>可继续说</span>
-        <button type="button" data-agent-open-module="${html(recommendedModule)}">${html(result.operatorFocus.primaryQuestion)}</button>
-        <button type="button" data-agent-bim-part="${html(primaryBimPart)}">定位疑似部件</button>
-        <button type="button" data-global-ai-open-page="${html(recommendedPage)}">打开详情页</button>
+        ${isGeneralChat ? `
+          <button type="button" data-agent-open-module="brief">切到当前预警</button>
+        ` : `
+          <button type="button" data-agent-open-module="${html(recommendedModule)}">${html(result.operatorFocus.primaryQuestion)}</button>
+          <button type="button" data-agent-bim-part="${html(primaryBimPart)}">定位疑似部件</button>
+          <button type="button" data-global-ai-open-page="${html(recommendedPage)}">打开详情页</button>
+        `}
       </section>
       <p class="global-ai-boundary">${html(result.riskBoundary)}</p>
     </article>
@@ -2853,6 +2858,7 @@ function intentText(intent: string): string {
     counter_evidence: "反证排查",
     evidence_chain: "证据链",
     explain_alarm: "告警解释",
+    general_chat: "普通对话",
     maintenance_plan: "处置策略",
     report: "诊断报告",
     workorder: "工单草案",
@@ -3313,13 +3319,14 @@ function buildAiVoiceAnswerSummary(): string {
 }
 
 function inferAgentIntent(question: string): string {
-  if (/(你能|能做什么|怎么用|是不是.*假|真假|真的假的|大模型|智能助手|AI|ai|对话|语音|能力|可用)/.test(question)) return "capability";
+  if (/(你是谁|你是|你能|能做什么|怎么用|是不是.*假|真假|真的假的|大模型|智能助手|AI|ai|对话|语音|能力|可用)/.test(question)) return "capability";
   if (/螺栓|叶根|反证|不是/.test(question)) return "counter_evidence";
   if (/证据|图表|来源|传感器/.test(question)) return "evidence_chain";
   if (/报告|摘要/.test(question)) return "report";
   if (/工单|派单|安排/.test(question)) return "workorder";
   if (/维护|处理|下一步|停机|检修/.test(question)) return "maintenance_plan";
-  return "explain_alarm";
+  if (/(报警|预警|故障|风险|风机|机组|齿轮箱|轴承|叶片|塔筒|山地|运维|诊断|健康|隐患|BIM|bim|GIS|gis)/.test(question)) return "explain_alarm";
+  return "general_chat";
 }
 
 function buildStageAwareOperatorFocus(intent: string, fallback: AgentOperatorFocus): AgentOperatorFocus {
@@ -3332,6 +3339,16 @@ function buildStageAwareOperatorFocus(intent: string, fallback: AgentOperatorFoc
       primaryQuestion: "试试：帮我定位齿轮箱",
       recommendedModule: "brief",
       why: "用户问的是 AI 是否真实可用，系统应先说明可读取的证据、可执行的导航和不可越权的人工边界。",
+    };
+  }
+
+  if (intent === "general_chat") {
+    return {
+      decision: "普通对话，不强行套用诊断流程",
+      humanCheck: "如果问题转到停机、登塔、检修、派发或关闭工单，仍必须进入人工确认门。",
+      primaryQuestion: "继续追问或切到当前预警",
+      recommendedModule: "brief",
+      why: "用户问的是基础对话问题，系统应直接回答，而不是把所有问题都解释成风机告警。",
     };
   }
 
@@ -3422,6 +3439,7 @@ function buildStageAwareAnswerText(
   const snapshot = readWorkOrderClosureSnapshot();
 
   if (result.source === "llm" && result.status === "ok") {
+    if (intent === "general_chat" || intent === "capability") return result.answerText;
     const focus = buildStageAwareOperatorFocus(intent, result.operatorFocus);
     const nextStep = `下一步：${focus.primaryQuestion}。${focus.why} ${focus.humanCheck}`;
     return result.answerText.includes(focus.primaryQuestion)
@@ -3456,6 +3474,10 @@ function buildStageAwareAnswerText(
 
   if (intent === "capability") {
     return `${reason} 我能读取当前预警、SCADA/CMS/油温/螺栓结构证据、知识图谱关系链和工单门控状态；也能按你的话打开 SCADA、CMS、融合判据、知识图谱、工单页面，或进入 BIM 定位齿轮箱。边界是停机、登塔、检修、派发和关闭工单必须人工确认。`;
+  }
+
+  if (intent === "general_chat") {
+    return `${reason} 我正在把这个问题按普通对话交给大模型，不会强行套用风机告警、证据链或工单流程。你也可以继续问当前风机预警、SCADA、CMS、BIM 定位或工单门控。`;
   }
 
   return `${reason} 这不是单阈值报警，而是融合判据升级：${scada?.result ?? "SCADA 运行残差异常"}、${cms?.result ?? "CMS 振动特征异常"} 与油温趋势共同指向齿轮箱，${bolts?.result ?? "结构侧暂不改写主疑似"}。下一步打开告警研判，确认 ${alerts?.result ?? brief.primaryFinding} 后再进入隐患排查和工单确认。`;
@@ -3708,7 +3730,12 @@ async function requestAiDiagnosisReport(
     if (requestCaseId !== activeCaseId || requestId !== latestAiRequestId) return result;
     const focusedResult = withStageAwareAgentGuidance(result, question);
     setAiDiagnosisResult(focusedResult, question, options.actionMessage ?? applyAgentQuestionAction(question));
-    setGlobalAiState(focusedResult.source === "llm" ? "ready" : "fallback", focusedResult.source === "llm" ? "大模型已完成研判" : "已使用本地规则兜底");
+    setGlobalAiState(
+      focusedResult.source === "llm" ? "ready" : "fallback",
+      focusedResult.source === "llm"
+        ? focusedResult.intent === "general_chat" ? "大模型已完成回答" : "大模型已完成研判"
+        : "已使用本地规则兜底",
+    );
     if (options.speak) speakAiAnswerSummary(focusedResult.voiceText);
     return focusedResult;
   } catch {

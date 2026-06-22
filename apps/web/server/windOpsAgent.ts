@@ -18,6 +18,7 @@ export type AgentIntent =
   | "counter_evidence"
   | "evidence_chain"
   | "explain_alarm"
+  | "general_chat"
   | "maintenance_plan"
   | "report"
   | "workorder";
@@ -139,10 +140,13 @@ export function classifyAgentIntent(question = ""): AgentIntent {
   if (/(工单|派单|巡检单|作业票|谁去|验收|闭环)/.test(text)) return "workorder";
   if (/(报告|汇报|材料|图文|导出|总结)/.test(text)) return "report";
   if (/(怎么处理|怎么办|下一步|处置|维护|检修|备件|停机|限功率)/.test(text)) return "maintenance_plan";
-  if (/(你能|能做什么|怎么用|是不是.*假|真假|真的假的|大模型|智能助手|ai|对话|语音|能力|可用)/i.test(text)) return "capability";
+  if (/(你是谁|你是|你能|能做什么|怎么用|是不是.*假|真假|真的假的|大模型|智能助手|ai|对话|语音|能力|可用)/i.test(text)) return "capability";
   if (/(不是|排除|反证|螺栓|叶根|塔筒|误报)/.test(text)) return "counter_evidence";
   if (/(证据|依据|数据|图|曲线|频谱|scada|cms|油温)/i.test(text)) return "evidence_chain";
-  return "explain_alarm";
+  if (/(报警|预警|故障|风险|风机|机组|齿轮箱|轴承|叶片|塔筒|山地|运维|诊断|健康|隐患|bim|gis)/i.test(text)) {
+    return "explain_alarm";
+  }
+  return "general_chat";
 }
 
 export function resolveAgentContext(payload: AgentAskPayload): AgentContext {
@@ -357,6 +361,13 @@ export function buildAgentOperatorFocus(intent: AgentIntent, workflowCase: Gearb
       recommendedModule: "brief",
       why: "用户问的是系统智能是否真实可用，先说明 AI 能读哪些证据、能打开哪些工作台、哪些操作不能越权。",
     },
+    general_chat: {
+      decision: "普通对话，不强行套用诊断流程",
+      humanCheck: "涉及停机、登塔、检修、派发或关闭工单时，仍必须进入人工确认门。",
+      primaryQuestion: "继续追问或切到当前预警",
+      recommendedModule: "brief",
+      why: "用户问的是基础对话问题，系统应直接回答，而不是把所有问题都解释成风机告警。",
+    },
     counter_evidence: {
       decision: "先确认是不是结构侧误报",
       humanCheck: "结构工程师确认螺栓松弛未形成环向扩展后，才能把齿轮箱作为主闭环。",
@@ -415,6 +426,12 @@ export function buildFallbackAgentAnswer(intent: AgentIntent, workflowCase: Gear
       "边界是：我可以生成研判和工单草案，但停机、登塔、派发、关闭工单必须由值班人员和现场工程师人工确认。",
     ].join("\n");
   }
+  if (intent === "general_chat") {
+    return [
+      "我在。你可以直接问普通问题，也可以让我解释当前风机预警。",
+      "如果问题涉及当前事件，我会切换到 SCADA、CMS、结构监测、知识图谱和工单门控；如果只是普通对话，我不会强行套用诊断流程。",
+    ].join("\n");
+  }
   if (intent === "counter_evidence") {
     return [
       `${workflowCase.turbineId} 当前主风险仍指向齿轮箱，不是叶根螺栓主故障。`,
@@ -454,6 +471,23 @@ export function buildFallbackAgentAnswer(intent: AgentIntent, workflowCase: Gear
 }
 
 export function buildAgentReportSections(intent: AgentIntent, workflowCase: GearboxWorkflowCase, answerText: string): AgentReportSection[] {
+  if (intent === "general_chat") {
+    return [
+      {
+        title: "对话回答",
+        body: answerText,
+      },
+      {
+        title: "可切换上下文",
+        body: "如果继续询问当前风机预警、SCADA、CMS、BIM 定位、知识图谱或工单门控，AI 会切回黔风智维业务工具链。",
+      },
+      {
+        title: "人工边界",
+        body: "涉及停机、登塔、检修、派发或关闭工单时，必须由值班人员和现场工程师人工确认。",
+      },
+    ];
+  }
+
   const brief = workflowCase.modules.brief.aiBrief;
   const maintenance = workflowCase.modules.maintenance;
   const ticket = workflowCase.modules.workorder.ticket;
@@ -483,6 +517,18 @@ export function buildAgentReportSections(intent: AgentIntent, workflowCase: Gear
 }
 
 export function buildAgentPrompt(intent: AgentIntent, question: string, workflowCase: GearboxWorkflowCase): string {
+  if (intent === "general_chat") {
+    return [
+      "你是黔风智维平台内嵌的 AI 值班助手，也可以进行普通中文对话。",
+      "请直接回答用户问题。不要把普通问题强行解释成风机故障、证据链或工单流程。",
+      "如果问题需要实时外部信息而你无法确定，请说明不能实时查询。",
+      "如果用户转而询问风电运维、预警、SCADA、CMS、BIM、知识图谱或工单，再引导其进入平台业务流程。",
+      "安全边界：停机、登塔、检修、派发、关闭工单必须人工确认。",
+      "",
+      `用户问题：${question || "你好"}`,
+    ].join("\n");
+  }
+
   const brief = workflowCase.modules.brief.aiBrief;
   const evidence = buildAgentEvidenceCards(workflowCase);
   const ticket = workflowCase.modules.workorder.ticket;
@@ -521,6 +567,8 @@ export function enforceAgentAnswerBoundaries(answerText: string, intent: AgentIn
     .replace(/正式派发/g, "人工确认后派发")
     .replace(/立即执行/g, "人工确认后执行");
 
+  if (intent === "general_chat") return guarded;
+
   if (!["maintenance_plan", "workorder"].includes(intent)) {
     guarded = guarded.replace(
       /已[^。！？]*工单草案[^。！？]*[。！？]?/g,
@@ -548,7 +596,9 @@ export async function runWindOpsAgent(
   const bimHighlights = buildAgentBimHighlights(context.workflowCase);
   const toolTrace = buildAgentToolTrace(context.workflowCase);
   const operatorFocus = buildAgentOperatorFocus(intent, context.workflowCase);
-  const riskBoundary = "AI 输出用于值班研判和工单草案；停机、检修、登塔和安全操作必须人工确认，并由现场工程师按规程执行。";
+  const riskBoundary = intent === "general_chat"
+    ? "这是普通对话回答，不形成工程处置结论；涉及停机、检修、登塔、派发或关闭工单时必须人工确认。"
+    : "AI 输出用于值班研判和工单草案；停机、检修、登塔和安全操作必须人工确认，并由现场工程师按规程执行。";
   const model = config.model?.trim() || DEFAULT_MODEL;
   let answerText = buildFallbackAgentAnswer(intent, context.workflowCase);
   let source: WindOpsAgentResponse["source"] = "fallback";
@@ -563,7 +613,7 @@ export async function runWindOpsAgent(
     try {
       const response = await fetchImpl(url, {
         body: JSON.stringify({
-          max_tokens: Math.max(256, Math.min(1200, Number(config.maxTokens || 900))),
+          max_tokens: intent === "general_chat" ? 360 : Math.max(256, Math.min(1200, Number(config.maxTokens || 900))),
           messages: [{ role: "user", content: buildAgentPrompt(intent, question, context.workflowCase) }],
           model,
           system: "你是风电运维诊断助手。只输出最终中文答复，不输出思考过程。",
@@ -596,7 +646,9 @@ export async function runWindOpsAgent(
   answerText = enforceAgentAnswerBoundaries(answerText, intent);
 
   const spokenId = context.workflowCase.turbineId.match(/(\d+)$/)?.[1];
-  const voiceText = `${spokenId ? `${Number(spokenId)}号机` : context.workflowCase.turbineId}齿轮箱一级预警。已生成证据链和工单草案，请人工确认。`;
+  const voiceText = intent === "general_chat"
+    ? "已生成对话回答。"
+    : `${spokenId ? `${Number(spokenId)}号机` : context.workflowCase.turbineId}齿轮箱一级预警。已生成证据链和工单草案，请人工确认。`;
 
   return {
     answerText,
