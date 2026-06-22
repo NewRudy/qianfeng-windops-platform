@@ -31,8 +31,46 @@ describe("analysis model run records", () => {
     expect(record.inputSummary).toContain("SCADA");
     expect(record.conclusion).toContain("运行侧异常成立");
     expect(record.evidence.join(" ")).toContain("功率残差阈值 %");
+    expect(record.chart?.scadaChart?.points.filter((point) => point.abnormal)).toHaveLength(3);
+    expect(record.diagnostics.map((item) => item.label)).toContain("越限窗口");
     expect(record.humanBoundary).toContain("确认");
     expect(record.nextAction).toContain("CMS");
+  });
+
+  it("returns recomputed chart payloads from operator thresholds", () => {
+    const scada = runAnalysisModel({
+      caseId: "hs-wtg-02-gearbox-bearing",
+      pageKey: "scada",
+      parameters: [{ label: "功率残差阈值 %", value: "30" }],
+    });
+    const cms = runAnalysisModel({
+      caseId: "hs-wtg-02-gearbox-bearing",
+      pageKey: "cms",
+      parameters: [{ label: "侧频幅值阈值 mm/s", value: "1.6" }],
+    });
+    const structure = runAnalysisModel({
+      caseId: "hs-wtg-02-gearbox-bearing",
+      pageKey: "structure",
+      parameters: [{ label: "预紧力松弛阈值 %", value: "9" }],
+    });
+
+    expect(scada.chart?.scadaChart?.points.some((point) => point.abnormal)).toBe(false);
+    expect(cms.chart?.cmsChart?.threshold.value).toBe(1.6);
+    expect(cms.chart?.cmsChart?.peaks.filter((peak) => peak.status === "warning")).toHaveLength(1);
+    expect(structure.chart?.boltChart?.warningRelaxationPct).toBe(9);
+    expect(structure.chart?.boltChart?.channels.filter((channel) => channel.status === "warning")).toHaveLength(1);
+  });
+
+  it("labels workorder refresh as a gate state machine instead of a fake prediction model", () => {
+    const record = runAnalysisModel({
+      caseId: "hs-wtg-02-gearbox-bearing",
+      pageKey: "workorders",
+      parameters: [{ label: "签核状态", value: "2/4" }],
+    });
+
+    expect(record.model).toBe("工单门控规则 + 人工签核状态机");
+    expect(record.chart).toBeUndefined();
+    expect(record.nextAction).toContain("签核");
   });
 
   it("keeps CMS and structure runs as different evidence roles", () => {

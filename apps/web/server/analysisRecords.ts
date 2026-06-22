@@ -4,7 +4,10 @@ import {
   buildGearboxWorkflowCase,
   gearboxCaseCatalog,
   gearboxWorkflowCase,
+  type BoltChart,
+  type CmsChart,
   type GearboxWorkflowCase,
+  type ScadaChart,
 } from "../src/workflow/gearboxWorkflow";
 
 export type AnalysisPageKey = "cms" | "fusion" | "health" | "maintenance" | "scada" | "structure" | "workorders";
@@ -12,6 +15,20 @@ export type AnalysisPageKey = "cms" | "fusion" | "health" | "maintenance" | "sca
 export type AnalysisParameter = {
   label: string;
   value: string;
+};
+
+export type AnalysisDiagnostic = {
+  label: string;
+  note: string;
+  status: "alarm" | "normal" | "watch";
+  unit?: string;
+  value: string;
+};
+
+export type AnalysisRunCharts = {
+  boltChart?: BoltChart;
+  cmsChart?: CmsChart;
+  scadaChart?: ScadaChart;
 };
 
 export type AnalysisRunPayload = {
@@ -29,8 +46,10 @@ export type AnalysisAdoptPayload = {
 export type AnalysisRunRecord = {
   adoptedAt?: string;
   caseId: string;
+  chart?: AnalysisRunCharts;
   conclusion: string;
   createdAt: string;
+  diagnostics: AnalysisDiagnostic[];
   evidence: string[];
   evidenceState: "adopted" | "computed";
   eventCode: string;
@@ -48,6 +67,14 @@ export type AnalysisRunRecord = {
 type AnalysisContext = {
   caseId: string;
   workflowCase: GearboxWorkflowCase;
+};
+
+type AnalysisProfile = Pick<
+  AnalysisRunRecord,
+  "conclusion" | "evidence" | "humanBoundary" | "inputSummary" | "model" | "nextAction"
+> & {
+  chart?: AnalysisRunCharts;
+  diagnostics?: AnalysisDiagnostic[];
 };
 
 type MiddlewareNext = () => void;
@@ -71,7 +98,7 @@ export function resolveAnalysisContext(caseId?: string): AnalysisContext {
 }
 
 export function getAnalysisRecords(): AnalysisRunRecord[] {
-  return records.map((record) => ({ ...record, parameters: [...record.parameters], evidence: [...record.evidence] }));
+  return records.map(cloneRecord);
 }
 
 export function resetAnalysisRecordsForTest(): void {
@@ -87,8 +114,10 @@ export function runAnalysisModel(payload: AnalysisRunPayload): AnalysisRunRecord
   const profile = buildAnalysisProfile(pageKey, context.workflowCase, parameters);
   const record: AnalysisRunRecord = {
     caseId: context.caseId,
+    chart: profile.chart,
     conclusion: profile.conclusion,
     createdAt: now,
+    diagnostics: profile.diagnostics ?? [],
     evidence: profile.evidence,
     evidenceState: "computed",
     eventCode: context.workflowCase.eventCode,
@@ -163,7 +192,7 @@ function buildAnalysisProfile(
   pageKey: AnalysisPageKey,
   workflowCase: GearboxWorkflowCase,
   parameters: AnalysisParameter[],
-): Pick<AnalysisRunRecord, "conclusion" | "evidence" | "humanBoundary" | "inputSummary" | "model" | "nextAction"> {
+): AnalysisProfile {
   const parameterText = formatParameterText(parameters);
   const module = pageKey === "structure" ? workflowCase.modules.bolts : workflowCase.modules[pageKey === "workorders" ? "workorder" : pageKey];
 
@@ -189,11 +218,29 @@ function buildAnalysisProfile(
   }
 
   if (pageKey === "scada") {
-    const chart = workflowCase.modules.scada.scadaChart;
+    const threshold = getNumericParameter(parameters, "功率残差阈值", 8);
+    const chart = buildScadaRunChart(workflowCase, parameters);
     const abnormalCount = chart?.points.filter((point) => point.abnormal).length ?? 0;
     const maxResidual = Math.max(...(chart?.points.map((point) => Math.abs(point.residualPct)) ?? [0]));
     return {
+      chart: chart ? { scadaChart: chart } : undefined,
       conclusion: `运行侧异常成立：${abnormalCount}/${chart?.points.length ?? 0} 个采样窗越限，最大功率残差 ${maxResidual.toFixed(1)}%，需转入 CMS 部件证据复核。`,
+      diagnostics: [
+        {
+          label: "越限窗口",
+          note: `按本次阈值 ${threshold}% 重新标记异常采样窗。`,
+          status: abnormalCount > 0 ? "alarm" : "normal",
+          unit: "个",
+          value: String(abnormalCount),
+        },
+        {
+          label: "最大残差",
+          note: "相同风速段实测功率与基线功率差异。",
+          status: maxResidual >= threshold ? "alarm" : "normal",
+          unit: "%",
+          value: maxResidual.toFixed(1),
+        },
+      ],
       evidence: [
         workflowCase.modules.scada.decision?.evidence ?? "SCADA 残差证据未就绪。",
         `本次参数：${parameterText}`,
@@ -206,10 +253,29 @@ function buildAnalysisProfile(
   }
 
   if (pageKey === "cms") {
-    const chart = workflowCase.modules.cms.cmsChart;
+    const threshold = getNumericParameter(parameters, "侧频", 1.2);
+    const chart = buildCmsRunChart(workflowCase, parameters);
     const warningPeak = chart?.peaks.find((peak) => peak.status === "warning");
+    const warningCount = chart?.peaks.filter((peak) => peak.status === "warning").length ?? 0;
     return {
+      chart: chart ? { cmsChart: chart } : undefined,
       conclusion: workflowCase.modules.cms.decision?.result ?? "CMS 复核完成。",
+      diagnostics: [
+        {
+          label: "侧频峰值",
+          note: `按 ${threshold} mm/s 阈值重新识别预警峰。`,
+          status: warningCount > 0 ? "alarm" : "normal",
+          unit: "个",
+          value: String(warningCount),
+        },
+        {
+          label: "最高幅值",
+          note: "用于判断齿轮箱高速轴轴承是否进入专项复核。",
+          status: warningPeak ? "alarm" : "normal",
+          unit: "mm/s",
+          value: Math.max(...(chart?.peaks.map((peak) => peak.amplitude) ?? [0])).toFixed(2),
+        },
+      ],
       evidence: [
         workflowCase.modules.cms.decision?.evidence ?? "CMS 侧频证据未就绪。",
         warningPeak ? `预警峰值：${warningPeak.label} / ${warningPeak.frequencyHz} Hz / ${warningPeak.amplitude} mm/s。` : "未发现预警峰值。",
@@ -223,10 +289,28 @@ function buildAnalysisProfile(
   }
 
   if (pageKey === "structure") {
-    const chart = workflowCase.modules.bolts.boltChart;
+    const threshold = getNumericParameter(parameters, "预紧力松弛阈值", 8);
+    const chart = buildBoltRunChart(workflowCase, parameters);
     const warningChannels = chart?.channels.filter((channel) => channel.status === "warning") ?? [];
     return {
+      chart: chart ? { boltChart: chart } : undefined,
       conclusion: workflowCase.modules.bolts.decision?.result ?? "结构侧反证完成。",
+      diagnostics: [
+        {
+          label: "预警通道",
+          note: `按本次松弛阈值 ${threshold}% 重算叶根螺栓状态。`,
+          status: warningChannels.length > 0 ? "alarm" : "normal",
+          unit: "路",
+          value: String(warningChannels.length),
+        },
+        {
+          label: "最大松弛",
+          note: "结构侧作为反证项，避免误判主疑似部件。",
+          status: warningChannels.length > 0 ? "alarm" : "watch",
+          unit: "%",
+          value: Math.max(...(chart?.channels.map((channel) => channel.relaxationPct) ?? [0])).toFixed(1),
+        },
+      ],
       evidence: [
         workflowCase.modules.bolts.decision?.evidence ?? "螺栓与结构证据未就绪。",
         `关注通道：${warningChannels.map((item) => `${item.id} ${item.relaxationPct.toFixed(1)}%`).join("、") || "无"}`,
@@ -273,7 +357,7 @@ function buildAnalysisProfile(
     evidence: [module.decision?.evidence ?? "工单证据未就绪。", `本次参数：${parameterText}`],
     humanBoundary: module.decision?.confirm ?? "人工确认后才允许派发和关闭。",
     inputSummary: module.decision?.input ?? "AI 诊断结论、维护策略、安全许可和资源",
-    model: module.decision?.model ?? "工单模板 + 人工确认门",
+    model: "工单门控规则 + 人工签核状态机",
     nextAction: "完成低风速窗口、安全许可、备件和复盘回写责任签核。",
   };
 }
@@ -287,9 +371,94 @@ function normalizeAnalysisPageKey(pageKey: AnalysisPageKey): AnalysisPageKey {
 function cloneRecord(record: AnalysisRunRecord): AnalysisRunRecord {
   return {
     ...record,
+    chart: cloneAnalysisCharts(record.chart),
+    diagnostics: record.diagnostics.map((item) => ({ ...item })),
     evidence: [...record.evidence],
-    parameters: [...record.parameters],
+    parameters: record.parameters.map((item) => ({ ...item })),
   };
+}
+
+function cloneAnalysisCharts(charts?: AnalysisRunCharts): AnalysisRunCharts | undefined {
+  if (!charts) return undefined;
+  return {
+    boltChart: charts.boltChart
+      ? {
+          ...charts.boltChart,
+          channels: charts.boltChart.channels.map((channel) => ({ ...channel })),
+        }
+      : undefined,
+    cmsChart: charts.cmsChart
+      ? {
+          ...charts.cmsChart,
+          peaks: charts.cmsChart.peaks.map((peak) => ({ ...peak })),
+          threshold: { ...charts.cmsChart.threshold },
+        }
+      : undefined,
+    scadaChart: charts.scadaChart
+      ? {
+          ...charts.scadaChart,
+          points: charts.scadaChart.points.map((point) => ({ ...point })),
+          xAxis: { ...charts.scadaChart.xAxis, ticks: [...charts.scadaChart.xAxis.ticks] },
+          yAxis: { ...charts.scadaChart.yAxis, ticks: [...charts.scadaChart.yAxis.ticks] },
+        }
+      : undefined,
+  };
+}
+
+function buildScadaRunChart(workflowCase: GearboxWorkflowCase, parameters: AnalysisParameter[]): ScadaChart | undefined {
+  const chart = workflowCase.modules.scada.scadaChart;
+  if (!chart) return undefined;
+  const threshold = getNumericParameter(parameters, "功率残差阈值", 8);
+  return {
+    ...chart,
+    points: chart.points.map((point) => ({
+      ...point,
+      abnormal: Math.abs(point.residualPct) >= threshold,
+    })),
+  };
+}
+
+function buildCmsRunChart(workflowCase: GearboxWorkflowCase, parameters: AnalysisParameter[]): CmsChart | undefined {
+  const chart = workflowCase.modules.cms.cmsChart;
+  if (!chart) return undefined;
+  const threshold = getNumericParameter(parameters, "侧频", chart.threshold.value);
+  return {
+    ...chart,
+    peaks: chart.peaks.map((peak) => ({
+      ...peak,
+      status: peak.amplitude >= threshold ? "warning" : "normal",
+    })),
+    threshold: {
+      ...chart.threshold,
+      value: threshold,
+    },
+  };
+}
+
+function buildBoltRunChart(workflowCase: GearboxWorkflowCase, parameters: AnalysisParameter[]): BoltChart | undefined {
+  const chart = workflowCase.modules.bolts.boltChart;
+  if (!chart) return undefined;
+  const threshold = getNumericParameter(parameters, "预紧力松弛阈值", chart.warningRelaxationPct);
+  const watchThreshold = Math.max(threshold * 0.6, 4);
+  return {
+    ...chart,
+    channels: chart.channels.map((channel) => ({
+      ...channel,
+      status:
+        channel.relaxationPct >= threshold
+          ? "warning"
+          : channel.relaxationPct >= watchThreshold
+            ? "watch"
+            : "normal",
+    })),
+    warningRelaxationPct: threshold,
+  };
+}
+
+function getNumericParameter(parameters: AnalysisParameter[], labelKeyword: string, fallback: number): number {
+  const candidate = parameters.find((item) => item.label.includes(labelKeyword))?.value;
+  const parsed = Number.parseFloat(candidate ?? "");
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function formatParameterText(parameters: AnalysisParameter[]): string {

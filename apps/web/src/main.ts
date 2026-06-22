@@ -108,7 +108,19 @@ type ManagementPage = {
 
 type AnalysisRunRecord = {
   adoptedAt?: string;
+  chart?: {
+    boltChart?: BoltChart;
+    cmsChart?: CmsChart;
+    scadaChart?: ScadaChart;
+  };
   conclusion: string;
+  diagnostics?: Array<{
+    label: string;
+    note: string;
+    status: "alarm" | "normal" | "watch";
+    unit?: string;
+    value: string;
+  }>;
   evidenceState: "adopted" | "computed";
   humanBoundary: string;
   id: string;
@@ -591,7 +603,7 @@ function renderCmsManagementPage(): string {
     ])}
     ${renderParameterPanel("cms", [
       { label: "频谱类型", value: "包络谱", type: "select", options: ["包络谱", "阶次谱", "原始频谱"] },
-      { label: "侧频阈值倍数", value: "1.2", type: "number" },
+      { label: "侧频幅值阈值 mm/s", value: "1.2", type: "number" },
       { label: "转速工况过滤", value: "额定转速附近", type: "select", options: ["额定转速附近", "全工况", "剔除启停段"] },
     ])}
     ${renderCmsChart(module.cmsChart)}
@@ -860,7 +872,7 @@ function renderScadaChart(chart?: ScadaChart): string {
     <figure class="engineering-chart scada-diagnostic">
       <figcaption>
         <strong>${html(chart.title)}</strong>
-        <span>${html(chart.sampleWindow)} · 诊断回放</span>
+        <span>${html(chart.sampleWindow)} · 当前模型运行结果</span>
       </figcaption>
       <svg viewBox="0 0 304 184" role="img" aria-label="${html(chart.title)}">
         ${renderSvgTicks(chart.yAxis, "y", plot)}
@@ -904,7 +916,7 @@ function renderCmsChart(chart?: CmsChart): string {
     <figure class="engineering-chart cms-spectrum">
       <figcaption>
         <strong>${html(chart.title)}</strong>
-        <span>${html(chart.sampleWindow)} · 频谱回放</span>
+        <span>${html(chart.sampleWindow)} · 当前阈值结果</span>
       </figcaption>
       <svg viewBox="0 0 304 184" role="img" aria-label="${html(chart.title)}">
         ${renderSvgTicks(chart.yAxis, "y", plot)}
@@ -946,7 +958,7 @@ function renderBoltChart(chart?: BoltChart): string {
     <figure class="engineering-chart bolt-map">
       <figcaption>
         <strong>${html(chart.title)}</strong>
-        <span>标称预紧力 ${html(chart.nominalPreloadKn)} kN / 松弛预警 ${html(chart.warningRelaxationPct)}% · 巡检回放</span>
+        <span>标称预紧力 ${html(chart.nominalPreloadKn)} kN / 松弛预警 ${html(chart.warningRelaxationPct)}%</span>
       </figcaption>
       <svg viewBox="0 0 304 164" role="img" aria-label="${html(chart.title)}">
         <circle class="bolt-ring" cx="${center.x}" cy="${center.y}" r="${radius}"></circle>
@@ -1485,14 +1497,14 @@ function getMetricValue(moduleName: WorkflowModuleKey, label: string, fallback: 
   return activeWorkflowCase.modules[moduleName].metrics?.find((metric) => metric.label === label)?.value ?? fallback;
 }
 
-function renderBimDiagnosticPanel(): string {
+function renderBimSideStatusCard(): string {
   const { module, nextPage, risk } = getBimPanelContext();
   const finding = activeWorkflowCase.modules.brief.aiBrief?.primaryFinding ?? activeWorkflowCase.component;
   const scadaResidual = getMetricValue("scada", "功率残差", "待复核");
   const cmsSideband = getMetricValue("cms", "啮合侧频", "待复核");
   const boltCounter = getMetricValue("bolts", "最低通道", "结构反证");
   return `
-    <aside class="bim-diagnostic-panel" aria-label="BIM 诊断摘要">
+    <section class="bim-side-status-card" aria-label="当前 BIM 定位状态">
       <header>
         <span>当前定位</span>
         <strong data-bim-panel-title>${html(risk?.title ?? finding)}</strong>
@@ -1517,10 +1529,10 @@ function renderBimDiagnosticPanel(): string {
       </div>
       <p data-bim-panel-summary>${html(finding)}；先在 BIM 中确认部件位置，再进入管理工作台查看可复算证据。</p>
       <footer>
-        <button type="button" data-bim-panel-page="${html(nextPage)}">打开证据页</button>
-        <button type="button" data-bim-panel-module="workorder">工单确认门</button>
+        <button type="button" data-manager-page-button="${html(nextPage)}" data-bim-side-page>打开证据页</button>
+        <button type="button" data-open-module="workorder">工单确认门</button>
       </footer>
-    </aside>
+    </section>
   `;
 }
 
@@ -1828,7 +1840,6 @@ root.innerHTML = `
             <button id="bim-toggle-decompose" type="button" data-state="composed">拆解模型</button>
             <button id="bim-warning" type="button">告警闪烁</button>
           </div>
-          ${renderBimDiagnosticPanel()}
           <button class="part-label label-blade" type="button" data-bim-part="blade">叶片/变桨</button>
           <button class="part-label label-gearbox" type="button" data-bim-part="gearbox">齿轮箱</button>
           <button class="part-label label-generator" type="button" data-bim-part="nacelle">发电机</button>
@@ -1860,7 +1871,6 @@ const bimStatus = document.querySelector<HTMLElement>("#bim-status");
 const componentStrip = document.querySelector<HTMLElement>(".component-strip");
 const moduleDrawer = document.querySelector<HTMLElement>(".module-drawer");
 const caseSelector = document.querySelector<HTMLSelectElement>("#case-selector");
-const bimDiagnosticPanel = document.querySelector<HTMLElement>(".bim-diagnostic-panel");
 const aiDutyTitle = document.querySelector<HTMLElement>("#ai-duty-title");
 const aiDutyText = document.querySelector<HTMLElement>("#ai-duty-text");
 const aiDutyStatus = document.querySelector<HTMLElement>("#ai-duty-status");
@@ -1901,11 +1911,12 @@ function setActiveComponent(componentName: string): void {
   document.querySelectorAll<HTMLButtonElement>(".component").forEach((item) => {
     item.classList.toggle("active", item.dataset.component === componentName);
   });
-  updateBimDiagnosticPanel(componentName);
+  updateBimSideStatusCard(componentName);
 }
 
-function updateBimDiagnosticPanel(componentName = "gearbox"): void {
-  if (!bimDiagnosticPanel) return;
+function updateBimSideStatusCard(componentName = "gearbox"): void {
+  const sideStatusCard = workflowModuleDrawer.querySelector<HTMLElement>(".bim-side-status-card");
+  if (!sideStatusCard) return;
   const { module, nextPage, risk } = getBimPanelContext(componentName);
   const summaryByModule: Record<WorkflowModuleKey, string> = {
     alerts: "BIM 已定位主疑似部件，进入告警中心确认等级、反证项和人工边界。",
@@ -1919,14 +1930,14 @@ function updateBimDiagnosticPanel(componentName = "gearbox"): void {
     scada: "SCADA 用于判断同风速段功率和油温是否偏离基线。",
     workorder: "工单中心只生成草案，派发和关闭必须人工确认。",
   };
-  const title = bimDiagnosticPanel.querySelector<HTMLElement>("[data-bim-panel-title]");
-  const status = bimDiagnosticPanel.querySelector<HTMLElement>("[data-bim-panel-status]");
-  const summary = bimDiagnosticPanel.querySelector<HTMLElement>("[data-bim-panel-summary]");
+  const title = sideStatusCard.querySelector<HTMLElement>("[data-bim-panel-title]");
+  const status = sideStatusCard.querySelector<HTMLElement>("[data-bim-panel-status]");
+  const summary = sideStatusCard.querySelector<HTMLElement>("[data-bim-panel-summary]");
   if (title) title.textContent = risk.title;
   if (status) status.textContent = `${risk.status} / ${moduleText(module)}`;
   if (summary) summary.textContent = summaryByModule[module];
-  const pageButton = bimDiagnosticPanel.querySelector<HTMLButtonElement>("[data-bim-panel-page]");
-  if (pageButton) pageButton.dataset.bimPanelPage = nextPage;
+  const pageButton = sideStatusCard.querySelector<HTMLButtonElement>("[data-bim-side-page]");
+  if (pageButton) pageButton.dataset.managerPageButton = nextPage;
 }
 
 function setEventTimelineStage(stage: EventTimelineStage): void {
@@ -2081,6 +2092,7 @@ function renderWorkflowSurfaces(): void {
   workflowComponentStrip.innerHTML = activeWorkflowCase.componentRisks.map(renderComponentButton).join("");
   workflowModuleDrawer.innerHTML = [
     renderWorkflowCommandCard(),
+    renderBimSideStatusCard(),
     renderManagementConsole(),
     `<details class="linked-evidence-drawer">
       <summary>展开当前页面的关联证据抽屉</summary>
@@ -3601,6 +3613,19 @@ function getAnalysisParameters(pageKey: AnalysisActionPageKey): AnalysisParamete
 
 function renderAnalysisRecord(record: AnalysisRunRecord): string {
   const stateLabel = record.status === "adopted" ? "已采纳为当前事件证据" : "模型复算完成";
+  const diagnostics = record.diagnostics?.length
+    ? `
+      <section class="analysis-diagnostics" aria-label="本次计算指标">
+        ${record.diagnostics.map((item) => `
+          <article data-status="${html(item.status)}">
+            <span>${html(item.label)}</span>
+            <strong>${html(item.value)}${item.unit ? ` ${html(item.unit)}` : ""}</strong>
+            <small>${html(item.note)}</small>
+          </article>
+        `).join("")}
+      </section>
+    `
+    : "";
   return `
     <header>
       <span>${html(stateLabel)}</span>
@@ -3613,7 +3638,23 @@ function renderAnalysisRecord(record: AnalysisRunRecord): string {
       <div><dt>下一步</dt><dd>${html(record.nextAction)}</dd></div>
       <div><dt>人工边界</dt><dd>${html(record.humanBoundary)}</dd></div>
     </dl>
+    ${diagnostics}
   `;
+}
+
+function renderChartFromAnalysisRecord(pageKey: AnalysisActionPageKey, record: AnalysisRunRecord): string {
+  if (pageKey === "scada" && record.chart?.scadaChart) return renderScadaChart(record.chart.scadaChart);
+  if (pageKey === "cms" && record.chart?.cmsChart) return renderCmsChart(record.chart.cmsChart);
+  if (pageKey === "structure" && record.chart?.boltChart) return renderBoltChart(record.chart.boltChart);
+  return "";
+}
+
+function updateManagementChartFromRecord(pageKey: AnalysisActionPageKey, record: AnalysisRunRecord): void {
+  const chartHtml = renderChartFromAnalysisRecord(pageKey, record);
+  if (!chartHtml) return;
+  const page = workflowModuleDrawer.querySelector<HTMLElement>(`[data-management-page="${pageKey}"]`);
+  const currentChart = page?.querySelector<HTMLElement>(".engineering-chart");
+  if (currentChart) currentChart.outerHTML = chartHtml;
 }
 
 function buildAnalysisRunSummary(pageKey: ManagementPageKey): string {
@@ -3705,6 +3746,7 @@ async function runManagementAnalysis(pageKey: ManagementPageKey): Promise<void> 
     const record = await requestAnalysisRun(pageKey);
     result.innerHTML = renderAnalysisRecord(record);
     result.dataset.runId = record.id;
+    updateManagementChartFromRecord(pageKey, record);
   } catch {
     result.textContent = `${buildAnalysisRunSummary(pageKey)} 后端记录暂不可用，当前仅为本地兜底结果。`;
   }
@@ -3725,6 +3767,7 @@ async function adoptManagementEvidence(pageKey: ManagementPageKey): Promise<void
     const record = await requestEvidenceAdoption(pageKey, result.dataset.runId);
     result.innerHTML = renderAnalysisRecord(record);
     result.dataset.runId = record.id;
+    updateManagementChartFromRecord(pageKey, record);
   } catch {
     result.textContent = `${buildAnalysisRunSummary(pageKey)} 后端采纳暂不可用，当前仅为本地兜底记录。`;
   }
@@ -3919,26 +3962,6 @@ document.querySelectorAll<HTMLButtonElement>(".part-label[data-bim-part]").forEa
       void getBimViewer().focusPart(part);
     }
   });
-});
-
-document.querySelector<HTMLButtonElement>("[data-bim-panel-page]")?.addEventListener("click", (event) => {
-  const button = event.currentTarget;
-  if (!(button instanceof HTMLButtonElement)) return;
-  const pageKey = button.dataset.bimPanelPage;
-  if (!isManagementPageKey(pageKey)) return;
-  const page = managementPageByKey.get(pageKey);
-  openManagementPage(pageKey, `已打开${page?.label ?? "管理端页面"}，请按输入-模型-结论-证据复核`);
-});
-
-document.querySelector<HTMLButtonElement>("[data-bim-panel-module]")?.addEventListener("click", (event) => {
-  const button = event.currentTarget;
-  if (!(button instanceof HTMLButtonElement)) return;
-  const moduleName = getWorkflowModule(button.dataset.bimPanelModule, "workorder");
-  if (!moduleName) return;
-  openWorkflowModule(moduleName, "已进入工单确认门，派发前需要人工确认");
-  openManagementWorkspace();
-  setActiveManagementPage(getManagementPageForModule(moduleName));
-  setEventTimelineStage("workorder-draft");
 });
 
 document.querySelectorAll<HTMLButtonElement>(".module-tab").forEach((button) => {
