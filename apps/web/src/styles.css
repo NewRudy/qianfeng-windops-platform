@@ -996,6 +996,41 @@ button {
   color: #fff4dd;
 }
 
+.ai-progress-details,
+.ai-reasoning-details {
+  padding: 9px 10px;
+  border: 1px solid rgba(91, 224, 246, 0.14);
+  background: rgba(1, 14, 22, 0.46);
+}
+
+.ai-progress-details > summary,
+.ai-reasoning-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: rgba(91, 224, 246, 0.84);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.ai-progress-details > summary strong,
+.ai-reasoning-details > summary strong {
+  color: rgba(240, 252, 255, 0.88);
+  font-size: 12px;
+  text-align: right;
+}
+
+.ai-progress-details .event-timeline,
+.ai-reasoning-details .ai-decision-chain {
+  margin-top: 9px;
+}
+
+.ai-progress-details .event-timeline {
+  margin-bottom: 0;
+}
+
 .ai-decision-chain {
   display: grid;
   gap: 9px;

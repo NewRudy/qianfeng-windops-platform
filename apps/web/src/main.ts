@@ -582,7 +582,6 @@ function renderAiBrief(module: WorkflowModule): string {
   const dutyFocus = brief.operatorFocus;
 
   return `
-    ${renderEventTimeline(activeWorkflowCase.eventTimeline)}
     <section class="ai-duty-assistant ${html(brief.riskLevel)}">
       <header>
         <div>
@@ -621,26 +620,39 @@ function renderAiBrief(module: WorkflowModule): string {
         <button class="primary" type="button" data-open-module="${html(primaryAction.module)}">${html(primaryAction.label)}</button>
         <button type="button" data-ai-generate-report>让 AI 解释这次预警</button>
       </div>
-      <ol class="ai-decision-chain" aria-label="AI 决策链">
-        ${brief.decisionSteps.map((step, index) => `
-          <li>
-            <span>${String(index + 1).padStart(2, "0")}</span>
-            <div>
-              <strong>${html(step.title)}</strong>
-              <dl>
-                <div><dt>输入</dt><dd>${html(step.input)}</dd></div>
-                <div><dt>模型</dt><dd>${html(step.model)}</dd></div>
-                <div><dt>结果</dt><dd>${html(step.result)}</dd></div>
-              </dl>
-              <details>
-                <summary>查看工程细节</summary>
-                <p>${html(step.detail)}</p>
-                <button type="button" data-open-module="${html(step.module)}">打开${html(moduleText(step.module))}</button>
-              </details>
-            </div>
-          </li>
-        `).join("")}
-      </ol>
+      <details class="ai-progress-details">
+        <summary>
+          <span>闭环进度</span>
+          <strong>查看 AI 预警到复盘回写</strong>
+        </summary>
+        ${renderEventTimeline(activeWorkflowCase.eventTimeline)}
+      </details>
+      <details class="ai-reasoning-details">
+        <summary>
+          <span>AI 推理链</span>
+          <strong>展开输入 / 模型 / 结果</strong>
+        </summary>
+        <ol class="ai-decision-chain" aria-label="AI 决策链">
+          ${brief.decisionSteps.map((step, index) => `
+            <li>
+              <span>${String(index + 1).padStart(2, "0")}</span>
+              <div>
+                <strong>${html(step.title)}</strong>
+                <dl>
+                  <div><dt>输入</dt><dd>${html(step.input)}</dd></div>
+                  <div><dt>模型</dt><dd>${html(step.model)}</dd></div>
+                  <div><dt>结果</dt><dd>${html(step.result)}</dd></div>
+                </dl>
+                <details>
+                  <summary>查看工程细节</summary>
+                  <p>${html(step.detail)}</p>
+                  <button type="button" data-open-module="${html(step.module)}">打开${html(moduleText(step.module))}</button>
+                </details>
+              </div>
+            </li>
+          `).join("")}
+        </ol>
+      </details>
       <details class="ai-evidence-details">
         <summary>展开本次证据明细</summary>
         <ol>
