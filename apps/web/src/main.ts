@@ -60,6 +60,94 @@ type SpeechRecognitionLike = {
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 
+type WorkflowStageKey = "ai" | "evidence" | "locate" | "close";
+
+type WorkflowStage = {
+  description: string;
+  key: WorkflowStageKey;
+  modules: WorkflowModuleKey[];
+  nextAction: string;
+  primaryModule: WorkflowModuleKey;
+  title: string;
+};
+
+const workflowStages: WorkflowStage[] = [
+  {
+    description: "先让 AI 给出当前判断、知识链和人工边界。",
+    key: "ai",
+    modules: ["brief", "health"],
+    nextAction: "运行融合判据",
+    primaryModule: "brief",
+    title: "AI研判",
+  },
+  {
+    description: "一次只复核一个数据源，避免曲线和文字同时铺满。",
+    key: "evidence",
+    modules: ["scada", "cms", "bolts", "fusion"],
+    nextAction: "查看关键证据",
+    primaryModule: "fusion",
+    title: "证据复核",
+  },
+  {
+    description: "把疑似故障落到风机部件，再决定是否进入处置。",
+    key: "locate",
+    modules: ["alerts", "inspection"],
+    nextAction: "定位齿轮箱",
+    primaryModule: "alerts",
+    title: "BIM定位",
+  },
+  {
+    description: "只处理维护策略、工单草案、签核和现场回写。",
+    key: "close",
+    modules: ["maintenance", "workorder"],
+    nextAction: "进入处置闭环",
+    primaryModule: "maintenance",
+    title: "处置闭环",
+  },
+];
+
+function getWorkflowStageForModule(moduleName: string | undefined): WorkflowStage {
+  return workflowStages.find((stage) => stage.modules.includes(moduleName as WorkflowModuleKey)) ?? workflowStages[0];
+}
+
+function renderWorkflowCommandCard(): string {
+  const brief = activeWorkflowCase.modules.brief.aiBrief;
+  const stage = getWorkflowStageForModule("brief");
+
+  return `
+    <section class="workflow-command-card" aria-label="当前值班任务" data-workflow-command-card>
+      <header>
+        <span>当前事件</span>
+        <strong data-command-title>${html(activeWorkflowCase.turbineId)} · ${html(brief?.primaryFinding ?? activeWorkflowCase.component)}</strong>
+      </header>
+      <div>
+        <article>
+          <span>当前阶段</span>
+          <strong data-command-stage>${html(stage.title)}</strong>
+        </article>
+        <article>
+          <span>只看这一件事</span>
+          <p data-command-description>${html(stage.description)}</p>
+        </article>
+        <article>
+          <span>下一步</span>
+          <p data-command-next>${html(stage.nextAction)}</p>
+        </article>
+      </div>
+    </section>
+  `;
+}
+
+function renderWorkflowStageTabs(): string {
+  return workflowStages.map((stage, index) => `
+    <button class="workflow-stage-tab module-tab" type="button" data-stage="${html(stage.key)}" data-module="${html(stage.primaryModule)}">
+      <span>${String(index + 1).padStart(2, "0")} ${html(stage.title)}</span>
+      <strong>${html(stage.nextAction)}</strong>
+      <small>${html(stage.description)}</small>
+    </button>
+  `).join("");
+}
+
 function html(value: string | number): string {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -1034,20 +1122,12 @@ root.innerHTML = `
         </aside>
 
         <aside class="module-drawer" aria-label="业务模块">
+          ${renderWorkflowCommandCard()}
           ${activeWorkflowCase.moduleOrder.map((moduleKey) => renderModulePanel(moduleKey, activeWorkflowCase.modules[moduleKey], activeWorkflowCase)).join("")}
         </aside>
 
         <nav class="bim-toolbar" aria-label="业务流程">
-          <button class="module-tab" type="button" data-module="brief">AI诊断包</button>
-          <button class="module-tab" type="button" data-module="health">健康评分</button>
-          <button class="module-tab" type="button" data-module="fusion">融合判据</button>
-          <button class="module-tab" type="button" data-module="scada">SCADA</button>
-          <button class="module-tab" type="button" data-module="cms">CMS</button>
-          <button class="module-tab" type="button" data-module="bolts">螺栓监测</button>
-          <button class="module-tab" type="button" data-module="alerts">告警中心</button>
-          <button class="module-tab" type="button" data-module="inspection">隐患排查</button>
-          <button class="module-tab" type="button" data-module="maintenance">预测维护</button>
-          <button class="module-tab" type="button" data-module="workorder">运维工单</button>
+          ${renderWorkflowStageTabs()}
         </nav>
       </section>
     </section>
@@ -1163,10 +1243,39 @@ function getBimViewer(): BimTurbineViewer {
 
 function setActiveModule(moduleName: string): void {
   dashboardShell.dataset.activeModule = moduleName;
+  const stage = getWorkflowStageForModule(moduleName);
+  dashboardShell.dataset.activeStage = moduleName === "none" ? "none" : stage.key;
 
   document.querySelectorAll<HTMLButtonElement>(".module-tab").forEach((tab) => {
-    tab.classList.toggle("active", tab.dataset.module === moduleName);
+    const tabStage = tab.dataset.stage;
+    const tabModule = tab.dataset.module;
+    const active = tabStage ? tabStage === dashboardShell.dataset.activeStage : tabModule === moduleName;
+    tab.classList.toggle("active", active);
   });
+
+  updateWorkflowCommandCard(moduleName);
+}
+
+function updateWorkflowCommandCard(moduleName: string): void {
+  const card = workflowModuleDrawer.querySelector<HTMLElement>("[data-workflow-command-card]");
+  if (!card) return;
+
+  const stage = getWorkflowStageForModule(moduleName);
+  const module = getWorkflowModule(moduleName);
+  const activeModuleTitle = module ? activeWorkflowCase.modules[module]?.title : "";
+  const title = card.querySelector<HTMLElement>("[data-command-title]");
+  const stageLabel = card.querySelector<HTMLElement>("[data-command-stage]");
+  const description = card.querySelector<HTMLElement>("[data-command-description]");
+  const next = card.querySelector<HTMLElement>("[data-command-next]");
+
+  if (title) {
+    title.textContent = `${activeWorkflowCase.turbineId} · ${activeWorkflowCase.modules.brief.aiBrief?.primaryFinding ?? activeWorkflowCase.component}`;
+  }
+  if (stageLabel) {
+    stageLabel.textContent = activeModuleTitle ? `${stage.title} / ${activeModuleTitle}` : stage.title;
+  }
+  if (description) description.textContent = stage.description;
+  if (next) next.textContent = stage.nextAction;
 }
 
 function setSelectedTurbineTitle(turbineId: string): void {
@@ -1194,10 +1303,12 @@ function triggerIntroAiAlert(turbine: TurbineAsset): void {
 
 function renderWorkflowSurfaces(): void {
   workflowComponentStrip.innerHTML = activeWorkflowCase.componentRisks.map(renderComponentButton).join("");
-  workflowModuleDrawer.innerHTML = activeWorkflowCase.moduleOrder
-    .map((moduleKey) => renderModulePanel(moduleKey, activeWorkflowCase.modules[moduleKey], activeWorkflowCase))
-    .join("");
+  workflowModuleDrawer.innerHTML = [
+    renderWorkflowCommandCard(),
+    ...activeWorkflowCase.moduleOrder.map((moduleKey) => renderModulePanel(moduleKey, activeWorkflowCase.modules[moduleKey], activeWorkflowCase)),
+  ].join("");
   bindWorkflowSurfaceEvents();
+  updateWorkflowCommandCard(dashboardShell.dataset.activeModule ?? "brief");
   void refreshAgentStatus();
 }
 

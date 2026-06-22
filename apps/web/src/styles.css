@@ -432,13 +432,13 @@ button {
 
 .bim-stage {
   position: absolute;
-  inset: 74px 20px 72px;
+  inset: 74px 20px 104px;
   min-width: 0;
   transition: inset 220ms ease;
 }
 
 .shell[data-mode="bim"]:not([data-active-module="none"]) .bim-stage {
-  inset: 80px 512px 84px 24px;
+  inset: 80px 512px 112px 24px;
 }
 
 .blueprint-grid {
@@ -716,9 +716,7 @@ button {
     transform 180ms ease;
 }
 
-.shell[data-active-module="alerts"] .component-strip,
-.shell[data-active-module="maintenance"] .component-strip,
-.shell[data-active-module="workorder"] .component-strip {
+.shell[data-active-stage="locate"] .component-strip {
   opacity: 1;
   pointer-events: auto;
   transform: translateX(0);
@@ -757,10 +755,65 @@ button {
   width: min(470px, calc(100vw - 42px));
 }
 
+.workflow-command-card {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 12px;
+  border: 1px solid rgba(91, 224, 246, 0.18);
+  background:
+    linear-gradient(135deg, rgba(13, 58, 75, 0.66), rgba(2, 13, 22, 0.78)),
+    radial-gradient(circle at 100% 0, rgba(246, 197, 104, 0.12), transparent 32%);
+  box-shadow:
+    inset 0 0 20px rgba(91, 224, 246, 0.06),
+    0 18px 44px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(14px);
+}
+
+.workflow-command-card header {
+  display: grid;
+  gap: 4px;
+}
+
+.workflow-command-card span {
+  color: rgba(91, 224, 246, 0.76);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.workflow-command-card header strong {
+  color: #ffffff;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.workflow-command-card > div {
+  display: grid;
+  grid-template-columns: 0.82fr 1fr 0.88fr;
+  gap: 7px;
+}
+
+.workflow-command-card article {
+  display: grid;
+  align-content: start;
+  min-height: 66px;
+  padding: 8px;
+  border: 1px solid rgba(91, 224, 246, 0.1);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.workflow-command-card article strong,
+.workflow-command-card article p {
+  margin: 0;
+  color: rgba(237, 252, 255, 0.9);
+  font-size: 12px;
+  line-height: 1.42;
+}
+
 .module-panel {
   display: none;
-  min-height: 450px;
-  max-height: calc(100vh - 172px);
+  min-height: 390px;
+  max-height: calc(100vh - 268px);
   padding: 20px;
   overflow: auto;
   box-shadow:
@@ -3734,26 +3787,62 @@ button {
 .bim-toolbar {
   position: absolute;
   right: 16px;
-  bottom: 16px;
+  bottom: 14px;
   left: 16px;
   z-index: 4;
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  overflow-x: auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .module-tab {
-  min-width: 92px;
-  height: 36px;
-  padding: 0 12px;
+  min-width: 0;
+  min-height: 66px;
+  padding: 9px 12px;
   color: rgba(235, 250, 253, 0.76);
   font-weight: 900;
+  text-align: left;
+}
+
+.workflow-stage-tab {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  background:
+    linear-gradient(135deg, rgba(5, 31, 44, 0.86), rgba(1, 13, 21, 0.9)),
+    radial-gradient(circle at 100% 0, rgba(91, 224, 246, 0.1), transparent 38%);
+}
+
+.workflow-stage-tab span {
+  color: rgba(91, 224, 246, 0.78);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.workflow-stage-tab strong {
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.28;
+}
+
+.workflow-stage-tab small {
+  color: rgba(214, 241, 246, 0.62);
+  font-size: 11px;
+  line-height: 1.34;
 }
 
 .module-tab.active {
   border-color: rgba(91, 224, 246, 0.8);
-  background: #5be0f6;
+  background:
+    linear-gradient(135deg, rgba(91, 224, 246, 0.96), rgba(19, 119, 145, 0.92)),
+    rgba(91, 224, 246, 0.88);
+  color: #041116;
+  box-shadow: 0 0 22px rgba(91, 224, 246, 0.26);
+}
+
+.module-tab.active span,
+.module-tab.active strong,
+.module-tab.active small {
   color: #041116;
 }
 
@@ -3782,11 +3871,11 @@ button {
   }
 
   .bim-stage {
-    inset: 84px 12px 210px;
+    inset: 84px 12px 238px;
   }
 
   .shell[data-mode="bim"]:not([data-active-module="none"]) .bim-stage {
-    inset: 84px 12px 210px;
+    inset: 84px 12px 238px;
   }
 
   .component-strip {
@@ -3827,7 +3916,7 @@ button {
   }
 
   .bim-toolbar {
-    justify-content: flex-start;
+    grid-template-columns: repeat(4, minmax(160px, 1fr));
     overflow-x: auto;
   }
 }
