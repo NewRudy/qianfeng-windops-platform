@@ -3,6 +3,7 @@ import cesium from "vite-plugin-cesium";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { createAiDiagnosisMiddleware } from "./server/aiDiagnosisProxy";
+import { createAnalysisRecordsMiddleware } from "./server/analysisRecords";
 import { createWindOpsAgentMiddleware } from "./server/windOpsAgent";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -39,6 +40,7 @@ function aiDiagnosisProxyPlugin(env: Record<string, string>): Plugin {
           timeoutSeconds: env.WINDOPS_AI_TIMEOUT_SECONDS,
         }),
       );
+      server.middlewares.use(createAnalysisRecordsMiddleware());
     },
     name: "windops-ai-diagnosis-proxy",
   };

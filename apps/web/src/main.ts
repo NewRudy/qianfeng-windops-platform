@@ -82,12 +82,31 @@ type ManagementPageKey =
   | "maintenance"
   | "knowledge";
 
+type AnalysisActionPageKey = Exclude<ManagementPageKey, "event" | "knowledge">;
+
 type ManagementPage = {
   key: ManagementPageKey;
   label: string;
   module: WorkflowModuleKey;
   subtitle: string;
   title: string;
+};
+
+type AnalysisRunRecord = {
+  adoptedAt?: string;
+  conclusion: string;
+  evidenceState: "adopted" | "computed";
+  humanBoundary: string;
+  id: string;
+  inputSummary: string;
+  model: string;
+  nextAction: string;
+  status: "adopted" | "computed";
+};
+
+type AnalysisParameter = {
+  label: string;
+  value: string;
 };
 
 const workflowStages: WorkflowStage[] = [
@@ -344,7 +363,7 @@ function renderParameterPanel(
         <button type="button" data-run-analysis="${html(pageKey)}">重新计算</button>
         <button type="button" data-adopt-evidence="${html(pageKey)}">采纳为当前事件证据</button>
       </footer>
-      <p class="analysis-result" data-analysis-result="${html(pageKey)}">等待参数确认，尚未形成新的复算记录。</p>
+      <section class="analysis-result" data-analysis-result="${html(pageKey)}">等待参数确认，尚未形成新的复算记录。</section>
     </section>
   `;
 }
@@ -3271,6 +3290,36 @@ function getAnalysisParamValue(pageKey: ManagementPageKey, index: number): strin
   return input?.value?.trim() ?? "";
 }
 
+function isAnalysisActionPageKey(value: string | undefined): value is AnalysisActionPageKey {
+  return Boolean(value && ["cms", "fusion", "maintenance", "scada", "structure", "workorders"].includes(value));
+}
+
+function getAnalysisParameters(pageKey: AnalysisActionPageKey): AnalysisParameter[] {
+  return Array.from(
+    workflowModuleDrawer.querySelectorAll<HTMLInputElement | HTMLSelectElement>(`[data-analysis-param^="${pageKey}-"]`),
+  ).map((input, index) => ({
+    label: input.closest("label")?.querySelector("span")?.textContent?.trim() || `参数 ${index + 1}`,
+    value: input.value.trim(),
+  }));
+}
+
+function renderAnalysisRecord(record: AnalysisRunRecord): string {
+  const stateLabel = record.status === "adopted" ? "已采纳为当前事件证据" : "模型复算完成";
+  return `
+    <header>
+      <span>${html(stateLabel)}</span>
+      <strong>${html(record.id)}</strong>
+    </header>
+    <dl>
+      <div><dt>输入</dt><dd>${html(record.inputSummary)}</dd></div>
+      <div><dt>模型</dt><dd>${html(record.model)}</dd></div>
+      <div><dt>结论</dt><dd>${html(record.conclusion)}</dd></div>
+      <div><dt>下一步</dt><dd>${html(record.nextAction)}</dd></div>
+      <div><dt>人工边界</dt><dd>${html(record.humanBoundary)}</dd></div>
+    </dl>
+  `;
+}
+
 function buildAnalysisRunSummary(pageKey: ManagementPageKey): string {
   if (pageKey === "scada") {
     const threshold = Number(getAnalysisParamValue("scada", 1) || "8");
@@ -3310,18 +3359,70 @@ function buildAnalysisRunSummary(pageKey: ManagementPageKey): string {
   return "已刷新当前页面记录。";
 }
 
-function runManagementAnalysis(pageKey: ManagementPageKey): void {
-  const result = workflowModuleDrawer.querySelector<HTMLElement>(`[data-analysis-result="${pageKey}"]`);
-  if (!result) return;
-  result.textContent = buildAnalysisRunSummary(pageKey);
-  result.dataset.state = "computed";
-  setBimStatus(`${managementPageByKey.get(pageKey)?.label ?? "管理端"}已完成本地复算`);
+async function requestAnalysisRun(pageKey: AnalysisActionPageKey): Promise<AnalysisRunRecord> {
+  const response = await fetch("/api/analysis/run", {
+    body: JSON.stringify({
+      caseId: activeCaseId,
+      pageKey,
+      parameters: getAnalysisParameters(pageKey),
+    }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
+  });
+  if (!response.ok) throw new Error("Analysis run failed");
+  return response.json() as Promise<AnalysisRunRecord>;
 }
 
-function adoptManagementEvidence(pageKey: ManagementPageKey): void {
+async function requestEvidenceAdoption(pageKey: AnalysisActionPageKey, runId?: string): Promise<AnalysisRunRecord> {
+  const response = await fetch("/api/analysis/adopt", {
+    body: JSON.stringify({
+      caseId: activeCaseId,
+      pageKey,
+      runId,
+    }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
+  });
+  if (!response.ok) throw new Error("Evidence adoption failed");
+  return response.json() as Promise<AnalysisRunRecord>;
+}
+
+async function runManagementAnalysis(pageKey: ManagementPageKey): Promise<void> {
   const result = workflowModuleDrawer.querySelector<HTMLElement>(`[data-analysis-result="${pageKey}"]`);
   if (!result) return;
-  result.textContent = `${buildAnalysisRunSummary(pageKey)} 已采纳为 ${activeWorkflowCase.eventCode} 的当前证据记录，等待人工复核签字。`;
+  if (!isAnalysisActionPageKey(pageKey)) {
+    result.textContent = buildAnalysisRunSummary(pageKey);
+    return;
+  }
+  result.textContent = "正在请求后端模型运行记录...";
+  result.dataset.state = "loading";
+  try {
+    const record = await requestAnalysisRun(pageKey);
+    result.innerHTML = renderAnalysisRecord(record);
+    result.dataset.runId = record.id;
+  } catch {
+    result.textContent = `${buildAnalysisRunSummary(pageKey)} 后端记录暂不可用，当前仅为本地兜底结果。`;
+  }
+  result.dataset.state = "computed";
+  setBimStatus(`${managementPageByKey.get(pageKey)?.label ?? "管理端"}已完成模型复算`);
+}
+
+async function adoptManagementEvidence(pageKey: ManagementPageKey): Promise<void> {
+  const result = workflowModuleDrawer.querySelector<HTMLElement>(`[data-analysis-result="${pageKey}"]`);
+  if (!result) return;
+  if (!isAnalysisActionPageKey(pageKey)) {
+    result.textContent = `${buildAnalysisRunSummary(pageKey)} 已采纳为 ${activeWorkflowCase.eventCode} 的当前证据记录，等待人工复核签字。`;
+    return;
+  }
+  result.textContent = "正在写入当前事件证据记录...";
+  result.dataset.state = "loading";
+  try {
+    const record = await requestEvidenceAdoption(pageKey, result.dataset.runId);
+    result.innerHTML = renderAnalysisRecord(record);
+    result.dataset.runId = record.id;
+  } catch {
+    result.textContent = `${buildAnalysisRunSummary(pageKey)} 后端采纳暂不可用，当前仅为本地兜底记录。`;
+  }
   result.dataset.state = "adopted";
   setEventTimelineStage(pageKey === "workorders" ? "workorder-draft" : "evidence-review");
   setBimStatus(`${managementPageByKey.get(pageKey)?.label ?? "证据"}已采纳到当前事件`);
@@ -3381,7 +3482,7 @@ function bindWorkflowSurfaceEvents(): void {
     button.addEventListener("click", () => {
       const pageKey = button.dataset.runAnalysis;
       if (!isManagementPageKey(pageKey)) return;
-      runManagementAnalysis(pageKey);
+      void runManagementAnalysis(pageKey);
     });
   });
 
@@ -3389,7 +3490,7 @@ function bindWorkflowSurfaceEvents(): void {
     button.addEventListener("click", () => {
       const pageKey = button.dataset.adoptEvidence;
       if (!isManagementPageKey(pageKey)) return;
-      adoptManagementEvidence(pageKey);
+      void adoptManagementEvidence(pageKey);
     });
   });
 
