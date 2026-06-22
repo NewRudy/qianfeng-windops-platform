@@ -350,7 +350,7 @@ button {
   left: 16px;
   z-index: 3;
   display: grid;
-  grid-template-columns: 1fr minmax(216px, 260px) auto auto;
+  grid-template-columns: 1fr minmax(216px, 260px) auto auto auto;
   gap: 14px;
   align-items: center;
   height: 54px;
@@ -438,7 +438,13 @@ button {
 }
 
 .shell[data-mode="bim"]:not([data-active-module="none"]) .bim-stage {
-  inset: 80px 538px 112px 24px;
+  inset: 80px 360px 112px 24px;
+}
+
+.shell[data-workspace="manager"] .bim-stage {
+  opacity: 0.18;
+  pointer-events: none;
+  filter: blur(1px) saturate(0.7);
 }
 
 .blueprint-grid {
@@ -755,19 +761,97 @@ button {
   z-index: 3;
   display: flex;
   flex-direction: column;
-  width: min(500px, calc(100vw - 42px));
+  width: min(340px, calc(100vw - 42px));
   min-height: 0;
   overflow: hidden;
+  transition:
+    inset 220ms ease,
+    width 220ms ease,
+    background-color 220ms ease,
+    border-color 220ms ease;
+}
+
+.shell[data-workspace="manager"] .module-drawer {
+  top: 78px;
+  right: 16px;
+  bottom: 18px;
+  left: 16px;
+  z-index: 8;
+  width: auto;
+  padding: 14px;
+  border: 1px solid rgba(91, 224, 246, 0.2);
+  background:
+    linear-gradient(135deg, rgba(2, 17, 28, 0.96), rgba(0, 6, 12, 0.98)),
+    radial-gradient(circle at 82% 12%, rgba(91, 224, 246, 0.12), transparent 34%);
+  box-shadow:
+    inset 0 0 38px rgba(91, 224, 246, 0.07),
+    0 28px 90px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(18px);
+}
+
+.shell[data-workspace="manager"] .workflow-command-card,
+.shell[data-workspace="manager"] .linked-evidence-drawer {
+  display: none;
 }
 
 .management-console {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   min-height: 0;
   flex: 1 1 auto;
   gap: 10px;
   margin-bottom: 10px;
   overflow: hidden;
+}
+
+.shell:not([data-workspace="manager"]) .management-console {
+  display: none;
+}
+
+.management-workbench-header {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 2px 12px;
+  border-bottom: 1px solid rgba(91, 224, 246, 0.16);
+}
+
+.shell[data-workspace="manager"] .management-workbench-header {
+  display: flex;
+}
+
+.management-workbench-header span {
+  color: rgba(91, 224, 246, 0.72);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.management-workbench-header strong {
+  display: block;
+  margin-top: 3px;
+  color: #ffffff;
+  font-size: 18px;
+}
+
+.management-workbench-header button {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(91, 224, 246, 0.22);
+  background: rgba(5, 30, 42, 0.78);
+  color: rgba(234, 251, 255, 0.84);
+  font-weight: 900;
+}
+
+.shell[data-workspace="manager"] .management-console {
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 14px;
+  margin-bottom: 0;
+}
+
+.shell[data-workspace="manager"] .management-workbench-header {
+  grid-column: 1 / -1;
 }
 
 .management-nav {
@@ -780,6 +864,13 @@ button {
   border: 1px solid rgba(91, 224, 246, 0.14);
   background: rgba(2, 16, 25, 0.74);
   backdrop-filter: blur(14px);
+}
+
+.shell[data-workspace="manager"] .management-nav {
+  grid-template-columns: 1fr;
+  align-content: start;
+  min-height: 0;
+  padding: 8px;
 }
 
 .management-nav button,
@@ -800,6 +891,12 @@ button {
   padding: 7px 6px;
   font-size: 12px;
   white-space: nowrap;
+}
+
+.shell[data-workspace="manager"] .management-nav button {
+  min-height: 42px;
+  padding: 0 12px;
+  text-align: left;
 }
 
 .management-nav button.active,
@@ -834,6 +931,23 @@ button {
     inset 0 0 26px rgba(91, 224, 246, 0.06),
     0 20px 54px rgba(0, 0, 0, 0.34);
   backdrop-filter: blur(16px);
+}
+
+.shell[data-workspace="manager"] .management-page {
+  gap: 16px;
+  padding: 20px;
+}
+
+.shell[data-workspace="manager"] .management-page-header h3 {
+  font-size: 24px;
+}
+
+.shell[data-workspace="manager"] .management-page-header p,
+.shell[data-workspace="manager"] .event-primary-card p,
+.shell[data-workspace="manager"] .record-list p,
+.shell[data-workspace="manager"] .parameter-panel p,
+.shell[data-workspace="manager"] .knowledge-detail p {
+  font-size: 13px;
 }
 
 .shell[data-manager-page="event"] .management-page[data-management-page="event"],
@@ -4396,7 +4510,11 @@ button {
 }
 
 .shell[data-mode="bim"] .bim-toolbar {
-  right: 532px;
+  right: 352px;
+}
+
+.shell[data-workspace="manager"] .bim-toolbar {
+  display: none;
 }
 
 .module-tab {

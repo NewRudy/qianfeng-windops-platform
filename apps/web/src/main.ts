@@ -297,6 +297,13 @@ function renderManagementNav(): string {
 function renderManagementConsole(): string {
   return `
     <section class="management-console" aria-label="管理端页面">
+      <header class="management-workbench-header">
+        <div>
+          <span>管理工作台</span>
+          <strong>证据复核、模型复算、工单闭环</strong>
+        </div>
+        <button type="button" data-close-manager-workspace>返回BIM视图</button>
+      </header>
       ${renderManagementNav()}
       <section class="management-pages">
         ${renderEventWorkbenchPage()}
@@ -1680,6 +1687,7 @@ root.innerHTML = `
             </select>
           </label>
           <strong id="bim-selected-title">HS-WTG-01</strong>
+          <button id="open-manager-workspace" class="bim-back manager-open" type="button">管理工作台</button>
           <button id="close-bim" class="bim-back" type="button">返回 GIS 场景</button>
         </header>
 
@@ -1807,6 +1815,14 @@ function openWorkflowModule(moduleName: WorkflowModuleKey, status?: string): voi
   if (status) setBimStatus(status);
 }
 
+function openManagementWorkspace(): void {
+  dashboardShell.dataset.workspace = "manager";
+}
+
+function closeManagementWorkspace(): void {
+  dashboardShell.dataset.workspace = "bim";
+}
+
 function isManagementPageKey(value: string | undefined): value is ManagementPageKey {
   return Boolean(value && managementPageByKey.has(value as ManagementPageKey));
 }
@@ -1821,6 +1837,7 @@ function setActiveManagementPage(pageKey: ManagementPageKey): void {
 
 function openManagementPage(pageKey: ManagementPageKey, status?: string): void {
   const page = managementPageByKey.get(pageKey) ?? managementPages[0];
+  openManagementWorkspace();
   setActiveModule(page.module);
   setActiveManagementPage(page.key);
   if (status) setBimStatus(status);
@@ -1953,6 +1970,7 @@ function selectWorkflowCaseForTurbine(turbineId: string): void {
 function openDiagnosis(turbine: TurbineAsset, moduleName: WorkflowModuleKey = "brief"): void {
   selectWorkflowCaseForTurbine(turbine.turbineId);
   dashboardShell.dataset.mode = "bim";
+  dashboardShell.dataset.workspace = "bim";
   setActiveModule(moduleName);
   window.requestAnimationFrame(() => {
     void getBimViewer().initialize();
@@ -3086,6 +3104,7 @@ function submitTypedAiQuestion(): void {
 
 function closeDiagnosis(): void {
   dashboardShell.dataset.mode = "intro";
+  delete dashboardShell.dataset.workspace;
   setActiveModule("none");
   if (warningActive) {
     getBimViewer().stopWarning();
@@ -3113,6 +3132,10 @@ void createWindFarmScene({
   document.querySelector("#close-bim")?.addEventListener("click", () => {
     closeDiagnosis();
     scene.showMountainOverview();
+  });
+
+  document.querySelector<HTMLButtonElement>("#open-manager-workspace")?.addEventListener("click", () => {
+    openManagementPage((dashboardShell.dataset.managerPage as ManagementPageKey | undefined) ?? "event", "已打开管理工作台");
   });
 
   document.querySelector<HTMLButtonElement>("#ai-duty-open")?.addEventListener("click", () => {
@@ -3377,6 +3400,7 @@ function bindAgentResultEvents(container: HTMLElement): void {
       const moduleName = getWorkflowModule(button.dataset.agentOpenModule);
       if (!moduleName) return;
       openWorkflowModule(moduleName, `AI 已打开${moduleText(moduleName)}证据`);
+      openManagementWorkspace();
       setEventTimelineStage(moduleName === "workorder" ? "workorder-draft" : "evidence-review");
       if (["scada", "cms", "bolts", "alerts", "workorder"].includes(moduleName)) {
         setActiveComponent(moduleName === "bolts" ? "blade-root" : "gearbox");
@@ -3606,6 +3630,11 @@ function bindWorkflowSurfaceEvents(): void {
     });
   });
 
+  workflowModuleDrawer.querySelector<HTMLButtonElement>("[data-close-manager-workspace]")?.addEventListener("click", () => {
+    closeManagementWorkspace();
+    setBimStatus("已返回 BIM 部件定位视图");
+  });
+
   workflowModuleDrawer.querySelectorAll<HTMLButtonElement>("[data-run-analysis]").forEach((button) => {
     button.addEventListener("click", () => {
       const pageKey = button.dataset.runAnalysis;
@@ -3659,6 +3688,7 @@ function bindWorkflowSurfaceEvents(): void {
       const moduleName = getWorkflowModule(button.dataset.openModule);
       if (!moduleName) return;
       openWorkflowModule(moduleName);
+      openManagementWorkspace();
       setEventTimelineStage(moduleName === "workorder" ? "workorder-draft" : "evidence-review");
       const part = button.dataset.bimPart as BimPartKey | undefined;
       if (part) {
@@ -3771,10 +3801,12 @@ document.querySelectorAll<HTMLButtonElement>(".module-tab").forEach((button) => 
 
     if (moduleName === "workorder") {
       openGeneratedWorkOrder();
+      openManagementWorkspace();
       return;
     }
 
     setActiveModule(moduleName);
+    openManagementWorkspace();
     if (["fusion", "scada", "cms", "bolts", "alerts", "inspection", "maintenance"].includes(moduleName)) {
       setEventTimelineStage(moduleName === "alerts" ? "bim-location" : "evidence-review");
     }
