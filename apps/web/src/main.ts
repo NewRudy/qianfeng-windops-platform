@@ -2699,6 +2699,7 @@ function renderGlobalAiAssistantAnswer(
   const recommendedPage = getManagementPageForModule(recommendedModule);
   const primaryBimPart = result.bimHighlights.find((item) => item.severity === "alarm")?.part ?? "gearbox";
   const isGeneralChat = result.intent === "general_chat";
+  const isBimLocateAction = Boolean(actionMessage && /(BIM|定位|聚焦|部件|齿轮箱)/i.test(actionMessage));
   const answer = actionMessage
     ? `${actionMessage}\n${result.operatorFocus.humanCheck}`
     : result.answerText.trim() || "当前没有生成有效回答，请重新提问。";
@@ -2725,6 +2726,9 @@ function renderGlobalAiAssistantAnswer(
         <span>可继续说</span>
         ${isGeneralChat ? `
           <button type="button" data-agent-open-module="brief">切到当前预警</button>
+        ` : isBimLocateAction ? `
+          <button type="button" data-agent-bim-part="${html(primaryBimPart)}">保持 BIM 定位</button>
+          <button type="button" data-global-ai-open-page="${html(recommendedPage)}">查看证据详情</button>
         ` : `
           <button type="button" data-agent-open-module="${html(recommendedModule)}">${html(result.operatorFocus.primaryQuestion)}</button>
           <button type="button" data-agent-bim-part="${html(primaryBimPart)}">定位疑似部件</button>
@@ -2777,6 +2781,7 @@ function applyAgentQuestionAction(question: string): string | undefined {
     /(齿轮箱|齿轮|部件|BIM|模型|告警|疑似)/i.test(question);
   if (asksToFocusBim) {
     ensureBimMode("alerts");
+    closeManagementWorkspace();
     activateGearboxWorkflow("alerts");
     setActiveComponent("gearbox");
     void getBimViewer().focusPart("gearbox");
@@ -2786,6 +2791,7 @@ function applyAgentQuestionAction(question: string): string | undefined {
 
   if (/(告警闪烁|报警闪烁|红色闪烁|闪一下|闪烁)/.test(question)) {
     ensureBimMode("alerts");
+    closeManagementWorkspace();
     activateGearboxWorkflow("alerts");
     if (!warningActive) {
       warningActive = getBimViewer().toggleWarning();
@@ -2819,8 +2825,12 @@ function applyAgentQuestionAction(question: string): string | undefined {
 
 function ensureBimMode(moduleName: WorkflowModuleKey = "brief"): void {
   hasPlayedIntroBroadcast = true;
-  if (dashboardShell.dataset.mode === "bim") return;
+  if (dashboardShell.dataset.mode === "bim") {
+    closeManagementWorkspace();
+    return;
+  }
   openDiagnosis(getDutyTurbine(), moduleName);
+  closeManagementWorkspace();
 }
 
 function submitAiQuestion(question: string, options: { speak?: boolean } = {}): void {
@@ -4144,6 +4154,7 @@ function bindAgentResultEvents(container: HTMLElement): void {
       const part = button.dataset.agentBimPart as BimPartKey | undefined;
       if (!part) return;
       ensureBimMode("alerts");
+      closeManagementWorkspace();
       if (part === "gearbox") {
         activateGearboxWorkflow("alerts");
       }
@@ -4239,6 +4250,7 @@ function bindGlobalAiOrbEvents(): void {
       const part = button.dataset.globalAiFocusPart as BimPartKey | undefined;
       if (!part) return;
       ensureBimMode("alerts");
+      closeManagementWorkspace();
       setEventTimelineStage("bim-location");
       if (part === "gearbox") activateGearboxWorkflow("alerts");
       void getBimViewer().focusPart(part);
