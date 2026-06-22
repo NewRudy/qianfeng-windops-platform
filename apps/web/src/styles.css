@@ -1067,7 +1067,10 @@ button {
 .shell[data-workspace="manager"] .management-page[data-management-page="scada"],
 .shell[data-workspace="manager"] .management-page[data-management-page="cms"],
 .shell[data-workspace="manager"] .management-page[data-management-page="structure"] {
-  grid-template-columns: minmax(300px, 0.42fr) minmax(540px, 0.58fr);
+  grid-template-columns: minmax(270px, 0.32fr) minmax(720px, 0.68fr);
+  grid-template-rows: auto minmax(0, 0.44fr) minmax(0, 0.56fr);
+  align-content: stretch;
+  overflow: hidden;
 }
 
 .shell[data-workspace="manager"] .management-page[data-management-page="maintenance"],
@@ -1092,13 +1095,21 @@ button {
 .shell[data-workspace="manager"] .management-page[data-management-page="cms"] .parameter-panel,
 .shell[data-workspace="manager"] .management-page[data-management-page="structure"] .parameter-panel {
   grid-column: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.shell[data-workspace="manager"] .management-page[data-management-page="scada"] .parameter-panel > div,
+.shell[data-workspace="manager"] .management-page[data-management-page="cms"] .parameter-panel > div,
+.shell[data-workspace="manager"] .management-page[data-management-page="structure"] .parameter-panel > div {
+  grid-template-columns: 1fr;
 }
 
 .shell[data-workspace="manager"] .management-page[data-management-page="scada"] .engineering-chart,
 .shell[data-workspace="manager"] .management-page[data-management-page="cms"] .engineering-chart,
 .shell[data-workspace="manager"] .management-page[data-management-page="structure"] .engineering-chart {
   grid-column: 2;
-  grid-row: 2 / span 2;
+  grid-row: 2 / 4;
   align-self: stretch;
   margin: 0;
 }
@@ -1149,6 +1160,10 @@ button {
   .shell[data-workspace="manager"] .management-page[data-management-page="structure"] .engineering-chart {
     grid-column: 1;
     grid-row: auto;
+  }
+
+  .shell[data-workspace="manager"] .engineering-chart {
+    min-height: clamp(380px, 54vh, 560px);
   }
 }
 
@@ -1201,6 +1216,10 @@ button {
 
   .shell[data-workspace="manager"] .health-component-row {
     grid-template-columns: 1fr;
+  }
+
+  .shell[data-workspace="manager"] .engineering-chart {
+    min-height: 340px;
   }
 }
 
@@ -4508,7 +4527,9 @@ button {
 }
 
 .shell[data-workspace="manager"] .engineering-chart {
-  min-height: 286px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   padding: 16px;
 }
 
@@ -4517,7 +4538,9 @@ button {
 }
 
 .shell[data-workspace="manager"] .engineering-chart svg {
-  height: clamp(218px, 30vh, 312px);
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
 }
 
 .grid-line {

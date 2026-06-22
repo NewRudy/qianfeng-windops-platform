@@ -951,13 +951,13 @@ function renderSvgTicks(axis: ScadaChart["xAxis"] | ScadaChart["yAxis"], orienta
         const x = scaleValue(tick, axis.min, axis.max, plot.left, plot.right);
         return `
           <line class="grid-line vertical" x1="${x}" y1="${plot.top}" x2="${x}" y2="${plot.bottom}"></line>
-          <text class="tick-label" x="${x}" y="164" text-anchor="middle">${html(tick)}</text>
+          <text class="tick-label" x="${x}" y="${plot.bottom + 22}" text-anchor="middle">${html(tick)}</text>
         `;
       }
       const y = scaleValue(tick, axis.min, axis.max, plot.bottom, plot.top);
       return `
         <line class="grid-line" x1="${plot.left}" y1="${y}" x2="${plot.right}" y2="${y}"></line>
-        <text class="tick-label" x="34" y="${y + 4}" text-anchor="end">${html(tick)}</text>
+        <text class="tick-label" x="${plot.left - 10}" y="${y + 4}" text-anchor="end">${html(tick)}</text>
       `;
     })
     .join("");
@@ -965,7 +965,8 @@ function renderSvgTicks(axis: ScadaChart["xAxis"] | ScadaChart["yAxis"], orienta
 
 function renderScadaChart(chart?: ScadaChart): string {
   if (!chart) return "";
-  const plot = { left: 42, right: 286, top: 18, bottom: 144 };
+  const plot = { left: 78, right: 610, top: 28, bottom: 202 };
+  const viewBox = { height: 260, width: 640 };
   const pointToSvg = (windSpeed: number, powerKw: number) =>
     `${scaleValue(windSpeed, chart.xAxis.min, chart.xAxis.max, plot.left, plot.right)},${scaleValue(powerKw, chart.yAxis.min, chart.yAxis.max, plot.bottom, plot.top)}`;
   const baseline = chart.points.map((point) => pointToSvg(point.windSpeed, point.expectedKw)).join(" ");
@@ -984,7 +985,7 @@ function renderScadaChart(chart?: ScadaChart): string {
         <strong>${html(chart.title)}</strong>
         <span>${html(chart.sampleWindow)} · 当前模型运行结果</span>
       </figcaption>
-      <svg viewBox="0 0 304 184" role="img" aria-label="${html(chart.title)}">
+      <svg viewBox="0 0 ${viewBox.width} ${viewBox.height}" role="img" aria-label="${html(chart.title)}">
         ${renderSvgTicks(chart.yAxis, "y", plot)}
         ${renderSvgTicks(chart.xAxis, "x", plot)}
         <line class="axis-line" x1="${plot.left}" y1="${plot.bottom}" x2="${plot.right}" y2="${plot.bottom}"></line>
@@ -992,8 +993,8 @@ function renderScadaChart(chart?: ScadaChart): string {
         <polyline class="chart-line baseline" points="${baseline}"></polyline>
         <polyline class="chart-line measured" points="${measured}"></polyline>
         ${points}
-        <text class="axis-title x-title" x="164" y="181" text-anchor="middle">${html(chart.xAxis.label)}</text>
-        <text class="axis-title y-title" x="-82" y="12" text-anchor="middle" transform="rotate(-90)">${html(chart.yAxis.label)}</text>
+        <text class="axis-title x-title" x="${(plot.left + plot.right) / 2}" y="${viewBox.height - 8}" text-anchor="middle">${html(chart.xAxis.label)}</text>
+        <text class="axis-title y-title" x="${-(plot.top + plot.bottom) / 2}" y="20" text-anchor="middle" transform="rotate(-90)">${html(chart.yAxis.label)}</text>
       </svg>
       <div class="chart-legend">
         <span><i class="legend-line baseline"></i>${html(chart.baselineLabel)}</span>
@@ -1006,7 +1007,8 @@ function renderScadaChart(chart?: ScadaChart): string {
 
 function renderCmsChart(chart?: CmsChart): string {
   if (!chart) return "";
-  const plot = { left: 42, right: 286, top: 18, bottom: 132 };
+  const plot = { left: 78, right: 610, top: 28, bottom: 202 };
+  const viewBox = { height: 260, width: 640 };
   const thresholdY = scaleValue(chart.threshold.value, chart.yAxis.min, chart.yAxis.max, plot.bottom, plot.top);
   const bars = chart.peaks
     .map((peak) => {
@@ -1015,7 +1017,7 @@ function renderCmsChart(chart?: CmsChart): string {
       const height = plot.bottom - y;
       return `
         <g class="spectrum-peak ${peak.status}">
-          <rect x="${x - 5}" y="${y}" width="10" height="${height}"></rect>
+          <rect x="${x - 7}" y="${y}" width="14" height="${height}"></rect>
           <text x="${x}" y="${Math.max(12, y - 5)}" text-anchor="middle">${html(peak.label)}</text>
         </g>
       `;
@@ -1028,7 +1030,7 @@ function renderCmsChart(chart?: CmsChart): string {
         <strong>${html(chart.title)}</strong>
         <span>${html(chart.sampleWindow)} · 当前阈值结果</span>
       </figcaption>
-      <svg viewBox="0 0 304 184" role="img" aria-label="${html(chart.title)}">
+      <svg viewBox="0 0 ${viewBox.width} ${viewBox.height}" role="img" aria-label="${html(chart.title)}">
         ${renderSvgTicks(chart.yAxis, "y", plot)}
         ${renderSvgTicks(chart.xAxis, "x", plot)}
         <line class="axis-line" x1="${plot.left}" y1="${plot.bottom}" x2="${plot.right}" y2="${plot.bottom}"></line>
@@ -1036,8 +1038,8 @@ function renderCmsChart(chart?: CmsChart): string {
         <line class="threshold-line" x1="${plot.left}" y1="${thresholdY}" x2="${plot.right}" y2="${thresholdY}"></line>
         <text class="threshold-label" x="${plot.right - 2}" y="${thresholdY - 4}" text-anchor="end">${html(chart.threshold.label)} ${html(chart.threshold.value)}</text>
         ${bars}
-        <text class="axis-title x-title" x="164" y="181" text-anchor="middle">${html(chart.xAxis.label)}</text>
-        <text class="axis-title y-title" x="-82" y="12" text-anchor="middle" transform="rotate(-90)">${html(chart.yAxis.label)}</text>
+        <text class="axis-title x-title" x="${(plot.left + plot.right) / 2}" y="${viewBox.height - 8}" text-anchor="middle">${html(chart.xAxis.label)}</text>
+        <text class="axis-title y-title" x="${-(plot.top + plot.bottom) / 2}" y="20" text-anchor="middle" transform="rotate(-90)">${html(chart.yAxis.label)}</text>
       </svg>
     </figure>
   `;
@@ -1045,19 +1047,19 @@ function renderCmsChart(chart?: CmsChart): string {
 
 function renderBoltChart(chart?: BoltChart): string {
   if (!chart) return "";
-  const center = { x: 152, y: 82 };
-  const radius = 48;
+  const center = { x: 320, y: 128 };
+  const radius = 80;
   const channels = chart.channels
     .map((channel) => {
       const radians = (channel.angle - 90) * (Math.PI / 180);
       const x = center.x + Math.cos(radians) * radius;
       const y = center.y + Math.sin(radians) * radius;
-      const labelX = center.x + Math.cos(radians) * (radius + 24);
-      const labelY = center.y + Math.sin(radians) * (radius + 24);
+      const labelX = center.x + Math.cos(radians) * (radius + 42);
+      const labelY = center.y + Math.sin(radians) * (radius + 42);
       return `
         <g class="bolt-channel ${channel.status}">
           <line x1="${center.x}" y1="${center.y}" x2="${x}" y2="${y}"></line>
-          <circle cx="${x}" cy="${y}" r="6"><title>${html(channel.id)} ${html(channel.preloadKn)} kN / 松弛 ${html(channel.relaxationPct)}%</title></circle>
+          <circle cx="${x}" cy="${y}" r="9"><title>${html(channel.id)} ${html(channel.preloadKn)} kN / 松弛 ${html(channel.relaxationPct)}%</title></circle>
           <text x="${labelX}" y="${labelY + 3}" text-anchor="middle">${html(channel.id)}</text>
         </g>
       `;
@@ -1070,9 +1072,9 @@ function renderBoltChart(chart?: BoltChart): string {
         <strong>${html(chart.title)}</strong>
         <span>标称预紧力 ${html(chart.nominalPreloadKn)} kN / 松弛预警 ${html(chart.warningRelaxationPct)}%</span>
       </figcaption>
-      <svg viewBox="0 0 304 164" role="img" aria-label="${html(chart.title)}">
+      <svg viewBox="0 0 640 260" role="img" aria-label="${html(chart.title)}">
         <circle class="bolt-ring" cx="${center.x}" cy="${center.y}" r="${radius}"></circle>
-        <circle class="bolt-hub" cx="${center.x}" cy="${center.y}" r="20"></circle>
+        <circle class="bolt-hub" cx="${center.x}" cy="${center.y}" r="34"></circle>
         ${channels}
       </svg>
       <div class="chart-legend">
