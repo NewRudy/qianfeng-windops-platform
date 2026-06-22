@@ -1899,15 +1899,14 @@ function getAiDutyEventText(): string {
 function renderGlobalAiOrb(): string {
   const brief = activeWorkflowCase.modules.brief.aiBrief;
   const quickQuestions = [
-    "为什么判定为齿轮箱风险？",
-    "下一步先看哪张证据？",
-    "把风险定位到 BIM 部件",
-    "工单现在能派发吗？",
+    "为什么报警？",
+    "下一步看哪里？",
+    "工单能派发吗？",
   ];
 
   return `
     <aside class="global-ai-shell" data-open="false" data-orb-state="idle" data-agent-status="checking" aria-label="AI 值班员">
-      <button id="global-ai-orb" class="global-ai-orb" type="button" aria-expanded="false" aria-controls="global-ai-panel">
+      <button id="global-ai-orb" class="global-ai-orb" type="button" aria-expanded="false" aria-controls="global-ai-panel" title="拖动调整位置，点击打开 AI 值班助手">
         <span class="global-ai-orb-core">AI</span>
         <span class="global-ai-orb-ring" aria-hidden="true"></span>
         <small>值班员</small>
@@ -1915,30 +1914,30 @@ function renderGlobalAiOrb(): string {
       <section id="global-ai-panel" class="global-ai-panel" aria-live="polite">
         <header>
           <div>
-            <span>AI 值班员</span>
+            <span>值班助手</span>
             <strong id="global-ai-finding">${html(brief?.primaryFinding ?? "等待诊断事件")}</strong>
           </div>
           <button id="global-ai-close" type="button" aria-label="收起 AI 值班员">收起</button>
         </header>
-        <p id="global-ai-context">我会跟随当前预警读取 SCADA、CMS、结构监测、知识图谱和工单上下文；停机、登塔、派发仍需人工确认。</p>
+        <p id="global-ai-context">问一句，或直接点动作。AI 只做研判和导航，派发、登塔、停机仍需人工确认。</p>
         <section class="global-ai-status-line">
           <span id="global-ai-asset">${html(activeWorkflowCase.turbineId)}</span>
           <strong id="global-ai-status">正在检测后端智能</strong>
         </section>
-        <div class="global-ai-quick-actions" aria-label="AI 快捷动作">
-          <button type="button" data-global-ai-open-page="fusion">看证据复核</button>
-          <button type="button" data-global-ai-focus-part="gearbox">定位齿轮箱</button>
-          <button type="button" data-global-ai-workorder>工单确认门</button>
+        <div class="global-ai-quick-actions" aria-label="值班动作">
+          <button type="button" data-global-ai-open-page="fusion">证据</button>
+          <button type="button" data-global-ai-focus-part="gearbox">定位</button>
+          <button type="button" data-global-ai-workorder>工单</button>
         </div>
         <section class="global-ai-question-chips" aria-label="推荐追问">
           ${quickQuestions.map((question) => `<button type="button" data-global-ai-question="${html(question)}">${html(question)}</button>`).join("")}
         </section>
         <div class="global-ai-input-row">
-          <input id="global-ai-input" type="text" placeholder="问 AI：为什么报警？下一步看哪里？工单能不能派发？" />
+          <input id="global-ai-input" type="text" placeholder="问 AI：为什么报警？下一步看哪里？" />
           <button type="button" data-global-ai-send>发送</button>
           <button type="button" data-global-ai-voice>语音</button>
         </div>
-        <div id="global-ai-answer" class="global-ai-answer">点击 AI 值班球可以直接提问。我会把回答落到当前事件，并给出可点击的证据、BIM 定位或工单动作。</div>
+        <div id="global-ai-answer" class="global-ai-answer">问一句或点一个动作：证据 -> 定位 -> 工单。</div>
       </section>
     </aside>
   `;
@@ -2060,6 +2059,24 @@ const globalAiUi = {
   shell: globalAiShell,
   status: globalAiStatus,
 };
+const globalAiPositionStorageKey = "qianfeng.globalAi.position.v1";
+let globalAiDragState: {
+  hasMoved: boolean;
+  offsetX: number;
+  offsetY: number;
+  pointerId: number;
+  startX: number;
+  startY: number;
+} | undefined;
+let globalAiMouseDragState: {
+  hasMoved: boolean;
+  offsetX: number;
+  offsetY: number;
+  startX: number;
+  startY: number;
+} | undefined;
+let suppressNextGlobalAiClick = false;
+let suppressGlobalAiClickTimer: number | undefined;
 
 const dashboardShell = shell;
 const bimModelContainer = bimModelRoot;
@@ -2083,6 +2100,7 @@ const eventStageOrder: EventTimelineStage[] = [
 renderWorkflowSurfaces();
 bindGlobalAiOrbEvents();
 updateGlobalAiContext();
+restoreGlobalAiPosition();
 setActiveModule("brief");
 setEventTimelineStage("ai-alert");
 setActiveComponent("gearbox");
@@ -2527,6 +2545,125 @@ function getGlobalAiQuestionInput(): HTMLInputElement | null {
 function setGlobalAiOpen(open: boolean): void {
   globalAiUi.shell.dataset.open = open ? "true" : "false";
   globalAiUi.orb.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function clampGlobalAiPosition(x: number, y: number): { x: number; y: number } {
+  const rect = globalAiUi.shell.getBoundingClientRect();
+  const margin = 12;
+  const maxX = Math.max(margin, window.innerWidth - rect.width - margin);
+  const maxY = Math.max(margin, window.innerHeight - rect.height - margin);
+  return {
+    x: Math.min(Math.max(x, margin), maxX),
+    y: Math.min(Math.max(y, margin), maxY),
+  };
+}
+
+function applyGlobalAiPosition(x: number, y: number, persist = false): void {
+  const position = clampGlobalAiPosition(x, y);
+  globalAiUi.shell.style.left = `${position.x}px`;
+  globalAiUi.shell.style.top = `${position.y}px`;
+  globalAiUi.shell.style.right = "auto";
+  globalAiUi.shell.style.bottom = "auto";
+  globalAiUi.shell.dataset.dragged = "true";
+  if (persist) {
+    window.localStorage.setItem(globalAiPositionStorageKey, JSON.stringify(position));
+  }
+}
+
+function suppressImmediateGlobalAiClick(): void {
+  suppressNextGlobalAiClick = true;
+  if (suppressGlobalAiClickTimer) window.clearTimeout(suppressGlobalAiClickTimer);
+  suppressGlobalAiClickTimer = window.setTimeout(() => {
+    suppressNextGlobalAiClick = false;
+    suppressGlobalAiClickTimer = undefined;
+  }, 180);
+}
+
+function restoreGlobalAiPosition(): void {
+  const storedPosition = window.localStorage.getItem(globalAiPositionStorageKey);
+  if (!storedPosition) return;
+  try {
+    const position = JSON.parse(storedPosition) as { x?: unknown; y?: unknown };
+    if (typeof position.x === "number" && typeof position.y === "number") {
+      applyGlobalAiPosition(position.x, position.y);
+    }
+  } catch {
+    window.localStorage.removeItem(globalAiPositionStorageKey);
+  }
+}
+
+function beginGlobalAiDrag(event: PointerEvent): void {
+  if (event.button > 0) return;
+  event.preventDefault();
+  const rect = globalAiUi.shell.getBoundingClientRect();
+  globalAiDragState = {
+    hasMoved: false,
+    offsetX: event.clientX - rect.left,
+    offsetY: event.clientY - rect.top,
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+  };
+  globalAiUi.shell.dataset.dragging = "true";
+  globalAiUi.orb.setPointerCapture(event.pointerId);
+}
+
+function moveGlobalAiDrag(event: PointerEvent): void {
+  if (!globalAiDragState || event.pointerId !== globalAiDragState.pointerId) return;
+  const movedDistance = Math.hypot(event.clientX - globalAiDragState.startX, event.clientY - globalAiDragState.startY);
+  if (movedDistance > 5) globalAiDragState.hasMoved = true;
+  if (!globalAiDragState.hasMoved) return;
+  applyGlobalAiPosition(event.clientX - globalAiDragState.offsetX, event.clientY - globalAiDragState.offsetY);
+}
+
+function endGlobalAiDrag(event: PointerEvent): void {
+  if (!globalAiDragState || event.pointerId !== globalAiDragState.pointerId) return;
+  const wasDragged = globalAiDragState.hasMoved;
+  if (wasDragged) {
+    const rect = globalAiUi.shell.getBoundingClientRect();
+    applyGlobalAiPosition(rect.left, rect.top, true);
+    suppressImmediateGlobalAiClick();
+  }
+  delete globalAiUi.shell.dataset.dragging;
+  if (globalAiUi.orb.hasPointerCapture(event.pointerId)) {
+    globalAiUi.orb.releasePointerCapture(event.pointerId);
+  }
+  globalAiDragState = undefined;
+}
+
+function beginGlobalAiMouseDrag(event: MouseEvent): void {
+  if (event.button > 0 || globalAiDragState) return;
+  event.preventDefault();
+  const rect = globalAiUi.shell.getBoundingClientRect();
+  globalAiMouseDragState = {
+    hasMoved: false,
+    offsetX: event.clientX - rect.left,
+    offsetY: event.clientY - rect.top,
+    startX: event.clientX,
+    startY: event.clientY,
+  };
+  globalAiUi.shell.dataset.dragging = "true";
+}
+
+function moveGlobalAiMouseDrag(event: MouseEvent): void {
+  if (!globalAiMouseDragState) return;
+  const movedDistance = Math.hypot(event.clientX - globalAiMouseDragState.startX, event.clientY - globalAiMouseDragState.startY);
+  if (movedDistance > 5) globalAiMouseDragState.hasMoved = true;
+  if (!globalAiMouseDragState.hasMoved) return;
+  event.preventDefault();
+  applyGlobalAiPosition(event.clientX - globalAiMouseDragState.offsetX, event.clientY - globalAiMouseDragState.offsetY);
+}
+
+function endGlobalAiMouseDrag(): void {
+  if (!globalAiMouseDragState) return;
+  const wasDragged = globalAiMouseDragState.hasMoved;
+  if (wasDragged) {
+    const rect = globalAiUi.shell.getBoundingClientRect();
+    applyGlobalAiPosition(rect.left, rect.top, true);
+    suppressImmediateGlobalAiClick();
+  }
+  delete globalAiUi.shell.dataset.dragging;
+  globalAiMouseDragState = undefined;
 }
 
 function setGlobalAiState(state: "alert" | "fallback" | "idle" | "listening" | "ready" | "thinking", status?: string): void {
@@ -3858,7 +3995,27 @@ function bindAgentResultEvents(container: HTMLElement): void {
 
 function bindGlobalAiOrbEvents(): void {
   globalAiUi.orb.addEventListener("click", () => {
+    if (suppressNextGlobalAiClick) {
+      suppressNextGlobalAiClick = false;
+      if (suppressGlobalAiClickTimer) {
+        window.clearTimeout(suppressGlobalAiClickTimer);
+        suppressGlobalAiClickTimer = undefined;
+      }
+      return;
+    }
     setGlobalAiOpen(globalAiUi.shell.dataset.open !== "true");
+  });
+  globalAiUi.orb.addEventListener("pointerdown", beginGlobalAiDrag);
+  window.addEventListener("pointermove", moveGlobalAiDrag);
+  window.addEventListener("pointerup", endGlobalAiDrag);
+  window.addEventListener("pointercancel", endGlobalAiDrag);
+  globalAiUi.orb.addEventListener("mousedown", beginGlobalAiMouseDrag);
+  window.addEventListener("mousemove", moveGlobalAiMouseDrag);
+  window.addEventListener("mouseup", endGlobalAiMouseDrag);
+  window.addEventListener("resize", () => {
+    if (globalAiUi.shell.dataset.dragged !== "true") return;
+    const rect = globalAiUi.shell.getBoundingClientRect();
+    applyGlobalAiPosition(rect.left, rect.top, true);
   });
 
   document.querySelector<HTMLButtonElement>("#global-ai-close")?.addEventListener("click", () => {

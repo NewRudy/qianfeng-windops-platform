@@ -326,6 +326,7 @@ button {
   gap: 12px;
   max-width: calc(100vw - 28px);
   pointer-events: none;
+  transition: opacity 180ms ease;
 }
 
 .global-ai-orb,
@@ -337,46 +338,87 @@ button {
   position: relative;
   display: grid;
   place-items: center;
-  width: 78px;
-  height: 78px;
-  border: 1px solid rgba(105, 230, 255, 0.64);
+  width: 68px;
+  height: 68px;
+  border: 1px solid rgba(155, 239, 255, 0.22);
   border-radius: 50%;
   background:
-    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.92), rgba(98, 235, 255, 0.64) 18%, rgba(13, 96, 124, 0.88) 44%, rgba(3, 18, 31, 0.98) 72%),
-    rgba(2, 12, 22, 0.96);
+    radial-gradient(circle at 36% 26%, rgba(255, 255, 255, 0.42), rgba(98, 235, 255, 0.18) 20%, rgba(7, 58, 77, 0.22) 48%, rgba(2, 12, 22, 0.18) 76%),
+    rgba(1, 16, 25, 0.16);
   box-shadow:
-    0 0 0 1px rgba(91, 224, 246, 0.2),
-    0 0 28px rgba(91, 224, 246, 0.38),
-    0 18px 45px rgba(0, 0, 0, 0.52);
+    inset 0 0 18px rgba(255, 255, 255, 0.05),
+    0 0 18px rgba(91, 224, 246, 0.12),
+    0 14px 32px rgba(0, 0, 0, 0.24);
   color: #ffffff;
+  cursor: grab;
+  opacity: 0.34;
+  backdrop-filter: blur(8px);
+  transform: scale(0.92);
   isolation: isolate;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.global-ai-shell[data-open="true"] .global-ai-orb,
+.global-ai-shell:hover .global-ai-orb,
+.global-ai-orb:focus-visible {
+  border-color: rgba(105, 230, 255, 0.66);
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.78), rgba(98, 235, 255, 0.46) 18%, rgba(13, 96, 124, 0.72) 44%, rgba(3, 18, 31, 0.88) 72%),
+    rgba(2, 12, 22, 0.78);
+  box-shadow:
+    0 0 0 1px rgba(91, 224, 246, 0.18),
+    0 0 26px rgba(91, 224, 246, 0.34),
+    0 18px 45px rgba(0, 0, 0, 0.48);
+  opacity: 0.92;
+  transform: scale(1);
+}
+
+.global-ai-shell[data-dragging="true"] .global-ai-orb {
+  cursor: grabbing;
+  opacity: 0.98;
+  transform: scale(1.04);
 }
 
 .global-ai-orb::before,
 .global-ai-orb::after {
   position: absolute;
-  inset: -7px;
-  border: 1px solid rgba(91, 224, 246, 0.24);
+  inset: -6px;
+  border: 1px solid rgba(91, 224, 246, 0.12);
   border-radius: 50%;
   content: "";
   animation: aiOrbSpin 7s linear infinite;
 }
 
 .global-ai-orb::after {
-  inset: -14px;
-  border-color: rgba(246, 197, 104, 0.18);
+  inset: -12px;
+  border-color: rgba(246, 197, 104, 0.08);
   animation-duration: 11s;
   animation-direction: reverse;
+}
+
+.global-ai-shell[data-open="true"] .global-ai-orb::before,
+.global-ai-shell:hover .global-ai-orb::before {
+  border-color: rgba(91, 224, 246, 0.3);
+}
+
+.global-ai-shell[data-open="true"] .global-ai-orb::after,
+.global-ai-shell:hover .global-ai-orb::after {
+  border-color: rgba(246, 197, 104, 0.18);
 }
 
 .global-ai-orb-core {
   position: relative;
   z-index: 2;
   color: #f9feff;
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 1000;
   line-height: 1;
-  text-shadow: 0 0 14px rgba(255, 255, 255, 0.64);
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.36);
 }
 
 .global-ai-orb small {
@@ -386,7 +428,7 @@ button {
   z-index: 3;
   padding: 3px 7px;
   border: 1px solid rgba(91, 224, 246, 0.46);
-  background: rgba(1, 16, 25, 0.92);
+  background: rgba(1, 16, 25, 0.72);
   color: rgba(227, 251, 255, 0.92);
   font-size: 10px;
   font-weight: 900;
@@ -398,9 +440,9 @@ button {
 .global-ai-orb-ring {
   position: absolute;
   inset: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 50%;
-  box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.06);
 }
 
 .global-ai-shell[data-orb-state="alert"] .global-ai-orb,
@@ -416,20 +458,21 @@ button {
     0 0 34px rgba(255, 79, 79, 0.44),
     0 0 54px rgba(246, 197, 104, 0.22),
     0 18px 45px rgba(0, 0, 0, 0.52);
+  opacity: 0.82;
 }
 
 .global-ai-panel {
   order: -1;
-  width: min(480px, calc(100vw - 28px));
-  max-height: min(74vh, 720px);
+  width: min(420px, calc(100vw - 28px));
+  max-height: min(68vh, 660px);
   display: grid;
-  gap: 12px;
-  padding: 14px;
+  gap: 10px;
+  padding: 12px;
   overflow: hidden;
-  border: 1px solid rgba(91, 224, 246, 0.3);
+  border: 1px solid rgba(91, 224, 246, 0.24);
   background:
-    linear-gradient(145deg, rgba(3, 24, 35, 0.94), rgba(1, 8, 15, 0.92)),
-    radial-gradient(circle at 12% 0%, rgba(91, 224, 246, 0.16), transparent 34%);
+    linear-gradient(145deg, rgba(3, 24, 35, 0.88), rgba(1, 8, 15, 0.86)),
+    radial-gradient(circle at 12% 0%, rgba(91, 224, 246, 0.12), transparent 34%);
   box-shadow:
     inset 0 0 28px rgba(91, 224, 246, 0.08),
     0 24px 70px rgba(0, 0, 0, 0.52);
@@ -458,7 +501,7 @@ button {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding-bottom: 10px;
+  padding-bottom: 8px;
   border-bottom: 1px solid rgba(91, 224, 246, 0.16);
 }
 
@@ -477,7 +520,7 @@ button {
 
 .global-ai-panel strong {
   color: #f6fdff;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.35;
 }
 
@@ -495,7 +538,7 @@ button {
   margin: 0;
   color: rgba(224, 246, 250, 0.78);
   font-size: 12px;
-  line-height: 1.58;
+  line-height: 1.5;
 }
 
 .global-ai-status-line {
@@ -503,7 +546,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 8px 10px;
+  padding: 7px 9px;
   border: 1px solid rgba(91, 224, 246, 0.14);
   background: rgba(0, 16, 25, 0.58);
 }
@@ -524,7 +567,7 @@ button {
 .global-ai-quick-actions button,
 .global-ai-question-chips button,
 .global-ai-input-row button {
-  min-height: 32px;
+  min-height: 30px;
   border: 1px solid rgba(91, 224, 246, 0.24);
   background: rgba(5, 31, 43, 0.78);
   color: rgba(230, 251, 255, 0.9);
@@ -539,7 +582,7 @@ button {
 }
 
 .global-ai-question-chips button {
-  flex: 1 1 190px;
+  flex: 1 1 120px;
   justify-content: center;
 }
 
@@ -550,7 +593,7 @@ button {
 
 .global-ai-input-row input {
   min-width: 0;
-  min-height: 34px;
+  min-height: 32px;
   border: 1px solid rgba(91, 224, 246, 0.2);
   outline: 0;
   background: rgba(0, 11, 18, 0.86);
@@ -565,8 +608,8 @@ button {
 }
 
 .global-ai-answer {
-  min-height: 116px;
-  max-height: min(42vh, 380px);
+  min-height: 92px;
+  max-height: min(34vh, 300px);
   overflow: auto;
   padding: 10px;
   border: 1px solid rgba(91, 224, 246, 0.14);
