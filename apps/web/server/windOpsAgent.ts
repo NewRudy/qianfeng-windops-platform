@@ -28,6 +28,12 @@ export type AgentAskPayload = {
 
 export type AgentEvidenceCard = {
   confidence: number;
+  gate: {
+    decision: string;
+    humanCheck: string;
+    label: string;
+    role: "amplify" | "counter" | "review" | "support";
+  };
   interpretation: string;
   module: WorkflowModuleKey;
   severity: "alarm" | "normal" | "watch";
@@ -158,6 +164,7 @@ export function resolveAgentContext(payload: AgentAskPayload): AgentContext {
 export function buildAgentEvidenceCards(workflowCase: GearboxWorkflowCase): AgentEvidenceCard[] {
   const evidenceRows = workflowCase.modules.alerts.evidenceRows ?? [];
   const fusionSignals = workflowCase.modules.fusion.fusionSignals ?? [];
+  const boltDecision = workflowCase.modules.bolts.decision;
   const sourceToModule = new Map<string, WorkflowModuleKey>([
     ["SCADA", "scada"],
     ["CMS", "cms"],
@@ -165,11 +172,12 @@ export function buildAgentEvidenceCards(workflowCase: GearboxWorkflowCase): Agen
     ["螺栓/结构监测", "bolts"],
   ]);
 
-  return evidenceRows.map((row, index) => {
+  const cards: AgentEvidenceCard[] = evidenceRows.map((row, index) => {
     const relatedSignal = fusionSignals.find((signal) => row.source.includes(signal.source.split(" ")[0]));
     const module = sourceToModule.get(row.source) ?? (row.source.includes("CMS") ? "cms" : "scada");
     return {
       confidence: Math.round(Number(row.confidence) * 100),
+      gate: evidenceGateForSource(row.source),
       interpretation: relatedSignal?.rule ?? row.model,
       module,
       severity: index < 2 ? "alarm" : "watch",
@@ -178,6 +186,59 @@ export function buildAgentEvidenceCards(workflowCase: GearboxWorkflowCase): Agen
       value: row.value,
     };
   });
+
+  if (boltDecision) {
+    cards.push({
+      confidence: 72,
+      gate: {
+        decision: "未改写齿轮箱主故障，只作为载荷放大因素跟踪。",
+        humanCheck: boltDecision.confirm,
+        label: "结构反证",
+        role: "counter",
+      },
+      interpretation: boltDecision.evidence,
+      module: "bolts",
+      severity: "watch",
+      source: "螺栓/结构监测",
+      title: "反证 1",
+      value: boltDecision.result,
+    });
+  }
+
+  return cards;
+}
+
+function evidenceGateForSource(source: string): AgentEvidenceCard["gate"] {
+  if (source.includes("CMS")) {
+    return {
+      decision: "支持齿轮箱高速轴轴承定位。",
+      humanCheck: "诊断工程师确认采样质量和转速工况后，才把侧频作为部件定位依据。",
+      label: "支持定位",
+      role: "support",
+    };
+  }
+  if (source.includes("Oil") || source.includes("油温")) {
+    return {
+      decision: "增强润滑/摩擦异常判断。",
+      humanCheck: "结合环境温度、散热状态和同类机组温升后，再作为风险增强证据。",
+      label: "增强判断",
+      role: "amplify",
+    };
+  }
+  if (source.includes("螺栓") || source.includes("结构")) {
+    return {
+      decision: "结构侧作为反证项，不直接派发叶根检修。",
+      humanCheck: "结构工程师确认螺栓松弛未形成环向扩展后，才排除结构主故障。",
+      label: "结构反证",
+      role: "counter",
+    };
+  }
+  return {
+    decision: "支持运行异常成立。",
+    humanCheck: "值班员确认非限电、非通信异常、非人为降载后，才把功率残差作为有效主证据。",
+    label: "支持主故障",
+    role: "support",
+  };
 }
 
 export function buildAgentChartRefs(workflowCase: GearboxWorkflowCase): AgentChartRef[] {
@@ -416,7 +477,7 @@ export function buildAgentPrompt(intent: AgentIntent, question: string, workflow
     `风机：${workflowCase.turbineId}`,
     `诊断结论：${brief?.conclusion ?? ""}`,
     `建议动作：${brief?.recommendedAction ?? ""}`,
-    `证据卡：${evidence.map((item) => `${item.source}:${item.value}:${item.interpretation}`).join("；")}`,
+    `证据卡：${evidence.map((item) => `${item.source}:${item.value}:${item.gate.label}:${item.gate.decision}:${item.interpretation}`).join("；")}`,
     `工单确认门：${confirmationChecks ?? "低风速窗口、安全许可、备件工器具、复盘回写责任"}`,
     `工单验收标准：${acceptanceCriteria ?? "现场复核材料上传并完成样本回写"}`,
   ].join("\n");

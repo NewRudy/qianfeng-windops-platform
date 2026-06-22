@@ -22,11 +22,14 @@ describe("WindOps diagnostic agent", () => {
   it("builds evidence cards from the trusted workflow package", () => {
     const cards = buildAgentEvidenceCards(gearboxWorkflowCase);
 
-    expect(cards).toHaveLength(3);
-    expect(cards.map((card) => card.source)).toEqual(["SCADA", "CMS", "SCADA/Oil Temp"]);
+    expect(cards).toHaveLength(4);
+    expect(cards.map((card) => card.source)).toEqual(["SCADA", "CMS", "SCADA/Oil Temp", "螺栓/结构监测"]);
     expect(cards[0].module).toBe("scada");
     expect(cards[1].module).toBe("cms");
+    expect(cards[3].module).toBe("bolts");
     expect(cards[0].confidence).toBeGreaterThan(80);
+    expect(cards.map((card) => card.gate.label)).toEqual(["支持主故障", "支持定位", "增强判断", "结构反证"]);
+    expect(cards[3].gate.decision).toContain("未改写齿轮箱主故障");
   });
 
   it("records tool trace so the AI answer is auditable", () => {
@@ -134,7 +137,8 @@ describe("WindOps diagnostic agent", () => {
     expect(result.source).toBe("llm");
     expect(result.answerText).toContain("模型答复");
     expect(result.operatorFocus.recommendedModule).toBe("alerts");
-    expect(result.evidenceCards).toHaveLength(3);
+    expect(result.evidenceCards).toHaveLength(4);
+    expect(result.evidenceCards.map((card) => card.gate.role)).toContain("counter");
     expect(result.toolTrace).toHaveLength(5);
   });
 
@@ -145,6 +149,7 @@ describe("WindOps diagnostic agent", () => {
     expect(prompt).toContain("workorder");
     expect(prompt).toContain("HS-WTG-02");
     expect(prompt).toContain("SCADA");
+    expect(prompt).toContain("结构反证");
     expect(prompt).toContain("待人工确认");
     expect(prompt).toContain("工单确认门");
     expect(prompt).toContain("复盘回写责任");

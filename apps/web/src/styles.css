@@ -2036,6 +2036,43 @@ button {
   line-height: 1.45;
 }
 
+.agent-evidence-gate {
+  display: grid;
+  gap: 4px;
+  padding: 7px 8px;
+  border: 1px solid rgba(91, 224, 246, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.agent-evidence-gate.support {
+  border-color: rgba(86, 240, 111, 0.22);
+}
+
+.agent-evidence-gate.amplify {
+  border-color: rgba(246, 197, 104, 0.26);
+}
+
+.agent-evidence-gate.counter {
+  border-color: rgba(91, 224, 246, 0.28);
+}
+
+.agent-evidence-gate span {
+  color: rgba(246, 197, 104, 0.9);
+  font-size: 10px;
+}
+
+.agent-evidence-gate strong {
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.agent-evidence-gate p {
+  margin: 0;
+  color: rgba(222, 246, 249, 0.68);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
 .agent-evidence-card div {
   display: grid;
   grid-template-columns: 1fr auto;
