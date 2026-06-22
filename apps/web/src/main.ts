@@ -2546,16 +2546,15 @@ document.querySelectorAll<HTMLButtonElement>(".part-label[data-bim-part]").forEa
 document.querySelectorAll<HTMLButtonElement>(".module-tab").forEach((button) => {
   button.addEventListener("click", () => {
     const moduleName = getWorkflowModule(button.dataset.module) ?? "health";
-    const nextModule = dashboardShell.dataset.activeModule === moduleName ? "none" : moduleName;
 
-    if (nextModule === "workorder") {
+    if (moduleName === "workorder") {
       openGeneratedWorkOrder();
       return;
     }
 
-    setActiveModule(nextModule);
-    if (["fusion", "scada", "cms", "bolts", "alerts", "inspection", "maintenance"].includes(nextModule)) {
-      setEventTimelineStage(nextModule === "alerts" ? "bim-location" : "evidence-review");
+    setActiveModule(moduleName);
+    if (["fusion", "scada", "cms", "bolts", "alerts", "inspection", "maintenance"].includes(moduleName)) {
+      setEventTimelineStage(moduleName === "alerts" ? "bim-location" : "evidence-review");
     }
   });
 });
