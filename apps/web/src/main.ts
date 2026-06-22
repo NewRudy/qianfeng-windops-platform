@@ -1671,7 +1671,7 @@ root.innerHTML = `
         <footer>
           <small id="ai-duty-status">已生成播报，等待风场巡航完成</small>
           <button id="ai-duty-speak" type="button">语音播报</button>
-          <button id="ai-duty-open" type="button">进入告警研判</button>
+          <button id="ai-duty-open" type="button">进入BIM诊断</button>
         </footer>
       </section>
 
@@ -1697,7 +1697,7 @@ root.innerHTML = `
           <div class="bim-stage-hud">
             <span>HS-WTG 单机透视</span>
             <strong id="bim-status">等待进入单机 BIM 诊断</strong>
-            <em>点击部件定位；需要证据、工单或维护策略时从下方流程打开。</em>
+            <em>先在 BIM 中定位疑似部件；需要证据、模型复算或工单时进入管理工作台。</em>
           </div>
           <div class="bim-stage-actions" aria-label="BIM 模型操作">
             <button id="bim-toggle-decompose" type="button" data-state="composed">拆解模型</button>
@@ -3143,7 +3143,7 @@ void createWindFarmScene({
     scene.focusTurbine(activeWorkflowCase.turbineId);
     scene.showTurbineAlert(activeWorkflowCase.turbineId);
     openDiagnosis(turbine, "brief");
-    openManagementPage("event", "已进入当前事件工作台");
+    setBimStatus("已进入单机 BIM 诊断，请先确认疑似部件位置");
   });
 
   window.setTimeout(() => {

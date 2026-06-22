@@ -950,6 +950,76 @@ button {
   font-size: 13px;
 }
 
+@media (max-width: 1180px) {
+  .shell[data-workspace="manager"] .management-console {
+    grid-template-columns: 170px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .shell[data-workspace="manager"] .management-nav button {
+    min-height: 38px;
+    padding: 0 10px;
+    font-size: 11px;
+  }
+
+  .shell[data-workspace="manager"] .parameter-panel > div,
+  .shell[data-workspace="manager"] .health-weight-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .shell[data-workspace="manager"] .module-drawer {
+    top: 82px;
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    padding: 10px;
+  }
+
+  .shell[data-workspace="manager"] .management-console {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  .shell[data-workspace="manager"] .management-nav {
+    grid-template-columns: repeat(9, minmax(94px, 1fr));
+    overflow-x: auto;
+    padding: 6px;
+  }
+
+  .shell[data-workspace="manager"] .management-nav button {
+    min-height: 34px;
+    text-align: center;
+  }
+
+  .shell[data-workspace="manager"] .management-page {
+    padding: 14px;
+  }
+
+  .shell[data-workspace="manager"] .management-page-header,
+  .management-workbench-header {
+    display: grid;
+    gap: 10px;
+  }
+
+  .shell[data-workspace="manager"] .event-workbench-grid,
+  .shell[data-workspace="manager"] .health-overview,
+  .shell[data-workspace="manager"] .health-source-grid,
+  .shell[data-workspace="manager"] .quick-module-grid,
+  .shell[data-workspace="manager"] .record-list,
+  .shell[data-workspace="manager"] .parameter-panel > div,
+  .shell[data-workspace="manager"] .health-weight-grid,
+  .shell[data-workspace="manager"] .knowledge-graph,
+  .shell[data-workspace="manager"] .workorder-page-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .shell[data-workspace="manager"] .health-component-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .shell[data-manager-page="event"] .management-page[data-management-page="event"],
 .shell[data-manager-page="health"] .management-page[data-management-page="health"],
 .shell[data-manager-page="scada"] .management-page[data-management-page="scada"],
@@ -4618,6 +4688,14 @@ button {
     width: auto;
   }
 
+  .shell[data-workspace="manager"] .module-drawer {
+    top: 82px;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
+  }
+
   .module-panel {
     min-height: auto;
     max-height: 34vh;
@@ -4640,5 +4718,9 @@ button {
   .bim-toolbar {
     grid-template-columns: repeat(4, minmax(160px, 1fr));
     overflow-x: auto;
+  }
+
+  .shell[data-workspace="manager"] .bim-toolbar {
+    display: none;
   }
 }
