@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { buildHealthAssessment } from "../src/workflow/healthAssessment";
 import {
   buildGearboxWorkflowCase,
   gearboxCaseCatalog,
@@ -6,7 +7,7 @@ import {
   type GearboxWorkflowCase,
 } from "../src/workflow/gearboxWorkflow";
 
-export type AnalysisPageKey = "cms" | "fusion" | "maintenance" | "scada" | "structure" | "workorders";
+export type AnalysisPageKey = "cms" | "fusion" | "health" | "maintenance" | "scada" | "structure" | "workorders";
 
 export type AnalysisParameter = {
   label: string;
@@ -166,6 +167,27 @@ function buildAnalysisProfile(
   const parameterText = formatParameterText(parameters);
   const module = pageKey === "structure" ? workflowCase.modules.bolts : workflowCase.modules[pageKey === "workorders" ? "workorder" : pageKey];
 
+  if (pageKey === "health") {
+    const assessment = buildHealthAssessment(workflowCase);
+    const watchList = assessment.componentScores
+      .filter((component) => component.level === 1 && component.status !== "normal")
+      .map((component) => `${component.label}${component.score}`)
+      .join("、");
+    return {
+      conclusion: `健康评估完成：${workflowCase.turbineId} 综合健康 ${assessment.overallScore}，${watchList || "主要系统均未触发关注"}；当前专项重点监测为齿轮箱、螺栓预紧力和法兰间隙。`,
+      evidence: [
+        assessment.broadScreeningSummary,
+        assessment.specialMonitoringSummary,
+        assessment.coverageGap,
+        `本次参数：${parameterText}`,
+      ],
+      humanBoundary: "健康评分用于筛查和排查优先级，停机、登塔、检修和派工仍需值班长与现场工程师确认。",
+      inputSummary: assessment.dataSources.map((source) => `${source.label}:${source.status}`).join("；"),
+      model: "系统层级权重评分 + 广谱筛查 + 专项重点监测门控",
+      nextAction: "先复核齿轮箱专项证据，再决定是否生成现场复核工单。",
+    };
+  }
+
   if (pageKey === "scada") {
     const chart = workflowCase.modules.scada.scadaChart;
     const abnormalCount = chart?.points.filter((point) => point.abnormal).length ?? 0;
@@ -257,7 +279,7 @@ function buildAnalysisProfile(
 }
 
 function normalizeAnalysisPageKey(pageKey: AnalysisPageKey): AnalysisPageKey {
-  const allowed = new Set<AnalysisPageKey>(["cms", "fusion", "maintenance", "scada", "structure", "workorders"]);
+  const allowed = new Set<AnalysisPageKey>(["cms", "fusion", "health", "maintenance", "scada", "structure", "workorders"]);
   if (!allowed.has(pageKey)) throw new Error("Unsupported analysis page");
   return pageKey;
 }

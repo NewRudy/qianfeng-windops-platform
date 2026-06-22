@@ -4,6 +4,13 @@ import { BimTurbineViewer, type BimPartKey } from "./bim/BimTurbineViewer";
 import { createWindFarmScene } from "./scene/createWindFarmScene";
 import { firstSliceSceneConfig, type TurbineAsset } from "./scene/sceneConfig";
 import {
+  buildHealthAssessment,
+  type HealthAssessment,
+  type HealthComponentScore,
+  type HealthComponentStatus,
+  type HealthDataSource,
+} from "./workflow/healthAssessment";
+import {
   buildGearboxWorkflowCase,
   gearboxCaseCatalog,
   gearboxWorkflowCase,
@@ -74,6 +81,7 @@ type WorkflowStage = {
 
 type ManagementPageKey =
   | "event"
+  | "health"
   | "scada"
   | "cms"
   | "structure"
@@ -157,6 +165,13 @@ const managementPages: ManagementPage[] = [
     title: "当前事件处置",
   },
   {
+    key: "health",
+    label: "健康管理",
+    module: "health",
+    subtitle: "按系统层级、部件权重和数据覆盖口径评估整机健康状态。",
+    title: "风机健康管理",
+  },
+  {
     key: "scada",
     label: "SCADA",
     module: "scada",
@@ -220,7 +235,7 @@ function getManagementPageForModule(moduleName: string | undefined): ManagementP
     brief: "event",
     cms: "cms",
     fusion: "fusion",
-    health: "event",
+    health: "health",
     inspection: "knowledge",
     maintenance: "maintenance",
     scada: "scada",
@@ -285,6 +300,7 @@ function renderManagementConsole(): string {
       ${renderManagementNav()}
       <section class="management-pages">
         ${renderEventWorkbenchPage()}
+        ${renderHealthManagementPage()}
         ${renderScadaManagementPage()}
         ${renderCmsManagementPage()}
         ${renderStructureManagementPage()}
@@ -407,6 +423,109 @@ function renderEventWorkbenchPage(): string {
           <small>${html(page.subtitle)}</small>
         </button>
       `).join("")}
+    </section>
+  `);
+}
+
+function healthStatusLabel(status: HealthComponentStatus): string {
+  if (status === "alarm") return "预警";
+  if (status === "watch") return "关注";
+  return "正常";
+}
+
+function renderHealthSourceCard(source: HealthDataSource): string {
+  const statusLabel = source.status === "connected" ? "已接入" : source.status === "demo" ? "演示接口" : "待接入";
+  return `
+    <article class="health-source-card" data-source-status="${html(source.status)}">
+      <header>
+        <span>${html(statusLabel)}</span>
+        <strong>${html(source.label)}</strong>
+      </header>
+      <p>${html(source.role)}</p>
+      <small>${html(source.latest)} · ${html(source.boundary)}</small>
+    </article>
+  `;
+}
+
+function renderHealthComponentRow(component: HealthComponentScore): string {
+  const sourceText = component.dataSources.map((source) => {
+    const sourceLabelMap: Record<string, string> = {
+      "ai-video": "AI视频",
+      bolt: "螺栓",
+      cms: "CMS",
+      "flange-gap": "法兰",
+      scada: "SCADA",
+      uav: "无人机",
+      weather: "气象",
+    };
+    return sourceLabelMap[source] ?? source;
+  }).join(" / ");
+
+  return `
+    <article class="health-component-row" data-health-status="${html(component.status)}" data-health-level="${component.level}">
+      <div class="health-component-main">
+        <span>${component.level === 1 ? "系统层级" : "子部件"} · 权重 ${component.weightPct}%</span>
+        <strong>${html(component.label)}</strong>
+        <p>${html(component.reason)}</p>
+      </div>
+      <div class="health-score-meter" aria-label="${html(component.label)}健康度">
+        <strong>${component.score}</strong>
+        <span>${html(healthStatusLabel(component.status))}</span>
+        <i style="--score: ${component.score}%;"></i>
+      </div>
+      <div class="health-component-evidence">
+        <span>${html(sourceText)}</span>
+        <p>${html(component.screening)}</p>
+        <small>${html(component.nextAction)}</small>
+      </div>
+    </article>
+  `;
+}
+
+function renderHealthSystemWeight(assessment: HealthAssessment): string {
+  return assessment.systemWeights.map((component) => `
+    <article>
+      <span>${html(component.label)}</span>
+      <strong>${component.score}</strong>
+      <i style="--score: ${component.score}%;"></i>
+      <small>权重 ${component.weightPct}%</small>
+    </article>
+  `).join("");
+}
+
+function renderHealthManagementPage(): string {
+  const assessment = buildHealthAssessment(activeWorkflowCase);
+  const primaryFocus = assessment.componentScores.find((component) => component.key === "gearbox") ?? assessment.componentScores[0];
+  return renderManagementPageFrame("health", `
+    <section class="health-overview">
+      <article class="health-score-card" data-health-status="${html(assessment.status)}">
+        <span>${html(assessment.turbineId)} 综合健康</span>
+        <strong>${assessment.overallScore}</strong>
+        <p>${html(assessment.broadScreeningSummary)}</p>
+      </article>
+      <article class="health-focus-card">
+        <span>专项重点监测</span>
+        <strong>${html(primaryFocus.label)} · ${html(healthStatusLabel(primaryFocus.status))}</strong>
+        <p>${html(assessment.specialMonitoringSummary)}</p>
+      </article>
+    </section>
+    ${renderParameterPanel("health", [
+      { label: "权重版本", value: "赛题十三部件权重", type: "select", options: ["赛题十三部件权重", "传动链加权", "结构安全加权"] },
+      { label: "广谱筛查范围", value: "全部主要部件", type: "select", options: ["全部主要部件", "传动链专项", "结构专项"] },
+      { label: "模拟接入口径", value: "公开/模拟边界显示", type: "select", options: ["公开/模拟边界显示", "只看已接入样例", "真实场站接入位"] },
+    ])}
+    <section class="health-source-grid" aria-label="数据源覆盖">
+      ${assessment.dataSources.map(renderHealthSourceCard).join("")}
+    </section>
+    <section class="health-weight-grid" aria-label="系统权重健康评分">
+      ${renderHealthSystemWeight(assessment)}
+    </section>
+    <section class="health-component-list" aria-label="部件层级健康评分">
+      ${assessment.componentScores.map(renderHealthComponentRow).join("")}
+    </section>
+    <section class="health-gap-note">
+      <strong>边界说明</strong>
+      <p>${html(assessment.coverageGap)}</p>
     </section>
   `);
 }
@@ -3291,7 +3410,7 @@ function getAnalysisParamValue(pageKey: ManagementPageKey, index: number): strin
 }
 
 function isAnalysisActionPageKey(value: string | undefined): value is AnalysisActionPageKey {
-  return Boolean(value && ["cms", "fusion", "maintenance", "scada", "structure", "workorders"].includes(value));
+  return Boolean(value && ["cms", "fusion", "health", "maintenance", "scada", "structure", "workorders"].includes(value));
 }
 
 function getAnalysisParameters(pageKey: AnalysisActionPageKey): AnalysisParameter[] {
@@ -3321,6 +3440,15 @@ function renderAnalysisRecord(record: AnalysisRunRecord): string {
 }
 
 function buildAnalysisRunSummary(pageKey: ManagementPageKey): string {
+  if (pageKey === "health") {
+    const assessment = buildHealthAssessment(activeWorkflowCase);
+    const alarmComponents = assessment.componentScores
+      .filter((component) => component.level === 1 && component.status !== "normal")
+      .map((component) => component.label)
+      .join("、");
+    return `已按“${getAnalysisParamValue("health", 0)}”复算：综合健康 ${assessment.overallScore}，关注系统 ${alarmComponents || "无"}；广谱筛查范围为 ${getAnalysisParamValue("health", 1)}，数据边界口径为 ${getAnalysisParamValue("health", 2)}。`;
+  }
+
   if (pageKey === "scada") {
     const threshold = Number(getAnalysisParamValue("scada", 1) || "8");
     const chart = activeWorkflowCase.modules.scada.scadaChart;
