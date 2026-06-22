@@ -1540,13 +1540,16 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
               </article>
             `).join("")}
           </section>
-          <ol>
-            ${result.workOrderDraft.steps.map((step, index) => `
-              <li><span>${String(index + 1).padStart(2, "0")}</span><strong>${html(step.action)}</strong><small>${html(step.owner)} / ${html(step.output)}</small></li>
-            `).join("")}
-          </ol>
+          <details class="agent-workorder-steps">
+            <summary>展开现场操作步骤（${result.workOrderDraft.steps.length}）</summary>
+            <ol>
+              ${result.workOrderDraft.steps.map((step, index) => `
+                <li><span>${String(index + 1).padStart(2, "0")}</span><strong>${html(step.action)}</strong><small>${html(step.owner)} / ${html(step.output)}</small></li>
+              `).join("")}
+            </ol>
+          </details>
           <details class="agent-workorder-review">
-            <summary>验收与回写要求</summary>
+            <summary>展开验收与复盘回写（${result.workOrderDraft.acceptanceCriteria.length + result.workOrderDraft.writebackItems.length}）</summary>
             <div>
               <section>
                 <h4>验收标准</h4>
