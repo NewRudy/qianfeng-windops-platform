@@ -443,10 +443,10 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
     eventCode: input.eventCode,
     eventTimeline: [
       {
-        description: `${spokenTurbineName(input.turbineId)}触发齿轮箱一级预警，AI 已生成短播报并锁定当前事件。`,
+        description: `${spokenTurbineName(input.turbineId)}触发齿轮箱一级预警，系统已生成短播报并锁定当前事件。`,
         id: "ai-alert",
         module: "brief",
-        owner: "AI 值班员",
+        owner: "集控值班员",
         status: "done",
         title: "预警触发",
       },
@@ -475,7 +475,7 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
         title: "工单草案",
       },
       {
-        description: "停机、登塔和检修动作必须由现场工程师确认后执行，AI 不自动派单或自动停机。",
+        description: "停机、登塔和检修动作必须由现场工程师确认后执行，系统不自动派单或自动停机。",
         id: "human-confirm",
         module: "workorder",
         owner: "现场工程师",
@@ -496,7 +496,7 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
       brief: {
         action: { label: "展开证据链", module: "fusion", primary: true },
         aiBrief: {
-          broadcast: `黔风智维提醒：${spokenTurbineName(input.turbineId)}齿轮箱出现一级预警，请进入诊断包查看证据链。`,
+          broadcast: `黔风智维提醒：${spokenTurbineName(input.turbineId)}齿轮箱出现一级预警，请进入告警研判查看证据链。`,
           conclusion: `${input.turbineId} 当前不是孤立阈值报警，而是运行残差、振动频谱和热异常共同指向齿轮箱高速轴轴承早期磨损。系统建议按预测维护流程生成巡检工单，复核前执行 ${input.maintenance.workMode}。`,
           decisionSteps: [
             {
@@ -527,7 +527,7 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
               title: "给出值班结论",
             },
             {
-              detail: "AI 只生成工单草案和复核建议；限功率、停机、登塔和检修仍由值长与现场工程师确认。",
+              detail: "系统只生成工单草案和复核建议；限功率、停机、登塔和检修仍由值长与现场工程师确认。",
               id: "human-action",
               input: `${input.maintenance.actionWindowHours}、${input.maintenance.workMode}、备件 ${input.maintenance.parts}`,
               model: "预测维护规则 + 人工确认边界",
@@ -547,7 +547,7 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
             humanCheck: "值班员确认非限电、非人为降载、非通信异常后，才进入告警研判和工单草案。",
             primaryQuestion: "先看融合判据",
             recommendedModule: "fusion",
-            why: "AI 值班员先把 SCADA、CMS、油温和螺栓/结构证据放到同一事件窗口，避免用户只看一张曲线就误判。",
+            why: "系统先把 SCADA、CMS、油温和螺栓/结构证据放到同一事件窗口，避免用户只看一张曲线就误判。",
           },
           operatorQuestions: [
             "为什么判定为齿轮箱风险？",
@@ -559,15 +559,15 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
           recommendedAction: `进入证据链并生成 ${input.maintenance.actionWindowHours} 现场复核工单`,
           riskLevel: exceededCoreSignals >= 3 ? "red" : "orange",
         },
-        body: "AI 将多源监测结果整理成值班可读的诊断包：先给结论，再列证据、反证和下一步动作。大模型后续只基于该结构化证据生成专业报告，不直接替代安全决策。",
-        kicker: "AI Duty Officer",
+        body: "系统将多源监测结果整理成值班可读的告警研判：先给结论，再列证据、反证和下一步动作。大模型只基于该结构化证据生成专业报告，不直接替代安全决策。",
+        kicker: "智能值班",
         metrics: [
-          { label: "AI 结论", value: "P1 预测维护" },
+          { label: "研判结论", value: "P1 预测维护" },
           { label: "疑似部件", value: "齿轮箱高速轴轴承" },
           { label: "证据来源", value: "SCADA / CMS / 螺栓 / 油温" },
           { label: "置信度", value: `${diagnostics.riskConfidencePct}%` },
         ],
-        title: `${input.turbineId} AI 诊断包`,
+        title: `${input.turbineId} 告警研判`,
       },
       health: {
         action: { label: "查看融合判据", module: "fusion" },
@@ -741,7 +741,7 @@ export function buildGearboxWorkflowCase(input: GearboxCaseInput = activeGearbox
         decision: {
           confirm: "值长确认告警级别、BIM 疑似部件和结构反证项后，才进入隐患排查清单。",
           evidence: "告警不是单阈值触发，而是由 SCADA、CMS、油温三类主证据共同支撑，并由 BIM 定位到齿轮箱高速轴轴承。",
-          input: "融合判据输出、BIM 齿轮箱定位、叶根/塔筒反证项、AI 值班建议",
+          input: "融合判据输出、BIM 齿轮箱定位、叶根/塔筒反证项、智能值班建议",
           model: "P1 告警分级规则 + BIM 部件映射 + 人工值班确认边界",
           operation: "确认告警闭环",
           result: "锁定齿轮箱主疑似部件，带着反证项进入隐患排查",

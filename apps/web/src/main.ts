@@ -64,6 +64,7 @@ type WorkflowStageKey = "ai" | "evidence" | "locate" | "close";
 
 type WorkflowStage = {
   description: string;
+  focusLabel: string;
   key: WorkflowStageKey;
   modules: WorkflowModuleKey[];
   nextAction: string;
@@ -73,15 +74,17 @@ type WorkflowStage = {
 
 const workflowStages: WorkflowStage[] = [
   {
-    description: "先让 AI 给出当前判断、知识链和人工边界。",
+    description: "确认当前预警是否成立，明确等级、疑似部件和复核边界。",
+    focusLabel: "当前预警",
     key: "ai",
     modules: ["brief", "health"],
-    nextAction: "运行融合判据",
+    nextAction: "复核多源证据",
     primaryModule: "brief",
-    title: "AI研判",
+    title: "告警研判",
   },
   {
-    description: "一次只复核一个数据源，避免曲线和文字同时铺满。",
+    description: "核对 SCADA、CMS、油温和结构监测是否在同一事件窗口内同向。",
+    focusLabel: "数据一致性",
     key: "evidence",
     modules: ["scada", "cms", "bolts", "fusion"],
     nextAction: "查看关键证据",
@@ -89,7 +92,8 @@ const workflowStages: WorkflowStage[] = [
     title: "证据复核",
   },
   {
-    description: "把疑似故障落到风机部件，再决定是否进入处置。",
+    description: "把风险落到 BIM 部件，记录主疑似对象和排除项。",
+    focusLabel: "疑似部件",
     key: "locate",
     modules: ["alerts", "inspection"],
     nextAction: "定位齿轮箱",
@@ -97,10 +101,11 @@ const workflowStages: WorkflowStage[] = [
     title: "BIM定位",
   },
   {
-    description: "只处理维护策略、工单草案、签核和现场回写。",
+    description: "形成处置策略、工单草案、人工签核和现场回写要求。",
+    focusLabel: "人工闭环",
     key: "close",
     modules: ["maintenance", "workorder"],
-    nextAction: "进入处置闭环",
+    nextAction: "打开处置闭环",
     primaryModule: "maintenance",
     title: "处置闭环",
   },
@@ -122,11 +127,11 @@ function renderWorkflowCommandCard(): string {
       </header>
       <div>
         <article>
-          <span>当前阶段</span>
-          <strong data-command-stage>${html(stage.title)}</strong>
+          <span>值班步骤</span>
+          <strong data-command-stage>${html(`${stage.title} / ${stage.focusLabel}`)}</strong>
         </article>
         <article>
-          <span>只看这一件事</span>
+          <span>本步目标</span>
           <p data-command-description>${html(stage.description)}</p>
         </article>
         <article>
@@ -647,7 +652,7 @@ function renderEventTimeline(steps: EventTimelineStep[]): string {
     <section class="event-timeline" aria-label="值班事件闭环">
       <header>
         <span>值班事件闭环</span>
-        <strong>AI 预警 -> 证据复核 -> 工单复盘</strong>
+        <strong>预警发现 -> 证据复核 -> 工单复盘</strong>
       </header>
       <ol>
         ${steps.map((step, index) => `
@@ -676,7 +681,7 @@ function renderAiBrief(module: WorkflowModule): string {
     <section class="ai-duty-assistant ${html(brief.riskLevel)}">
       <header>
         <div>
-          <span>AI 值班助手</span>
+          <span>智能值班员</span>
           <strong>下一步：${html(primaryAction.label)}</strong>
         </div>
         <small id="ai-agent-status">后端智能检测中</small>
@@ -709,21 +714,21 @@ function renderAiBrief(module: WorkflowModule): string {
       </section>
       <div class="ai-next-actions">
         <button class="primary" type="button" data-open-module="${html(primaryAction.module)}">${html(primaryAction.label)}</button>
-        <button type="button" data-ai-generate-report>让 AI 解释这次预警</button>
+        <button type="button" data-ai-generate-report>生成研判说明</button>
       </div>
       <details class="ai-progress-details">
         <summary>
           <span>闭环进度</span>
-          <strong>查看 AI 预警到复盘回写</strong>
+          <strong>查看预警到复盘回写</strong>
         </summary>
         ${renderEventTimeline(activeWorkflowCase.eventTimeline)}
       </details>
       <details class="ai-reasoning-details">
         <summary>
-          <span>AI 推理链</span>
+          <span>研判依据</span>
           <strong>展开输入 / 模型 / 结果</strong>
         </summary>
-        <ol class="ai-decision-chain" aria-label="AI 决策链">
+        <ol class="ai-decision-chain" aria-label="研判决策链">
           ${brief.decisionSteps.map((step, index) => `
             <li>
               <span>${String(index + 1).padStart(2, "0")}</span>
@@ -754,12 +759,12 @@ function renderAiBrief(module: WorkflowModule): string {
     <section class="ai-generated-report ai-duty-console" aria-live="polite">
       <header>
         <div>
-          <span>AI 值班问答</span>
+          <span>值班问答</span>
           <strong>围绕当前预警追问，不做泛聊</strong>
         </div>
         <div class="ai-report-actions">
-          <button type="button" data-ai-voice-question>语音问AI</button>
-          <button type="button" data-ai-generate-report>生成AI报告</button>
+          <button type="button" data-ai-voice-question>语音追问</button>
+          <button type="button" data-ai-generate-report>生成研判报告</button>
         </div>
       </header>
       <div class="ai-duty-console-grid">
@@ -774,7 +779,7 @@ function renderAiBrief(module: WorkflowModule): string {
           <p>${html(dutyFocus.humanCheck)}</p>
         </section>
       </div>
-      <section class="ai-evidence-scope" aria-label="AI 已读取的证据范围">
+      <section class="ai-evidence-scope" aria-label="已读取的证据范围">
         <span>证据范围</span>
         <ul>
           ${evidenceScope.map((item) => `<li>${html(item)}</li>`).join("")}
@@ -784,7 +789,7 @@ function renderAiBrief(module: WorkflowModule): string {
         <input id="ai-question-input" type="text" placeholder="例如：为什么不是螺栓问题？下一步怎么处理？" />
         <button type="button" data-ai-send-question>发送问题</button>
       </div>
-      <div id="ai-generated-report-text" class="ai-report-body">AI 已载入当前事件的 SCADA、CMS、油温、螺栓/结构证据包。请选择上方追问或输入问题；回答会标注证据来源和人工确认边界。</div>
+      <div id="ai-generated-report-text" class="ai-report-body">已载入当前事件的 SCADA、CMS、油温、螺栓/结构证据包。请选择上方追问或输入问题；回答会标注证据来源和人工确认边界。</div>
     </section>
   `;
 }
@@ -983,11 +988,11 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
           </article>
           <article>
             <span>下一动作</span>
-            <strong data-workorder-next-action>由 AI 诊断包或预测维护模块生成工单</strong>
+            <strong data-workorder-next-action>由告警研判或预测维护模块生成工单</strong>
           </article>
           <article>
             <span>人工边界</span>
-            <strong data-workorder-human-boundary>AI 只给草案，派发和关闭必须人工确认</strong>
+            <strong data-workorder-human-boundary>系统只给草案，派发和关闭必须人工确认</strong>
           </article>
         </section>
         <div class="workorder-confirm-grid">
@@ -1052,7 +1057,7 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
 }
 
 function getAiDutyEventText(): string {
-  return `${shortTurbineName(activeWorkflowCase.turbineId)}齿轮箱出现一级预警。已锁定多源证据，进入诊断包查看证据链与工单。`;
+  return `${shortTurbineName(activeWorkflowCase.turbineId)}齿轮箱出现一级预警。已锁定多源证据，进入告警研判查看证据链与工单。`;
 }
 
 root.innerHTML = `
@@ -1070,16 +1075,16 @@ root.innerHTML = `
         <strong>多气候山地风电机组智驭预警及故障诊断平台</strong>
       </header>
 
-      <section class="ai-duty-card" aria-label="AI 值班播报" aria-live="polite">
+      <section class="ai-duty-card" aria-label="值班播报" aria-live="polite">
         <div>
-          <span>AI 值班事件</span>
+          <span>值班提醒</span>
           <strong id="ai-duty-title">${html(activeWorkflowCase.modules.brief.aiBrief?.primaryFinding ?? "等待诊断事件")}</strong>
         </div>
         <p id="ai-duty-text">${html(getAiDutyEventText())}</p>
         <footer>
           <small id="ai-duty-status">已生成播报，等待风场巡航完成</small>
           <button id="ai-duty-speak" type="button">语音播报</button>
-          <button id="ai-duty-open" type="button">进入诊断包</button>
+          <button id="ai-duty-open" type="button">进入告警研判</button>
         </footer>
       </section>
 
@@ -1261,8 +1266,6 @@ function updateWorkflowCommandCard(moduleName: string): void {
   if (!card) return;
 
   const stage = getWorkflowStageForModule(moduleName);
-  const module = getWorkflowModule(moduleName);
-  const activeModuleTitle = module ? activeWorkflowCase.modules[module]?.title : "";
   const title = card.querySelector<HTMLElement>("[data-command-title]");
   const stageLabel = card.querySelector<HTMLElement>("[data-command-stage]");
   const description = card.querySelector<HTMLElement>("[data-command-description]");
@@ -1271,9 +1274,7 @@ function updateWorkflowCommandCard(moduleName: string): void {
   if (title) {
     title.textContent = `${activeWorkflowCase.turbineId} · ${activeWorkflowCase.modules.brief.aiBrief?.primaryFinding ?? activeWorkflowCase.component}`;
   }
-  if (stageLabel) {
-    stageLabel.textContent = activeModuleTitle ? `${stage.title} / ${activeModuleTitle}` : stage.title;
-  }
+  if (stageLabel) stageLabel.textContent = `${stage.title} / ${stage.focusLabel}`;
   if (description) description.textContent = stage.description;
   if (next) next.textContent = stage.nextAction;
 }
@@ -1287,7 +1288,7 @@ function updateAiDutyCard(): void {
   const brief = activeWorkflowCase.modules.brief.aiBrief;
   if (aiDutyTitle) aiDutyTitle.textContent = brief?.primaryFinding ?? "等待诊断事件";
   if (aiDutyText) aiDutyText.textContent = getAiDutyEventText();
-  if (aiDutyStatus) aiDutyStatus.textContent = "AI 已生成诊断播报，可语音复述或进入诊断包";
+  if (aiDutyStatus) aiDutyStatus.textContent = "已生成值班播报，可语音复述或进入告警研判";
 }
 
 function triggerIntroAiAlert(turbine: TurbineAsset): void {
@@ -1297,7 +1298,7 @@ function triggerIntroAiAlert(turbine: TurbineAsset): void {
   dashboardShell.dataset.aiEvent = "active";
   setEventTimelineStage("ai-alert");
   updateAiDutyCard();
-  if (aiDutyStatus) aiDutyStatus.textContent = "巡航发现异常，AI 已自动生成值班提醒";
+  if (aiDutyStatus) aiDutyStatus.textContent = "巡航发现异常，已生成值班提醒";
   speakAiDutyBrief(false);
 }
 
@@ -1481,18 +1482,18 @@ function speakAiDutyBrief(userInitiated = true): void {
 
   speakText(brief.broadcast, {
     onEnd: () => {
-      if (aiDutyStatus) aiDutyStatus.textContent = "播报完成，可进入诊断包查看证据链";
+      if (aiDutyStatus) aiDutyStatus.textContent = "播报完成，可进入告警研判查看证据链";
     },
     onError: () => {
       if (aiDutyStatus) {
-        aiDutyStatus.textContent = userInitiated ? "浏览器语音未启动，诊断包文字已同步显示" : "AI 已生成播报，可点击语音播报";
+        aiDutyStatus.textContent = userInitiated ? "浏览器语音未启动，研判文字已同步显示" : "已生成播报，可点击语音播报";
       }
     },
     onStart: () => {
-      if (aiDutyStatus) aiDutyStatus.textContent = "AI 正在播报当前风机风险";
+      if (aiDutyStatus) aiDutyStatus.textContent = "正在播报当前风机风险";
     },
     onUnsupported: () => {
-      if (aiDutyStatus) aiDutyStatus.textContent = "当前浏览器不支持语音播报，已保留文字诊断包";
+      if (aiDutyStatus) aiDutyStatus.textContent = "当前浏览器不支持语音播报，已保留文字研判";
     },
   });
 }
@@ -1540,7 +1541,7 @@ function moduleText(moduleName: WorkflowModuleKey): string {
   const labels: Record<WorkflowModuleKey, string> = {
     alerts: "告警中心",
     bolts: "螺栓监测",
-    brief: "AI诊断包",
+    brief: "告警研判",
     cms: "CMS",
     fusion: "融合判据",
     health: "健康评分",
@@ -1608,7 +1609,7 @@ function renderAgentClosureStatusContent(): string {
   const snapshot = readWorkOrderClosureSnapshot();
   const sampleItems = snapshot.completedWritebacks
     .map(({ item }) => `<li>${html(item.label)} 已进入复盘样本</li>`)
-    .join("") || "<li>等待现场回写，暂不进入 AI 样本。</li>";
+    .join("") || "<li>等待现场回写，暂不进入复盘样本。</li>";
   const pendingItems = [
     ...snapshot.pendingChecks.map((item) => `${item.label}（${item.owner}）`),
     ...snapshot.pendingWritebacks.map(({ item, disabled }) => `${item.label}${disabled ? "（派发后回写）" : "（待现场回写）"}`),
@@ -1645,7 +1646,7 @@ function renderAgentClosureStatusContent(): string {
         <ul>${humanReviewItems}</ul>
       </section>
     </div>
-    <p>AI 报告只引用已确认的结构化证据和现场回写状态；未回写项不会被当成已验证事实。</p>
+    <p>研判报告只引用已确认的结构化证据和现场回写状态；未回写项不会被当成已验证事实。</p>
   `;
 }
 
@@ -1816,13 +1817,13 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
       </header>
 
       <section class="agent-answer-card">
-        <span>AI 答复</span>
+        <span>值班答复</span>
         <p>${html(result.answerText)}</p>
       </section>
 
       ${showWorkOrderDetails ? renderAgentClosureStatusCard() : renderAgentClosureSummaryCard()}
 
-      <section class="agent-judgement-strip" aria-label="AI 研判链">
+      <section class="agent-judgement-strip" aria-label="研判链">
         ${judgementChain.map((item) => `
           <article>
             <span>${html(item.label)}</span>
@@ -1857,7 +1858,7 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
 
       <details class="agent-detail-group agent-evidence-details">
         <summary>展开证据卡（${result.evidenceCards.length}）</summary>
-        <section class="agent-evidence-grid" aria-label="AI 证据卡">
+        <section class="agent-evidence-grid" aria-label="证据卡">
           ${result.evidenceCards.map((card) => `
             <button class="agent-evidence-card ${html(card.severity)}" type="button" data-agent-open-module="${html(card.module)}">
               <span>${html(card.title)} · ${html(card.source)}</span>
@@ -1892,7 +1893,7 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
 
       <details class="agent-detail-group">
         <summary>展开图表联动、BIM 定位与报告正文（${result.chartRefs.length + result.bimHighlights.length} 个联动）</summary>
-        <section class="agent-link-grid" aria-label="AI 图表联动">
+        <section class="agent-link-grid" aria-label="图表联动">
           <h4>图表联动</h4>
           ${result.chartRefs.map((ref) => `
             <button type="button" data-agent-open-module="${html(ref.module)}">
@@ -1903,7 +1904,7 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
           `).join("")}
         </section>
 
-        <section class="agent-link-grid" aria-label="AI BIM 定位">
+        <section class="agent-link-grid" aria-label="BIM 定位">
           <h4>BIM 定位</h4>
           ${result.bimHighlights.map((highlight) => `
             <button class="${html(highlight.severity)}" type="button" data-agent-bim-part="${html(highlight.part)}">
@@ -1978,9 +1979,9 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
       ` : ""}
 
       <details class="agent-detail-group">
-        <summary>展开 AI 工具轨迹</summary>
+        <summary>展开工具轨迹</summary>
         <section class="agent-tool-trace">
-          <h4>AI 工具轨迹</h4>
+          <h4>工具轨迹</h4>
           <ol>
             ${result.toolTrace.map((item) => `
               <li class="${html(item.status)}">
@@ -2003,7 +2004,7 @@ function renderAiGeneratedReport(result: AiDiagnosisResponse, question: string):
 
 function buildAiVoiceAnswerSummary(): string {
   const brief = activeWorkflowCase.modules.brief.aiBrief;
-  if (!brief) return "AI 答复：当前诊断包未就绪。";
+  if (!brief) return "值班答复：当前研判未就绪。";
 
   const finding = brief.primaryFinding.includes("齿轮箱") ? "齿轮箱 P1 预警" : brief.primaryFinding;
   const action = brief.recommendedAction
@@ -2011,7 +2012,7 @@ function buildAiVoiceAnswerSummary(): string {
     .replace(/内安排/g, "内")
     .replace(/[。；]+$/g, "");
 
-  return `AI 答复：${shortTurbineName(activeWorkflowCase.turbineId)}${finding}。${action}，复核前按限载策略运行。`;
+  return `值班答复：${shortTurbineName(activeWorkflowCase.turbineId)}${finding}。${action}，复核前按限载策略运行。`;
 }
 
 function inferAgentIntent(question: string): string {
@@ -2067,7 +2068,7 @@ function buildStageAwareOperatorFocus(intent: string, fallback: AgentOperatorFoc
   if (intent === "evidence_chain" || intent === "report") {
     return {
       decision: activeWorkflowCase.modules.fusion.decision?.result ?? "先复核多源证据是否同向",
-      humanCheck: activeWorkflowCase.modules.fusion.decision?.confirm ?? "值班员确认数据质量后，AI 结论才进入告警研判。",
+      humanCheck: activeWorkflowCase.modules.fusion.decision?.confirm ?? "值班员确认数据质量后，系统结论才进入告警研判。",
       primaryQuestion: "运行融合判据",
       recommendedModule: "fusion",
       why: "用户需要看证据或报告，第一步应先核对 SCADA、CMS、结构监测是否在同一事件窗口内相互支持。",
@@ -2087,7 +2088,7 @@ function buildStageAwareOperatorFocus(intent: string, fallback: AgentOperatorFoc
   if (intent === "explain_alarm") {
     return {
       decision: activeWorkflowCase.modules.alerts.decision?.result ?? "先看告警成立条件",
-      humanCheck: activeWorkflowCase.modules.alerts.decision?.confirm ?? "告警确认后才允许进入工单草案，不能由 AI 自动派发。",
+      humanCheck: activeWorkflowCase.modules.alerts.decision?.confirm ?? "告警确认后才允许进入工单草案，系统不能自动派发。",
       primaryQuestion: "打开告警研判",
       recommendedModule: "alerts",
       why: "用户问的是为什么报警，先看融合结论如何进入告警等级，避免直接跳到派单。",
@@ -2103,7 +2104,7 @@ function buildStageAwareAnswerText(
   reason = "已先展开本地结构化证据包。",
 ): string {
   const brief = activeWorkflowCase.modules.brief.aiBrief;
-  if (!brief) return `${reason} 当前诊断包未就绪，请重新进入 AI 诊断包。`;
+  if (!brief) return `${reason} 当前研判未就绪，请重新进入告警研判。`;
 
   const alerts = activeWorkflowCase.modules.alerts.decision;
   const cms = activeWorkflowCase.modules.cms.decision;
@@ -2128,13 +2129,13 @@ function buildStageAwareAnswerText(
       const pending = snapshot.pendingWritebacks.length > 0
         ? snapshot.pendingWritebacks.join("、")
         : "关闭确认";
-      return `${reason} 工单已经派发，下一步不是继续生成建议，而是现场回写门：${pending}。回写完成前不能关闭工单，AI 只提示缺口，关闭动作必须人工确认。`;
+      return `${reason} 工单已经派发，下一步不是继续生成建议，而是现场回写门：${pending}。回写完成前不能关闭工单，系统只提示缺口，关闭动作必须人工确认。`;
     }
-    return `${reason} 现场安排先进入工单确认门：低风速窗口、安全许可、备件工器具、复盘责任 ${snapshot.totalChecks} 项签核，目前已确认 ${snapshot.confirmedChecks.length} 项。签核未齐前不能派发，AI 不自动下发检修命令。`;
+    return `${reason} 现场安排先进入工单确认门：低风速窗口、安全许可、备件工器具、复盘责任 ${snapshot.totalChecks} 项签核，目前已确认 ${snapshot.confirmedChecks.length} 项。签核未齐前不能派发，系统不自动下发检修命令。`;
   }
 
   if (intent === "evidence_chain" || intent === "report") {
-    return `${reason} 证据链按同一事件窗口复核：SCADA 看功率残差和油温趋势，CMS 看高速轴侧频/齿轮啮合频率，螺栓与结构监测作为反证项，山地气象用于解释阵风载荷。下一步先运行融合判据，确认多源数据是否同向；数据质量未确认前，AI 结论不能进入派单。`;
+    return `${reason} 证据链按同一事件窗口复核：SCADA 看功率残差和油温趋势，CMS 看高速轴侧频/齿轮啮合频率，螺栓与结构监测作为反证项，山地气象用于解释阵风载荷。下一步先运行融合判据，确认多源数据是否同向；数据质量未确认前，系统结论不能进入派单。`;
   }
 
   if (intent === "counter_evidence") {
@@ -2269,9 +2270,9 @@ function buildLocalAiDiagnosisResponse(
     answerText: buildStageAwareAnswerText(intent, {
       answerText: "",
       operatorFocus: brief?.operatorFocus ?? {
-        decision: "等待诊断包",
-        humanCheck: "诊断包恢复前不得形成工程处置结论。",
-        primaryQuestion: "重新进入 AI 诊断包",
+        decision: "等待告警研判",
+        humanCheck: "研判恢复前不得形成工程处置结论。",
+        primaryQuestion: "重新进入告警研判",
         recommendedModule: "brief",
         why: "当前没有可追踪证据包。",
       },
@@ -2313,9 +2314,9 @@ function buildLocalAiDiagnosisResponse(
     evidenceCards,
     intent,
     operatorFocus: brief?.operatorFocus ?? {
-      decision: "等待诊断包",
-      humanCheck: "诊断包恢复前不得形成工程处置结论。",
-      primaryQuestion: "重新进入 AI 诊断包",
+      decision: "等待告警研判",
+      humanCheck: "研判恢复前不得形成工程处置结论。",
+      primaryQuestion: "重新进入告警研判",
       recommendedModule: "brief",
       why: "当前没有可追踪证据包。",
     },
@@ -2336,7 +2337,7 @@ function buildLocalAiDiagnosisResponse(
     riskBoundary: "本地证据包只用于等待大模型期间的值班复核；停机、登塔、检修和派单必须人工确认。",
     source: "fallback",
     status,
-    title: `${activeWorkflowCase.turbineId} AI 值班诊断`,
+    title: `${activeWorkflowCase.turbineId} 值班研判`,
     toolTrace: [
       { label: "读取当前事件", output: activeWorkflowCase.eventCode, status: "ok", tool: "frontend_event_context" },
       { label: "展开结构化证据", output: `${alerts.evidenceRows?.length ?? 0} 张证据卡`, status: "ok", tool: "frontend_evidence_bundle" },
@@ -2394,7 +2395,7 @@ async function requestAiDiagnosisReport(
     return focusedResult;
   } catch {
     const result = withStageAwareAgentGuidance(
-      buildLocalAiDiagnosisResponse(question, "fallback", "后端 Agent 暂未返回，已保留本地规则诊断包。"),
+      buildLocalAiDiagnosisResponse(question, "fallback", "后端智能服务暂未返回，已保留本地规则研判。"),
       question,
     );
     if (requestCaseId !== activeCaseId) return result;
@@ -2617,7 +2618,7 @@ function updateWorkOrderGateSummary(): void {
   }
 
   blocker.textContent = enabledWritebacks ? "等待现场回写" : "等待生成工单草案";
-  nextAction.textContent = "从 AI 诊断包或预测维护模块进入工单确认门";
+  nextAction.textContent = "从告警研判或预测维护模块进入工单确认门";
   boundary.textContent = "派发、关闭、停机、登塔必须人工确认";
 }
 
