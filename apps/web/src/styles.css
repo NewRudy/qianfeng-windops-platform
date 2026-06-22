@@ -538,6 +538,110 @@ button {
   background: rgba(19, 91, 111, 0.76);
 }
 
+.bim-diagnostic-panel {
+  position: absolute;
+  right: 14px;
+  bottom: 54px;
+  z-index: 4;
+  display: grid;
+  gap: 8px;
+  width: min(330px, 32vw);
+  padding: 10px;
+  border: 1px solid rgba(91, 224, 246, 0.22);
+  background:
+    linear-gradient(135deg, rgba(3, 24, 36, 0.9), rgba(0, 8, 15, 0.86)),
+    radial-gradient(circle at 100% 0, rgba(246, 197, 104, 0.13), transparent 34%);
+  box-shadow:
+    inset 0 0 28px rgba(91, 224, 246, 0.08),
+    0 20px 52px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(14px);
+}
+
+.shell[data-workspace="manager"] .bim-diagnostic-panel {
+  display: none;
+}
+
+.bim-diagnostic-panel header {
+  display: grid;
+  gap: 3px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(91, 224, 246, 0.12);
+}
+
+.bim-diagnostic-panel header span,
+.bim-diagnostic-panel header small,
+.bim-panel-evidence span,
+.bim-panel-evidence small {
+  color: rgba(91, 224, 246, 0.72);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.bim-diagnostic-panel header strong {
+  color: #fff7e2;
+  font-size: 16px;
+  line-height: 1.22;
+}
+
+.bim-panel-evidence {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.bim-panel-evidence article {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid rgba(91, 224, 246, 0.12);
+  background:
+    linear-gradient(180deg, rgba(9, 42, 55, 0.68), rgba(2, 14, 22, 0.72));
+}
+
+.bim-panel-evidence strong {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 12px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bim-diagnostic-panel p {
+  margin: 0;
+  color: rgba(225, 247, 251, 0.76);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.bim-diagnostic-panel footer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.bim-diagnostic-panel footer button {
+  min-height: 30px;
+  border: 1px solid rgba(91, 224, 246, 0.24);
+  background: rgba(5, 32, 44, 0.82);
+  color: rgba(235, 250, 253, 0.9);
+  font-size: 11.5px;
+  font-weight: 900;
+}
+
+.bim-diagnostic-panel footer button:first-child {
+  border-color: rgba(246, 197, 104, 0.44);
+  background: linear-gradient(180deg, rgba(107, 61, 24, 0.82), rgba(35, 22, 13, 0.84));
+  color: #fff3d9;
+}
+
+.bim-diagnostic-panel footer button:hover {
+  border-color: rgba(91, 224, 246, 0.82);
+  background: rgba(19, 91, 111, 0.78);
+}
+
 .turbine-blueprint {
   position: absolute;
   top: 50%;
@@ -821,6 +925,11 @@ button {
   display: flex;
 }
 
+.shell[data-workspace="manager"] .management-workbench-header {
+  padding: 0 4px 9px;
+  border-bottom-color: rgba(91, 224, 246, 0.2);
+}
+
 .management-workbench-header span {
   color: rgba(91, 224, 246, 0.72);
   font-size: 11px;
@@ -829,9 +938,10 @@ button {
 
 .management-workbench-header strong {
   display: block;
-  margin-top: 3px;
+  margin-top: 2px;
   color: #ffffff;
-  font-size: 18px;
+  font-size: 17px;
+  letter-spacing: 0;
 }
 
 .management-workbench-header button {
@@ -871,6 +981,10 @@ button {
   align-content: start;
   min-height: 0;
   padding: 8px;
+  border-color: rgba(91, 224, 246, 0.18);
+  background:
+    linear-gradient(180deg, rgba(5, 28, 41, 0.84), rgba(1, 11, 19, 0.9)),
+    radial-gradient(circle at 0 0, rgba(91, 224, 246, 0.12), transparent 34%);
 }
 
 .management-nav button,
@@ -894,9 +1008,21 @@ button {
 }
 
 .shell[data-workspace="manager"] .management-nav button {
+  position: relative;
   min-height: 42px;
   padding: 0 12px;
+  overflow: hidden;
   text-align: left;
+}
+
+.shell[data-workspace="manager"] .management-nav button::before {
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: 0;
+  width: 3px;
+  content: "";
+  background: rgba(91, 224, 246, 0);
 }
 
 .management-nav button.active,
@@ -909,6 +1035,11 @@ button {
   background: linear-gradient(135deg, rgba(42, 158, 187, 0.84), rgba(6, 48, 65, 0.9));
   color: #ffffff;
   box-shadow: 0 0 20px rgba(91, 224, 246, 0.2);
+}
+
+.shell[data-workspace="manager"] .management-nav button.active::before {
+  background: #5be0f6;
+  box-shadow: 0 0 14px rgba(91, 224, 246, 0.72);
 }
 
 .management-pages {
@@ -934,12 +1065,52 @@ button {
 }
 
 .shell[data-workspace="manager"] .management-page {
-  gap: 16px;
-  padding: 20px;
+  gap: 14px;
+  padding: 18px;
+  align-content: start;
+}
+
+.shell[data-workspace="manager"] .management-page[data-management-page="scada"],
+.shell[data-workspace="manager"] .management-page[data-management-page="cms"],
+.shell[data-workspace="manager"] .management-page[data-management-page="structure"] {
+  grid-template-columns: minmax(300px, 0.42fr) minmax(540px, 0.58fr);
+}
+
+.shell[data-workspace="manager"] .management-page[data-management-page="maintenance"],
+.shell[data-workspace="manager"] .management-page[data-management-page="workorders"] {
+  grid-template-columns: minmax(280px, 0.86fr) minmax(420px, 1.14fr);
+}
+
+.shell[data-workspace="manager"] .management-page[data-management-page="scada"] .management-page-header,
+.shell[data-workspace="manager"] .management-page[data-management-page="cms"] .management-page-header,
+.shell[data-workspace="manager"] .management-page[data-management-page="structure"] .management-page-header,
+.shell[data-workspace="manager"] .management-page[data-management-page="maintenance"] .management-page-header,
+.shell[data-workspace="manager"] .management-page[data-management-page="workorders"] .management-page-header,
+.shell[data-workspace="manager"] .management-page[data-management-page="maintenance"] .maintenance-readiness-card,
+.shell[data-workspace="manager"] .management-page[data-management-page="workorders"] .workorder-writeback {
+  grid-column: 1 / -1;
+}
+
+.shell[data-workspace="manager"] .management-page[data-management-page="scada"] .record-list,
+.shell[data-workspace="manager"] .management-page[data-management-page="cms"] .record-list,
+.shell[data-workspace="manager"] .management-page[data-management-page="structure"] .record-list,
+.shell[data-workspace="manager"] .management-page[data-management-page="scada"] .parameter-panel,
+.shell[data-workspace="manager"] .management-page[data-management-page="cms"] .parameter-panel,
+.shell[data-workspace="manager"] .management-page[data-management-page="structure"] .parameter-panel {
+  grid-column: 1;
+}
+
+.shell[data-workspace="manager"] .management-page[data-management-page="scada"] .engineering-chart,
+.shell[data-workspace="manager"] .management-page[data-management-page="cms"] .engineering-chart,
+.shell[data-workspace="manager"] .management-page[data-management-page="structure"] .engineering-chart {
+  grid-column: 2;
+  grid-row: 2 / span 2;
+  align-self: stretch;
+  margin: 0;
 }
 
 .shell[data-workspace="manager"] .management-page-header h3 {
-  font-size: 24px;
+  font-size: 23px;
 }
 
 .shell[data-workspace="manager"] .management-page-header p,
@@ -965,6 +1136,25 @@ button {
   .shell[data-workspace="manager"] .parameter-panel > div,
   .shell[data-workspace="manager"] .health-weight-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .shell[data-workspace="manager"] .management-page[data-management-page="scada"],
+  .shell[data-workspace="manager"] .management-page[data-management-page="cms"],
+  .shell[data-workspace="manager"] .management-page[data-management-page="structure"] {
+    grid-template-columns: 1fr;
+  }
+
+  .shell[data-workspace="manager"] .management-page[data-management-page="scada"] .record-list,
+  .shell[data-workspace="manager"] .management-page[data-management-page="cms"] .record-list,
+  .shell[data-workspace="manager"] .management-page[data-management-page="structure"] .record-list,
+  .shell[data-workspace="manager"] .management-page[data-management-page="scada"] .parameter-panel,
+  .shell[data-workspace="manager"] .management-page[data-management-page="cms"] .parameter-panel,
+  .shell[data-workspace="manager"] .management-page[data-management-page="structure"] .parameter-panel,
+  .shell[data-workspace="manager"] .management-page[data-management-page="scada"] .engineering-chart,
+  .shell[data-workspace="manager"] .management-page[data-management-page="cms"] .engineering-chart,
+  .shell[data-workspace="manager"] .management-page[data-management-page="structure"] .engineering-chart {
+    grid-column: 1;
+    grid-row: auto;
   }
 }
 
@@ -1037,7 +1227,7 @@ button {
   gap: 12px;
   align-items: flex-start;
   justify-content: space-between;
-  padding-bottom: 12px;
+  padding-bottom: 9px;
   border-bottom: 1px solid rgba(91, 224, 246, 0.12);
 }
 
@@ -4232,6 +4422,206 @@ button {
   font-weight: 900;
 }
 
+.engineering-chart {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 84% 18%, rgba(91, 224, 246, 0.14), transparent 30%),
+    linear-gradient(rgba(91, 224, 246, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(91, 224, 246, 0.055) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(3, 24, 36, 0.9), rgba(0, 8, 15, 0.86));
+  background-size: auto, 22px 22px, 22px 22px, auto;
+  box-shadow:
+    inset 0 0 28px rgba(91, 224, 246, 0.055),
+    0 14px 34px rgba(0, 0, 0, 0.22);
+}
+
+.engineering-chart::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  content: "";
+  background: linear-gradient(90deg, rgba(91, 224, 246, 0), rgba(91, 224, 246, 0.82), rgba(246, 197, 104, 0.68), rgba(91, 224, 246, 0));
+  opacity: 0.84;
+}
+
+.engineering-chart::after {
+  position: absolute;
+  top: 46px;
+  bottom: 34px;
+  left: 12px;
+  width: 38%;
+  content: "";
+  background: linear-gradient(90deg, transparent, rgba(91, 224, 246, 0.16), transparent);
+  pointer-events: none;
+  transform: translateX(-128%);
+  animation: chartScan 5.6s linear infinite;
+}
+
+.engineering-chart figcaption {
+  position: relative;
+  z-index: 1;
+  align-items: center;
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(91, 224, 246, 0.1);
+}
+
+.engineering-chart figcaption strong {
+  letter-spacing: 0;
+}
+
+.engineering-chart figcaption span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(203, 234, 239, 0.7);
+  white-space: nowrap;
+}
+
+.engineering-chart figcaption span::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  content: "";
+  background: #56f06f;
+  box-shadow: 0 0 10px rgba(86, 240, 111, 0.72);
+  animation: statusPulse 1.8s ease-in-out infinite;
+}
+
+.engineering-chart svg {
+  position: relative;
+  z-index: 1;
+}
+
+.shell[data-workspace="manager"] .engineering-chart {
+  min-height: 286px;
+  padding: 16px;
+}
+
+.shell[data-workspace="manager"] .engineering-chart figcaption strong {
+  font-size: 18px;
+}
+
+.shell[data-workspace="manager"] .engineering-chart svg {
+  height: clamp(218px, 30vh, 312px);
+}
+
+.grid-line {
+  stroke: rgba(91, 224, 246, 0.16);
+}
+
+.axis-line {
+  stroke: rgba(221, 249, 252, 0.54);
+}
+
+.axis-title,
+.tick-label {
+  fill: rgba(221, 249, 252, 0.74);
+  font-size: 10.5px;
+}
+
+.chart-line.baseline {
+  stroke: rgba(91, 224, 246, 0.7);
+  stroke-dasharray: 5 5;
+}
+
+.chart-line.measured {
+  stroke: #6cff83;
+  stroke-dasharray: 8 5;
+  filter: drop-shadow(0 0 5px rgba(86, 240, 111, 0.38));
+  animation: chartFlow 3.6s linear infinite;
+}
+
+.chart-point {
+  filter: drop-shadow(0 0 3px rgba(86, 240, 111, 0.32));
+}
+
+.chart-point.abnormal {
+  animation: hotPulse 1.6s ease-in-out infinite;
+}
+
+.threshold-line {
+  filter: drop-shadow(0 0 4px rgba(255, 177, 59, 0.38));
+}
+
+.spectrum-peak rect {
+  rx: 2px;
+}
+
+.spectrum-peak.warning rect {
+  animation: spectrumPulse 1.65s ease-in-out infinite;
+}
+
+.bolt-ring {
+  filter: drop-shadow(0 0 5px rgba(91, 224, 246, 0.18));
+}
+
+.bolt-channel.warning circle {
+  animation: hotPulse 1.55s ease-in-out infinite;
+}
+
+.chart-legend {
+  position: relative;
+  z-index: 1;
+  padding-top: 6px;
+  border-top: 1px solid rgba(91, 224, 246, 0.08);
+}
+
+@keyframes chartScan {
+  0% {
+    transform: translateX(-128%);
+  }
+  100% {
+    transform: translateX(278%);
+  }
+}
+
+@keyframes chartFlow {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -52;
+  }
+}
+
+@keyframes statusPulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.88);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes hotPulse {
+  0%,
+  100% {
+    opacity: 0.74;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+}
+
+@keyframes spectrumPulse {
+  0%,
+  100% {
+    opacity: 0.76;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .alarm-card,
 .workorder-ticket {
   margin-bottom: 12px;
@@ -4822,6 +5212,13 @@ button {
     top: 82px;
     right: 12px;
     bottom: 12px;
+    left: 12px;
+    width: auto;
+  }
+
+  .bim-diagnostic-panel {
+    right: 12px;
+    bottom: 112px;
     left: 12px;
     width: auto;
   }
