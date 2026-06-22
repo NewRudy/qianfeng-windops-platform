@@ -888,11 +888,15 @@ function renderModulePanel(moduleKey: WorkflowModuleKey, module: WorkflowModule,
         </header>
         <div class="workorder-confirm-grid">
           ${(ticket?.confirmationChecks ?? []).map((item) => `
-            <label class="workorder-confirm">
+            <label class="workorder-confirm" data-workorder-confirm-card="${html(item.id)}" data-state="pending">
               <input type="checkbox" data-workorder-confirm="${html(item.id)}" />
-              <span>
+              <span class="workorder-confirm-body">
+                <span class="workorder-confirm-row">
+                  <small>${html(item.owner)}</small>
+                  <em data-workorder-confirm-state>待签核</em>
+                </span>
                 <b>${html(item.label)}</b>
-                <small>${html(item.owner)} / ${html(item.detail)}</small>
+                <p>${html(item.detail)}</p>
               </span>
             </label>
           `).join("")}
@@ -2010,6 +2014,7 @@ function openGeneratedWorkOrder(status = activeWorkflowCase.statuses.ticketCreat
   if (closeButton) closeButton.disabled = true;
   setEventTimelineStage("human-confirm");
   openWorkflowModule("workorder", status);
+  updateWorkOrderConfirmationState();
 }
 
 function areWorkOrderConfirmationsReady(): boolean {
@@ -2020,6 +2025,14 @@ function areWorkOrderConfirmationsReady(): boolean {
 function updateWorkOrderConfirmationState(): void {
   const dispatchButton = document.querySelector<HTMLButtonElement>("[data-dispatch-workorder]");
   if (!dispatchButton) return;
+  const checks = Array.from(document.querySelectorAll<HTMLInputElement>("[data-workorder-confirm]"));
+  checks.forEach((input) => {
+    const card = input.closest<HTMLElement>(".workorder-confirm");
+    const state = card?.querySelector<HTMLElement>("[data-workorder-confirm-state]");
+    const isConfirmed = input.checked;
+    if (card) card.dataset.state = isConfirmed ? "confirmed" : "pending";
+    if (state) state.textContent = isConfirmed ? "已签核" : "待签核";
+  });
   dispatchButton.disabled = !areWorkOrderConfirmationsReady();
 }
 

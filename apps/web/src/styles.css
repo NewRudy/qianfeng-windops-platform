@@ -3251,13 +3251,21 @@ button {
 
 .workorder-confirm {
   display: grid;
-  grid-template-columns: 18px 1fr;
-  gap: 9px;
+  grid-template-columns: 16px 1fr;
+  gap: 10px;
   align-items: start;
-  padding: 9px;
+  padding: 10px;
   border: 1px solid rgba(91, 224, 246, 0.12);
+  border-left: 2px solid rgba(246, 197, 104, 0.45);
   background: rgba(255, 255, 255, 0.035);
   cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.workorder-confirm[data-state="confirmed"] {
+  border-color: rgba(86, 240, 111, 0.2);
+  border-left-color: rgba(86, 240, 111, 0.82);
+  background: rgba(86, 240, 111, 0.055);
 }
 
 .workorder-confirm input {
@@ -3265,6 +3273,21 @@ button {
   height: 14px;
   margin-top: 2px;
   accent-color: #f6c568;
+}
+
+.workorder-confirm[data-state="confirmed"] input {
+  accent-color: #56f06f;
+}
+
+.workorder-confirm-body,
+.workorder-confirm-row {
+  display: grid;
+  gap: 5px;
+}
+
+.workorder-confirm-row {
+  grid-template-columns: 1fr auto;
+  align-items: center;
 }
 
 .workorder-confirm b,
@@ -3278,10 +3301,34 @@ button {
 .workorder-confirm small,
 .workorder-writeback small {
   display: block;
-  margin-top: 4px;
   color: rgba(203, 234, 239, 0.68);
   font-size: 11px;
   line-height: 1.4;
+}
+
+.workorder-confirm em {
+  justify-self: end;
+  padding: 2px 7px;
+  border: 1px solid rgba(246, 197, 104, 0.34);
+  color: #fff0c8;
+  background: rgba(246, 197, 104, 0.08);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1.3;
+}
+
+.workorder-confirm[data-state="confirmed"] em {
+  border-color: rgba(86, 240, 111, 0.34);
+  color: #a8ffb8;
+  background: rgba(86, 240, 111, 0.08);
+}
+
+.workorder-confirm p {
+  margin: 0;
+  color: rgba(220, 242, 247, 0.72);
+  font-size: 11px;
+  line-height: 1.42;
 }
 
 .workorder-writeback ul {
