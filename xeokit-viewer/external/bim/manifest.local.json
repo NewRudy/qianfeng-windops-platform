@@ -1,0 +1,36 @@
+{
+  "schema": "qianfeng.windops.bim-assets.local.v1",
+  "generatedAt": "2026-06-24T12:23:04.149Z",
+  "assets": [
+    {
+      "id": "wind-turbines",
+      "label": "多风机 IFC",
+      "note": "多风机 IFC 轻量模型，用于验证机组资产与 GIS 点位的关联。",
+      "sourcePath": "/Users/rudy/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/wxid_v8cyyrd6qx8h12_1bc1/msg/file/2026-06/风机.ifc",
+      "cachedIfcPath": "/Users/rudy/Documents/geo_agent/qianfeng-windops-platform/data/external/bim/ifc/wind-turbines.ifc",
+      "xktPath": "/Users/rudy/Documents/geo_agent/qianfeng-windops-platform/data/external/bim/xkt/wind-turbines.xkt",
+      "publicUrl": "/external/bim/xkt/wind-turbines.xkt",
+      "ifcSizeMb": 0.42,
+      "xktSizeMb": 0.06,
+      "convertedAt": "2026-06-24T12:22:40.810Z",
+      "conversionTool": "@xeokit/xeokit-convert convert2xkt"
+    },
+    {
+      "id": "factory-masterplan",
+      "label": "厂房总图 IFC",
+      "note": "厂房总图模型较大，用于验证大型 BIM 资产的 XKT 加载边界。",
+      "sourcePath": "/Users/rudy/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/wxid_v8cyyrd6qx8h12_1bc1/msg/file/2026-06/厂房总图.ifc",
+      "cachedIfcPath": "/Users/rudy/Documents/geo_agent/qianfeng-windops-platform/data/external/bim/ifc/factory-masterplan.ifc",
+      "xktPath": "/Users/rudy/Documents/geo_agent/qianfeng-windops-platform/data/external/bim/xkt/factory-masterplan.xkt",
+      "publicUrl": "/external/bim/xkt/factory-masterplan.xkt",
+      "ifcSizeMb": 197.32,
+      "xktSizeMb": 16.56,
+      "convertedAt": "2026-06-24T12:23:04.149Z",
+      "conversionTool": "@xeokit/xeokit-convert convert2xkt"
+    }
+  ],
+  "notes": [
+    "This manifest and generated model files are local development assets and are intentionally ignored by Git.",
+    "Direct IFC conversion is enough for prototype verification. For production BIM metadata fidelity, prefer a vetted IFC to glTF/XKT pipeline with model QA."
+  ]
+}

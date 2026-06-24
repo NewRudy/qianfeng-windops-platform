@@ -1,0 +1,25 @@
+{
+  "schema": "qianfeng.windops.ifc-assets.local.v1",
+  "generatedAt": "2026-06-24T13:04:01.034Z",
+  "assets": [
+    {
+      "id": "wind-turbines-ifc",
+      "label": "风机 IFC 直读",
+      "publicUrl": "/external/bim/ifc/wind-turbines.ifc",
+      "sizeMb": 0.42,
+      "sourcePath": "/Users/rudy/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/wxid_v8cyyrd6qx8h12_1bc1/msg/file/2026-06/风机.ifc"
+    },
+    {
+      "id": "factory-masterplan-ifc",
+      "label": "厂房总图 IFC 直读",
+      "publicUrl": "/external/bim/ifc/factory-masterplan.ifc",
+      "sizeMb": 197.32,
+      "sourcePath": "/Users/rudy/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/wxid_v8cyyrd6qx8h12_1bc1/msg/file/2026-06/厂房总图.ifc"
+    }
+  ],
+  "webIfcRuntimeUrl": "/external/bim/web-ifc/",
+  "notes": [
+    "These IFC files are local development assets and are intentionally ignored by Git.",
+    "Direct IFC loading is for source-model diagnostics. Large models may be slow or exceed browser memory."
+  ]
+}

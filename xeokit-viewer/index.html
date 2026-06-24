@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>黔风智维 - xeokit BIM 数据验证</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #06111f;
+        color: #e9f7ff;
+        font-family:
+          Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      }
+
+      .file-fallback {
+        display: grid;
+        min-height: 100vh;
+        place-items: center;
+        padding: 32px;
+        box-sizing: border-box;
+        background:
+          radial-gradient(circle at 50% 30%, rgba(20, 177, 214, 0.18), transparent 34%),
+          linear-gradient(135deg, #06111f 0%, #071b2b 48%, #04101d 100%);
+      }
+
+      .file-fallback__panel {
+        width: min(720px, 100%);
+        border: 1px solid rgba(78, 201, 236, 0.35);
+        border-radius: 12px;
+        padding: 28px;
+        background: rgba(5, 16, 29, 0.82);
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.42);
+      }
+
+      .file-fallback__eyebrow {
+        margin: 0 0 10px;
+        color: #7fe7ff;
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .file-fallback h1 {
+        margin: 0 0 14px;
+        font-size: 28px;
+        line-height: 1.25;
+      }
+
+      .file-fallback p {
+        margin: 10px 0;
+        color: #b8d0dc;
+        font-size: 16px;
+        line-height: 1.7;
+      }
+
+      .file-fallback code {
+        display: block;
+        margin-top: 16px;
+        border: 1px solid rgba(127, 231, 255, 0.25);
+        border-radius: 8px;
+        padding: 14px 16px;
+        background: rgba(3, 9, 17, 0.72);
+        color: #9cf0ff;
+        font-size: 15px;
+        white-space: pre-wrap;
+      }
+    </style>
+    <script type="module" crossorigin src="/qianfeng-windops-platform/xeokit-viewer/assets/index-DeLuhYdy.js"></script>
+    <link rel="stylesheet" crossorigin href="/qianfeng-windops-platform/xeokit-viewer/assets/index-B4f78_Mt.css">
+  </head>
+  <body>
+    <main id="app">
+      <section class="file-fallback" aria-label="xeokit BIM 数据验证启动提示">
+        <div class="file-fallback__panel">
+          <p class="file-fallback__eyebrow">xeokit BIM Viewer</p>
+          <h1>这个页面需要通过本地服务打开</h1>
+          <p>
+            直接用 file:// 打开时，浏览器不会加载 Vite 的模块入口和 BIM 资源，所以会看到空白。
+            我已经保留这个提示，避免误判为模型损坏。
+          </p>
+          <p>请启动独立 xeokit 验证服务后访问：</p>
+          <code>npm run dev:xeokit
+http://127.0.0.1:1150/</code>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
