@@ -13,6 +13,7 @@ coverage/
 outputs/
 data/raw/
 data/external/
+apps/web/public/external/
 *.log
 *.sqlite
 *.db

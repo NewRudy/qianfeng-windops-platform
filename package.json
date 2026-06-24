@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "npm --workspace apps/web run dev",
     "build": "npm --workspace apps/web run build",
+    "assets:ifc-xkt": "node scripts/convert-ifc-xkt.mjs",
     "assets:laoyeling": "node scripts/convert-laoyeling-tileset.mjs",
     "test": "npm --workspace apps/web run test",
     "typecheck": "npm --workspace apps/web run typecheck"
@@ -14,6 +15,7 @@
     "apps/web"
   ],
   "devDependencies": {
+    "@xeokit/xeokit-convert": "^1.3.2",
     "3d-tiles-tools": "^0.5.3"
   }
 }

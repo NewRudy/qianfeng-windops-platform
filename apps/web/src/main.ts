@@ -1,6 +1,7 @@
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import "./styles.css";
 import { BimTurbineViewer, type BimPartKey } from "./bim/BimTurbineViewer";
+import { XktBimAssetViewer } from "./bim/XktBimAssetViewer";
 import { createWindFarmScene } from "./scene/createWindFarmScene";
 import { firstSliceSceneConfig, type TurbineAsset } from "./scene/sceneConfig";
 import {
@@ -1995,6 +1996,7 @@ root.innerHTML = `
         <section class="bim-stage" aria-label="风机 BIM 部件拆分视图">
           <div class="blueprint-grid" aria-hidden="true"></div>
           <div id="bim-model-root" class="first-version-bim-canvas" aria-label="风机 BIM 精细模型"></div>
+          <div id="xkt-bim-root" class="xkt-bim-canvas" aria-label="真实 IFC 转换 XKT 模型" hidden></div>
           <div class="bim-stage-hud">
             <span>HS-WTG 单机透视</span>
             <strong id="bim-status">等待进入单机 BIM 诊断</strong>
@@ -2003,6 +2005,7 @@ root.innerHTML = `
           <div class="bim-stage-actions" aria-label="BIM 模型操作">
             <button id="bim-toggle-decompose" type="button" data-state="composed">拆解模型</button>
             <button id="bim-warning" type="button">告警闪烁</button>
+            <button id="bim-xkt-toggle" type="button" data-state="first-version">真实IFC/XKT</button>
           </div>
           <button class="part-label label-blade" type="button" data-bim-part="blade">叶片/变桨</button>
           <button class="part-label label-gearbox" type="button" data-bim-part="gearbox">齿轮箱</button>
@@ -2032,6 +2035,7 @@ root.innerHTML = `
 const shell = document.querySelector<HTMLElement>(".shell");
 const sceneRoot = document.querySelector<HTMLDivElement>("#cesium-root");
 const bimModelRoot = document.querySelector<HTMLDivElement>("#bim-model-root");
+const xktBimRoot = document.querySelector<HTMLDivElement>("#xkt-bim-root");
 const bimStatus = document.querySelector<HTMLElement>("#bim-status");
 const componentStrip = document.querySelector<HTMLElement>(".component-strip");
 const moduleDrawer = document.querySelector<HTMLElement>(".module-drawer");
@@ -2049,7 +2053,7 @@ const globalAiFinding = document.querySelector<HTMLElement>("#global-ai-finding"
 const globalAiAsset = document.querySelector<HTMLElement>("#global-ai-asset");
 const globalAiContext = document.querySelector<HTMLElement>("#global-ai-context");
 
-if (!shell || !sceneRoot || !bimModelRoot || !componentStrip || !moduleDrawer || !caseSelector || !globalAiShell || !globalAiOrb || !globalAiPanel || !globalAiInput || !globalAiAnswer) {
+if (!shell || !sceneRoot || !bimModelRoot || !xktBimRoot || !componentStrip || !moduleDrawer || !caseSelector || !globalAiShell || !globalAiOrb || !globalAiPanel || !globalAiInput || !globalAiAnswer) {
   throw new Error("Missing dashboard shell, Cesium root, BIM root, or workflow controls");
 }
 
@@ -2085,13 +2089,16 @@ let suppressGlobalAiClickTimer: number | undefined;
 
 const dashboardShell = shell;
 const bimModelContainer = bimModelRoot;
+const xktBimContainer = xktBimRoot;
 const workflowComponentStrip = componentStrip;
 const workflowModuleDrawer = moduleDrawer;
 const workflowCaseSelector = caseSelector;
 let bimViewer: BimTurbineViewer | undefined;
+let xktBimViewer: XktBimAssetViewer | undefined;
 let warningActive = false;
 let modelDecomposed = false;
 let hasPlayedIntroBroadcast = false;
+let xktBimMode = false;
 
 const eventStageOrder: EventTimelineStage[] = [
   "ai-alert",
@@ -2236,6 +2243,38 @@ function getBimViewer(): BimTurbineViewer {
   }
 
   return bimViewer;
+}
+
+function getXktBimViewer(): XktBimAssetViewer {
+  if (!xktBimViewer) {
+    xktBimViewer = new XktBimAssetViewer({
+      container: xktBimContainer,
+      onStatus: setBimStatus,
+    });
+  }
+
+  return xktBimViewer;
+}
+
+function setXktBimMode(active: boolean): void {
+  xktBimMode = active;
+  bimModelContainer.hidden = active;
+  xktBimContainer.hidden = !active;
+  dashboardShell.dataset.bimAssetMode = active ? "xkt" : "first-version";
+  const toggleButton = document.querySelector<HTMLButtonElement>("#bim-xkt-toggle");
+  if (toggleButton) {
+    toggleButton.dataset.state = active ? "xkt" : "first-version";
+    toggleButton.textContent = active ? "返回拆解模型" : "真实IFC/XKT";
+  }
+  if (!active) {
+    setBimStatus(modelDecomposed ? "已返回第一版风机部件拆解视图" : "已返回第一版风机整机视图");
+    return;
+  }
+  const viewer = getXktBimViewer();
+  viewer.initialize();
+  void viewer.loadAsset("wind-turbines").catch(() => {
+    setBimStatus("真实 XKT 模型未加载，请先运行 npm run assets:ifc-xkt");
+  });
 }
 
 function setActiveModule(moduleName: string): void {
@@ -4637,10 +4676,12 @@ document.querySelectorAll<HTMLButtonElement>(".part-label[data-bim-part]").forEa
   button.addEventListener("click", () => {
     const part = button.dataset.bimPart as BimPartKey | undefined;
     if (part === "gearbox") {
+      if (xktBimMode) setXktBimMode(false);
       void getBimViewer().focusPart(part).then(() => activateGearboxWorkflow("alerts"));
       return;
     }
     if (part) {
+      if (xktBimMode) setXktBimMode(false);
       setEventTimelineStage("bim-location");
       void getBimViewer().focusPart(part);
     }
@@ -4673,6 +4714,7 @@ document.querySelector<HTMLButtonElement>("#ai-duty-speak")?.addEventListener("c
 document.querySelector<HTMLButtonElement>("#bim-toggle-decompose")?.addEventListener("click", (event) => {
   const button = event.currentTarget;
   if (!(button instanceof HTMLButtonElement)) return;
+  if (xktBimMode) setXktBimMode(false);
   const nextAction = modelDecomposed ? getBimViewer().compose() : getBimViewer().decompose();
   void nextAction.then(() => {
     modelDecomposed = !modelDecomposed;
@@ -4684,6 +4726,11 @@ document.querySelector<HTMLButtonElement>("#bim-toggle-decompose")?.addEventList
 document.querySelector<HTMLButtonElement>("#bim-warning")?.addEventListener("click", (event) => {
   const button = event.currentTarget;
   if (!(button instanceof HTMLButtonElement)) return;
+  if (xktBimMode) setXktBimMode(false);
   warningActive = getBimViewer().toggleWarning();
   button.textContent = warningActive ? "停止告警" : "告警闪烁";
+});
+
+document.querySelector<HTMLButtonElement>("#bim-xkt-toggle")?.addEventListener("click", () => {
+  setXktBimMode(!xktBimMode);
 });

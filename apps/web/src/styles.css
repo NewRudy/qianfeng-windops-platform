@@ -909,6 +909,177 @@ button {
     rgba(0, 9, 16, 0.08);
 }
 
+.xkt-bim-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 42% 44%, rgba(68, 206, 238, 0.13), transparent 30%),
+    linear-gradient(90deg, rgba(0, 6, 12, 0.42), transparent 22%, transparent 76%, rgba(0, 6, 12, 0.58)),
+    rgba(0, 8, 15, 0.96);
+}
+
+.xkt-bim-canvas[hidden] {
+  display: none;
+}
+
+.xkt-viewer-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+}
+
+.xkt-viewer-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+}
+
+.xkt-viewer-panel {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  bottom: 56px;
+  z-index: 2;
+  display: grid;
+  width: min(340px, calc(100% - 36px));
+  grid-template-rows: auto auto auto auto 1fr;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(91, 224, 246, 0.28);
+  background:
+    linear-gradient(145deg, rgba(2, 18, 30, 0.88), rgba(0, 8, 16, 0.78)),
+    radial-gradient(circle at 100% 0, rgba(91, 224, 246, 0.15), transparent 36%);
+  box-shadow:
+    inset 0 0 30px rgba(91, 224, 246, 0.08),
+    0 18px 40px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(12px);
+}
+
+.xkt-viewer-panel header {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(91, 224, 246, 0.14);
+}
+
+.xkt-viewer-panel header span,
+.xkt-viewer-panel header small,
+.xkt-asset-switch small,
+.xkt-object-list small {
+  color: rgba(199, 238, 246, 0.68);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.xkt-viewer-panel header strong {
+  color: #ffffff;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.xkt-asset-switch,
+.xkt-actions {
+  display: grid;
+  gap: 7px;
+}
+
+.xkt-asset-switch button,
+.xkt-actions button,
+.xkt-object-list button {
+  border: 1px solid rgba(91, 224, 246, 0.2);
+  background: rgba(5, 24, 38, 0.78);
+  color: rgba(236, 251, 254, 0.92);
+  text-align: left;
+}
+
+.xkt-asset-switch button {
+  display: grid;
+  gap: 3px;
+  padding: 8px 9px;
+}
+
+.xkt-asset-switch button.active,
+.xkt-asset-switch button:hover,
+.xkt-actions button:hover,
+.xkt-object-list button:hover {
+  border-color: rgba(91, 224, 246, 0.72);
+  background: rgba(13, 68, 88, 0.72);
+}
+
+.xkt-asset-switch strong,
+.xkt-object-list strong {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.xkt-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin: 0;
+}
+
+.xkt-stats div {
+  padding: 8px;
+  border: 1px solid rgba(91, 224, 246, 0.16);
+  background: rgba(0, 12, 22, 0.54);
+}
+
+.xkt-stats dt {
+  margin: 0 0 4px;
+  color: rgba(199, 238, 246, 0.64);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.xkt-stats dd {
+  margin: 0;
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.xkt-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.xkt-actions button {
+  height: 30px;
+  padding: 0 9px;
+  text-align: center;
+}
+
+.xkt-object-list {
+  display: grid;
+  min-height: 0;
+  gap: 7px;
+}
+
+.xkt-object-list > strong {
+  color: rgba(236, 251, 254, 0.92);
+}
+
+.xkt-object-list [data-xkt-object-list] {
+  display: grid;
+  min-height: 0;
+  gap: 6px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.xkt-object-list button {
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px;
+}
+
 .bim-webgl {
   display: block;
   width: 100%;
