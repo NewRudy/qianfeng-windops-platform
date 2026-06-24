@@ -29,9 +29,7 @@ button {
 }
 
 button:hover,
-button.active,
-.asset-card:hover,
-.asset-card.active {
+button.active {
   border-color: rgba(91, 224, 246, 0.78);
   background: rgba(13, 68, 88, 0.78);
 }
@@ -53,7 +51,6 @@ button.active,
 }
 
 .viewer-header span,
-.asset-card small,
 .status-card span,
 .object-list small {
   color: rgba(198, 239, 247, 0.68);
@@ -184,38 +181,12 @@ button.active,
   line-height: 1.4;
 }
 
-.asset-cards {
-  display: grid;
-  gap: 8px;
-}
-
-.asset-card {
-  display: grid;
-  gap: 4px;
-  padding: 10px 11px;
-  border: 1px solid rgba(91, 224, 246, 0.12);
-  background: rgba(0, 12, 22, 0.34);
-  cursor: pointer;
-  text-align: left;
-}
-
-.asset-card strong,
 .object-list strong {
   overflow: hidden;
   font-size: 13px;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.asset-card em {
-  margin-right: 7px;
-  border: 1px solid rgba(91, 224, 246, 0.28);
-  border-radius: 3px;
-  padding: 1px 5px;
-  color: #7fe7ff;
-  font-style: normal;
-  font-size: 10px;
 }
 
 .stats-grid {

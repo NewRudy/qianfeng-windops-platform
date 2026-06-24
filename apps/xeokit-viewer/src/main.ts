@@ -132,18 +132,6 @@ app.innerHTML = `
             <button type="button" data-load-selected>加载资产</button>
           </div>
           <div class="asset-summary" data-asset-summary></div>
-          <div class="asset-cards">
-          ${visibleAssets
-            .map(
-              (asset) => `
-                <article class="asset-card" data-asset-id="${asset.id}">
-                  <strong>${asset.label}</strong>
-                  <small><em>${asset.format.toUpperCase()}</em>${asset.sourceLabel} · ${asset.sizeLabel}</small>
-                </article>
-              `,
-            )
-            .join("")}
-          </div>
         </section>
         <section class="stats-grid" aria-label="模型统计">
           <div class="metric"><span>对象数</span><strong data-object-count>--</strong></div>
@@ -223,9 +211,6 @@ function setAssetSelection(assetId: AssetId): void {
     <strong>${escapeHtml(asset.label)}</strong>
     <span>${escapeHtml(asset.sourceLabel)} · ${escapeHtml(asset.sizeLabel)}${asset.localOnly ? " · 仅本机调试" : ""}</span>
   `;
-  document.querySelectorAll<HTMLElement>("[data-asset-id]").forEach((item) => {
-    item.classList.toggle("active", item.dataset.assetId === asset.id);
-  });
 }
 
 function describeStats(stats: LoaderStats): string {
@@ -424,14 +409,6 @@ function handleAction(action: string): void {
     setStatus("已复位显示", "全部对象恢复可见。");
   }
 }
-
-document.querySelectorAll<HTMLElement>("[data-asset-id]").forEach((card) => {
-  card.addEventListener("click", () => {
-    const assetId = card.dataset.assetId as AssetId | undefined;
-    if (!assetId) return;
-    setAssetSelection(assetId);
-  });
-});
 
 assetSelect.addEventListener("change", () => {
   setAssetSelection(assetSelect.value as AssetId);

@@ -15,6 +15,13 @@ outputs/
 data/raw/
 data/external/
 apps/*/public/external/
+!apps/xeokit-viewer/public/external/
+apps/xeokit-viewer/public/external/*
+!apps/xeokit-viewer/public/external/bim/
+apps/xeokit-viewer/public/external/bim/*
+!apps/xeokit-viewer/public/external/bim/xkt/
+apps/xeokit-viewer/public/external/bim/xkt/*
+!apps/xeokit-viewer/public/external/bim/xkt/*.xkt
 *.log
 *.sqlite
 *.db
