@@ -16,8 +16,9 @@ const ifcCacheDir =
 const xktCacheDir =
   process.env.WINDOPS_BIM_XKT_CACHE_DIR ?? join(repoRoot, "data/external/bim/xkt");
 const publicXktDir =
-  process.env.WINDOPS_BIM_PUBLIC_XKT_DIR ?? join(repoRoot, "apps/web/public/external/bim/xkt");
-const publicManifestPath = join(repoRoot, "apps/web/public/external/bim/manifest.local.json");
+  process.env.WINDOPS_BIM_PUBLIC_XKT_DIR ??
+  join(repoRoot, "apps/xeokit-viewer/public/external/bim/xkt");
+const publicManifestPath = join(repoRoot, "apps/xeokit-viewer/public/external/bim/manifest.local.json");
 const localManifestPath = join(repoRoot, "data/external/bim/manifest.local.json");
 const converterScript = join(repoRoot, "node_modules/@xeokit/xeokit-convert/convert2xkt.js");
 

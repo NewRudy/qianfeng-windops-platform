@@ -10,7 +10,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@xeokit/xeokit-sdk": "^2.6.111",
     "cesium": "^1.127.0",
     "three": "^0.184.0"
   },

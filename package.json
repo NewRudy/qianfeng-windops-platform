@@ -5,14 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "npm --workspace apps/web run dev",
+    "dev:xeokit": "npm --workspace apps/xeokit-viewer run dev",
     "build": "npm --workspace apps/web run build",
+    "build:xeokit": "npm --workspace apps/xeokit-viewer run build",
     "assets:ifc-xkt": "node scripts/convert-ifc-xkt.mjs",
     "assets:laoyeling": "node scripts/convert-laoyeling-tileset.mjs",
     "test": "npm --workspace apps/web run test",
     "typecheck": "npm --workspace apps/web run typecheck"
   },
   "workspaces": [
-    "apps/web"
+    "apps/web",
+    "apps/xeokit-viewer"
   ],
   "devDependencies": {
     "@xeokit/xeokit-convert": "^1.3.2",
