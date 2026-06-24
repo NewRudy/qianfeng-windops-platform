@@ -7,6 +7,7 @@ export interface LocalOffset {
 export interface ModelAsset {
   name: string;
   absolutePath: string;
+  publicPath?: string;
   scale: number;
   offset: LocalOffset;
   credit: string;
@@ -85,6 +86,7 @@ function createRidgeTurbine(
     name: turbineId,
     turbineId,
     absolutePath: "/Users/rudy/Downloads/wind_turbine/scene.gltf",
+    publicPath: "models/wind-turbine/scene.gltf",
     scale: 2.8,
     offset,
     headingDegrees,

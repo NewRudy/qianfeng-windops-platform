@@ -118,7 +118,7 @@ export async function createWindFarmScene({
     addTurbineFoundation(viewer, localFrame, turbine);
     riskEntities.set(turbine.turbineId, addTurbineRiskMarker(viewer, localFrame, turbine));
 
-    if (canLoadLocalFsAssets()) {
+    if (canLoadLocalFsAssets() || turbine.publicPath) {
       void loadTurbineGltfModel(viewer, localFrame, turbine)
         .then((model) => {
           turbineModels.set(turbine.turbineId, model);
@@ -370,7 +370,7 @@ async function loadTurbineGltfModel(
   localFrame: Matrix4,
   turbineAsset: TurbineAsset,
 ): Promise<Model> {
-  const modelUrl = toViteFsUrl(turbineAsset.absolutePath);
+  const modelUrl = turbineModelUrl(turbineAsset);
   const response = await fetch(modelUrl, { method: "HEAD" });
   const contentType = response.headers.get("content-type") ?? "";
   if (!response.ok || contentType.includes("text/html")) {
@@ -393,6 +393,13 @@ async function loadTurbineGltfModel(
   }
 
   return turbine;
+}
+
+function turbineModelUrl(turbineAsset: TurbineAsset): string {
+  if (turbineAsset.publicPath) {
+    return `${import.meta.env.BASE_URL}${turbineAsset.publicPath.replace(/^\//, "")}`;
+  }
+  return toViteFsUrl(turbineAsset.absolutePath);
 }
 
 function updateTurbineModelAlertVisuals(turbineModels: Map<string, Model>, activeAlertTurbineId?: string): void {
