@@ -181,6 +181,35 @@ button {
     visibility 0s linear 220ms;
 }
 
+.data-validation-link {
+  position: absolute;
+  top: 24px;
+  right: 28px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid rgba(91, 224, 246, 0.28);
+  background: rgba(2, 13, 24, 0.52);
+  color: rgba(218, 250, 255, 0.88);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  backdrop-filter: blur(14px);
+}
+
+.data-validation-link:hover {
+  border-color: rgba(91, 224, 246, 0.72);
+  background: rgba(13, 68, 88, 0.56);
+}
+
+.shell[data-mode="bim"] .data-validation-link {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
 .ai-duty-card {
   position: absolute;
   right: 28px;

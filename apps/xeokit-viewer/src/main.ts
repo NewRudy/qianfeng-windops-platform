@@ -14,6 +14,7 @@ type BimAsset = {
   id: AssetId;
   format: AssetFormat;
   label: string;
+  localOnly?: boolean;
   sizeLabel: string;
   sourceLabel: string;
   timeoutMs: number;
@@ -71,12 +72,22 @@ const assets: BimAsset[] = [
     id: "factory-masterplan-ifc",
     format: "ifc",
     label: "厂房总图 IFC / 浏览器直读",
+    localOnly: true,
     sizeLabel: "197MB IFC",
-    sourceLabel: "验证原始 IFC 是否保留构件",
+    sourceLabel: "本地诊断原始 IFC 是否保留构件",
     timeoutMs: 240000,
     url: "/external/bim/ifc/factory-masterplan.ifc",
   },
 ];
+
+const isLocalHost = ["", "127.0.0.1", "localhost"].includes(window.location.hostname);
+const isStaticPagesBuild = import.meta.env.MODE === "github-pages";
+const visibleAssets = assets.filter((asset) => !asset.localOnly || (isLocalHost && !isStaticPagesBuild));
+
+function appAssetUrl(path: string): string {
+  if (/^https?:\/\//.test(path)) return path;
+  return `${import.meta.env.BASE_URL}${path.replace(/^\//, "")}`;
+}
 
 const app = document.querySelector<HTMLDivElement>("#app");
 
@@ -105,16 +116,34 @@ app.innerHTML = `
       <aside class="side-panel">
         <section class="panel-section">
           <h2>资产</h2>
-          ${assets
+          <div class="asset-picker">
+            <label for="asset-select">测试资产</label>
+            <select id="asset-select" data-asset-select>
+              ${visibleAssets
+                .map(
+                  (asset) => `
+                    <option value="${asset.id}">
+                      ${asset.label} · ${asset.sizeLabel}${asset.localOnly ? " · 本地" : ""}
+                    </option>
+                  `,
+                )
+                .join("")}
+            </select>
+            <button type="button" data-load-selected>加载资产</button>
+          </div>
+          <div class="asset-summary" data-asset-summary></div>
+          <div class="asset-cards">
+          ${visibleAssets
             .map(
               (asset) => `
-                <button class="asset-button" type="button" data-asset-id="${asset.id}">
+                <article class="asset-card" data-asset-id="${asset.id}">
                   <strong>${asset.label}</strong>
                   <small><em>${asset.format.toUpperCase()}</em>${asset.sourceLabel} · ${asset.sizeLabel}</small>
-                </button>
+                </article>
               `,
             )
             .join("")}
+          </div>
         </section>
         <section class="stats-grid" aria-label="模型统计">
           <div class="metric"><span>对象数</span><strong data-object-count>--</strong></div>
@@ -153,6 +182,8 @@ const objectCount = requireElement<HTMLElement>("[data-object-count]");
 const typeCount = requireElement<HTMLElement>("[data-type-count]");
 const selection = requireElement<HTMLElement>("[data-selection]");
 const objectList = requireElement<HTMLElement>("[data-object-list]");
+const assetSelect = requireElement<HTMLSelectElement>("[data-asset-select]");
+const assetSummary = requireElement<HTMLElement>("[data-asset-summary]");
 
 const viewer = new Viewer({
   canvasElement: canvas,
@@ -184,6 +215,19 @@ function setMetric(target: HTMLElement, value: string): void {
   target.textContent = value;
 }
 
+function setAssetSelection(assetId: AssetId): void {
+  const asset = visibleAssets.find((item) => item.id === assetId) ?? visibleAssets[0];
+  if (!asset) return;
+  assetSelect.value = asset.id;
+  assetSummary.innerHTML = `
+    <strong>${escapeHtml(asset.label)}</strong>
+    <span>${escapeHtml(asset.sourceLabel)} · ${escapeHtml(asset.sizeLabel)}${asset.localOnly ? " · 仅本机调试" : ""}</span>
+  `;
+  document.querySelectorAll<HTMLElement>("[data-asset-id]").forEach((item) => {
+    item.classList.toggle("active", item.dataset.assetId === asset.id);
+  });
+}
+
 function describeStats(stats: LoaderStats): string {
   const parts = [
     typeof stats.numMetaObjects === "number" ? `元对象 ${stats.numMetaObjects}` : "",
@@ -203,7 +247,7 @@ async function getIfcLoader(): Promise<WebIFCLoaderPlugin> {
     ifcLoaderInit = (async () => {
       setStatus("正在初始化 IFC 直读引擎", "加载 web-ifc wasm，本模式用于诊断源 IFC 语义层级。");
       const ifcAPI = new WebIFC.IfcAPI();
-      ifcAPI.SetWasmPath("/external/bim/web-ifc/");
+      ifcAPI.SetWasmPath(appAssetUrl("/external/bim/web-ifc/"));
       await ifcAPI.Init();
       ifcLoader = new WebIFCLoaderPlugin(viewer, {
         WebIFC,
@@ -293,25 +337,24 @@ function selectObject(objectId: string): void {
 
 async function loadAsset(assetId: AssetId): Promise<void> {
   if (loadingAssetId === assetId) return;
-  const asset = assets.find((item) => item.id === assetId);
+  const asset = visibleAssets.find((item) => item.id === assetId);
   if (!asset) return;
 
   loadingAssetId = assetId;
   clearModel();
-  setStatus(`正在加载 ${asset.label}`, asset.url);
-  document.querySelectorAll<HTMLButtonElement>("[data-asset-id]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.assetId === assetId);
-  });
+  setAssetSelection(asset.id);
+  const assetUrl = appAssetUrl(asset.url);
+  setStatus(`正在加载 ${asset.label}`, assetUrl);
 
   const stats: LoaderStats = {};
   let model: XeokitModel;
 
   if (asset.format === "ifc") {
     const loader = await getIfcLoader();
-    setStatus(`正在直读 ${asset.label}`, `${asset.url}。大 IFC 首次解析可能需要几分钟。`);
+    setStatus(`正在直读 ${asset.label}`, `${assetUrl}。大 IFC 首次解析可能需要几分钟。`);
     model = loader.load({
       id: asset.id,
-      src: asset.url,
+      src: assetUrl,
       edges: true,
       loadMetadata: true,
       saoEnabled: true,
@@ -322,7 +365,7 @@ async function loadAsset(assetId: AssetId): Promise<void> {
   } else {
     model = xktLoader.load({
       id: asset.id,
-      src: asset.url,
+      src: assetUrl,
       edges: asset.id === "wind-turbines-xkt",
       saoEnabled: true,
       globalizeObjectIds: true,
@@ -331,7 +374,7 @@ async function loadAsset(assetId: AssetId): Promise<void> {
   currentModel = model;
 
   await new Promise<void>((resolve, reject) => {
-    const timeout = window.setTimeout(() => reject(new Error(`加载超时：${asset.url}`)), asset.timeoutMs);
+    const timeout = window.setTimeout(() => reject(new Error(`加载超时：${assetUrl}`)), asset.timeoutMs);
     model.on?.("loaded", () => {
       window.clearTimeout(timeout);
       resolve();
@@ -382,12 +425,22 @@ function handleAction(action: string): void {
   }
 }
 
-document.querySelectorAll<HTMLButtonElement>("[data-asset-id]").forEach((button) => {
-  button.addEventListener("click", () => {
-    void loadAsset(button.dataset.assetId as AssetId).catch((error: Error) => {
-      loadingAssetId = undefined;
-      setStatus("加载失败", error.message);
-    });
+document.querySelectorAll<HTMLElement>("[data-asset-id]").forEach((card) => {
+  card.addEventListener("click", () => {
+    const assetId = card.dataset.assetId as AssetId | undefined;
+    if (!assetId) return;
+    setAssetSelection(assetId);
+  });
+});
+
+assetSelect.addEventListener("change", () => {
+  setAssetSelection(assetSelect.value as AssetId);
+});
+
+requireElement<HTMLButtonElement>("[data-load-selected]").addEventListener("click", () => {
+  void loadAsset(assetSelect.value as AssetId).catch((error: Error) => {
+    loadingAssetId = undefined;
+    setStatus("加载失败", error.message);
   });
 });
 
@@ -406,7 +459,8 @@ canvas.addEventListener("click", (event) => {
   if (objectId !== undefined) selectObject(String(objectId));
 });
 
-void loadAsset("wind-turbines-xkt").catch((error: Error) => {
+setAssetSelection((visibleAssets[0]?.id ?? "wind-turbines-xkt") as AssetId);
+void loadAsset((visibleAssets[0]?.id ?? "wind-turbines-xkt") as AssetId).catch((error: Error) => {
   loadingAssetId = undefined;
   setStatus("加载失败", `${error.message}。请先运行 npm run assets:ifc-xkt 和 npm run assets:ifc-publish。`);
 });

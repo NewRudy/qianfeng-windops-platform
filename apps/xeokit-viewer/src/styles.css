@@ -29,7 +29,9 @@ button {
 }
 
 button:hover,
-button.active {
+button.active,
+.asset-card:hover,
+.asset-card.active {
   border-color: rgba(91, 224, 246, 0.78);
   background: rgba(13, 68, 88, 0.78);
 }
@@ -51,7 +53,7 @@ button.active {
 }
 
 .viewer-header span,
-.asset-button small,
+.asset-card small,
 .status-card span,
 .object-list small {
   color: rgba(198, 239, 247, 0.68);
@@ -132,14 +134,72 @@ button.active {
   font-size: 15px;
 }
 
-.asset-button {
+.asset-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  gap: 8px;
+}
+
+.asset-picker label {
+  grid-column: 1 / -1;
+  color: rgba(198, 239, 247, 0.64);
+  font-size: 12px;
+}
+
+.asset-picker select {
+  min-width: 0;
+  height: 36px;
+  border: 1px solid rgba(91, 224, 246, 0.24);
+  border-radius: 0;
+  padding: 0 10px;
+  background: rgba(0, 12, 22, 0.78);
+  color: #effdff;
+  font: inherit;
+  outline: none;
+}
+
+.asset-picker button {
+  height: 36px;
+}
+
+.asset-summary {
+  display: grid;
+  gap: 4px;
+  min-height: 58px;
+  padding: 10px;
+  border: 1px solid rgba(91, 224, 246, 0.16);
+  background: rgba(0, 12, 22, 0.42);
+}
+
+.asset-summary strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-summary span {
+  color: rgba(198, 239, 247, 0.66);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.asset-cards {
+  display: grid;
+  gap: 8px;
+}
+
+.asset-card {
   display: grid;
   gap: 4px;
   padding: 10px 11px;
+  border: 1px solid rgba(91, 224, 246, 0.12);
+  background: rgba(0, 12, 22, 0.34);
+  cursor: pointer;
   text-align: left;
 }
 
-.asset-button strong,
+.asset-card strong,
 .object-list strong {
   overflow: hidden;
   font-size: 13px;
@@ -148,7 +208,7 @@ button.active {
   white-space: nowrap;
 }
 
-.asset-button em {
+.asset-card em {
   margin-right: 7px;
   border: 1px solid rgba(91, 224, 246, 0.28);
   border-radius: 3px;

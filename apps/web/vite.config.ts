@@ -48,8 +48,10 @@ function aiDiagnosisProxyPlugin(env: Record<string, string>): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, repoRoot, "");
+  const defaultBase = mode === "github-pages" ? "/qianfeng-windops-platform/" : "/";
 
   return {
+    base: env.WINDOPS_VITE_BASE ?? defaultBase,
     plugins: [
       aiDiagnosisProxyPlugin(env),
       cesium({

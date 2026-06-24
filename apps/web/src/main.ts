@@ -1962,6 +1962,9 @@ root.innerHTML = `
         <h1>黔风智维</h1>
         <strong>多气候山地风电机组智驭预警及故障诊断平台</strong>
       </header>
+      <a class="data-validation-link" href="${html(`${import.meta.env.BASE_URL}xeokit-viewer/`)}" target="_blank" rel="noreferrer">
+        数据验证
+      </a>
 
       <section class="ai-duty-card" aria-label="值班播报" aria-live="polite">
         <div>

@@ -7,6 +7,7 @@
     "dev": "npm --workspace apps/web run dev",
     "dev:xeokit": "npm --workspace apps/xeokit-viewer run dev",
     "build": "npm --workspace apps/web run build",
+    "build:pages": "node scripts/build-pages.mjs",
     "build:xeokit": "npm --workspace apps/xeokit-viewer run build",
     "assets:ifc-xkt": "node scripts/convert-ifc-xkt.mjs",
     "assets:ifc-publish": "node scripts/publish-ifc-assets.mjs",

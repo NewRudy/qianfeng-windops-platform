@@ -3,9 +3,13 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-const EQUIPMENT_MODEL_URL = "/models/first-version/equipment.glb";
-const SKELETON_MODEL_URL = "/models/first-version/skeleton.glb";
-const DRACO_DECODER_PATH = "/js/draco/gltf/";
+function appAssetUrl(path: string): string {
+  return `${import.meta.env.BASE_URL}${path.replace(/^\//, "")}`;
+}
+
+const EQUIPMENT_MODEL_URL = appAssetUrl("models/first-version/equipment.glb");
+const SKELETON_MODEL_URL = appAssetUrl("models/first-version/skeleton.glb");
+const DRACO_DECODER_PATH = appAssetUrl("js/draco/gltf/");
 
 type BimMesh = THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]>;
 type BimPartKey = "blade" | "hub" | "nacelle" | "tower" | "foundation" | "gearbox";

@@ -93,10 +93,18 @@ export async function createWindFarmScene({
   );
   const localFrame = Transforms.eastNorthUpToFixedFrame(origin);
 
-  const mountain = await Cesium3DTileset.fromUrl(toViteFsUrl(config.mountain.absolutePath));
-  mountain.maximumScreenSpaceError = 2;
-  viewer.scene.primitives.add(mountain);
-  addMountainSurface(viewer, config);
+  let hasMountainTileset = false;
+  if (canLoadLocalFsAssets()) {
+    try {
+      const mountain = await Cesium3DTileset.fromUrl(toViteFsUrl(config.mountain.absolutePath));
+      mountain.maximumScreenSpaceError = 2;
+      viewer.scene.primitives.add(mountain);
+      hasMountainTileset = true;
+    } catch (error) {
+      console.warn("[WindOps GIS] failed to load local mountain tileset; using remote-safe surface.", error);
+    }
+  }
+  addMountainSurface(viewer, config, hasMountainTileset && canLoadLocalFsAssets());
 
   let selectedTurbine = config.turbines[0];
   const riskEntities = new Map<string, Entity[]>();
@@ -110,14 +118,16 @@ export async function createWindFarmScene({
     addTurbineFoundation(viewer, localFrame, turbine);
     riskEntities.set(turbine.turbineId, addTurbineRiskMarker(viewer, localFrame, turbine));
 
-    void loadTurbineGltfModel(viewer, localFrame, turbine)
-      .then((model) => {
-        turbineModels.set(turbine.turbineId, model);
-        updateTurbineModelAlertVisuals(turbineModels, activeAlertTurbineId);
-      })
-      .catch((error: unknown) => {
-        console.error(`Failed to load ${turbine.turbineId} wind turbine model.`, error);
-      });
+    if (canLoadLocalFsAssets()) {
+      void loadTurbineGltfModel(viewer, localFrame, turbine)
+        .then((model) => {
+          turbineModels.set(turbine.turbineId, model);
+          updateTurbineModelAlertVisuals(turbineModels, activeAlertTurbineId);
+        })
+        .catch((error: unknown) => {
+          console.warn(`[WindOps GIS] failed to load ${turbine.turbineId} local wind turbine model.`, error);
+        });
+    }
   }
 
   const flashAlertModel = () => {
@@ -197,6 +207,10 @@ export async function createWindFarmScene({
   };
 }
 
+function canLoadLocalFsAssets(): boolean {
+  return import.meta.env.DEV && ["127.0.0.1", "localhost"].includes(window.location.hostname);
+}
+
 function playIntroFlight(
   viewer: Viewer,
   origin: Cartesian3,
@@ -222,7 +236,7 @@ function playIntroFlight(
   }, 700);
 }
 
-function addMountainSurface(viewer: Viewer, config: SceneConfig): void {
+function addMountainSurface(viewer: Viewer, config: SceneConfig, useTexture: boolean): void {
   const centerLongitude = config.origin.longitude;
   const centerLatitude = config.origin.latitude;
   const halfWidthDegrees = 0.023;
@@ -238,9 +252,11 @@ function addMountainSurface(viewer: Viewer, config: SceneConfig): void {
         centerLatitude + halfHeightDegrees,
       ),
       height: config.origin.height + 8,
-      material: new ImageMaterialProperty({
-        image: toViteFsUrl(config.mountain.baseColorTexturePath),
-      }),
+      material: useTexture
+        ? new ImageMaterialProperty({
+            image: toViteFsUrl(config.mountain.baseColorTexturePath),
+          })
+        : new ColorMaterialProperty(Color.fromCssColorString("rgba(84, 118, 94, 0.78)")),
     },
   });
 }
