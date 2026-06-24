@@ -148,6 +148,16 @@ button.active {
   white-space: nowrap;
 }
 
+.asset-button em {
+  margin-right: 7px;
+  border: 1px solid rgba(91, 224, 246, 0.28);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: #7fe7ff;
+  font-style: normal;
+  font-size: 10px;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

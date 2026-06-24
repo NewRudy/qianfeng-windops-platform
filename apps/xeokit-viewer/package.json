@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@xeokit/xeokit-sdk": "^2.6.111"
+    "@xeokit/xeokit-sdk": "^2.6.111",
+    "web-ifc": "^0.0.70"
   },
   "devDependencies": {
     "@types/node": "^24.0.4",

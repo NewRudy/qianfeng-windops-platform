@@ -1,13 +1,22 @@
-import { Viewer, XKTLoaderPlugin } from "@xeokit/xeokit-sdk";
+import { Viewer, WebIFCLoaderPlugin, XKTLoaderPlugin } from "@xeokit/xeokit-sdk";
+import * as WebIFC from "web-ifc";
 import "./styles.css";
 
-type AssetId = "factory-masterplan" | "wind-turbines";
+type AssetId =
+  | "factory-masterplan-ifc"
+  | "factory-masterplan-xkt"
+  | "wind-turbines-ifc"
+  | "wind-turbines-xkt";
+
+type AssetFormat = "ifc" | "xkt";
 
 type BimAsset = {
   id: AssetId;
+  format: AssetFormat;
   label: string;
   sizeLabel: string;
   sourceLabel: string;
+  timeoutMs: number;
   url: string;
 };
 
@@ -22,20 +31,50 @@ type XeokitHit = {
   };
 };
 
+type LoaderStats = {
+  numMetaObjects?: number;
+  numObjects?: number;
+  numPropertySets?: number;
+  numTriangles?: number;
+  numVertices?: number;
+};
+
 const assets: BimAsset[] = [
   {
-    id: "wind-turbines",
-    label: "风机.ifc / 多风机模型",
+    id: "wind-turbines-xkt",
+    format: "xkt",
+    label: "风机 XKT / 快速加载",
     sizeLabel: "60KB XKT",
     sourceLabel: "9 个可选对象",
+    timeoutMs: 30000,
     url: "/external/bim/xkt/wind-turbines.xkt",
   },
   {
-    id: "factory-masterplan",
-    label: "厂房总图.ifc / 厂房总图",
+    id: "factory-masterplan-xkt",
+    format: "xkt",
+    label: "厂房总图 XKT / 转换结果",
     sizeLabel: "17MB XKT",
-    sourceLabel: "大体量单对象",
+    sourceLabel: "用于对比转换后对象层级",
+    timeoutMs: 45000,
     url: "/external/bim/xkt/factory-masterplan.xkt",
+  },
+  {
+    id: "wind-turbines-ifc",
+    format: "ifc",
+    label: "风机 IFC / 浏览器直读",
+    sizeLabel: "426KB IFC",
+    sourceLabel: "不经过 XKT 转换",
+    timeoutMs: 60000,
+    url: "/external/bim/ifc/wind-turbines.ifc",
+  },
+  {
+    id: "factory-masterplan-ifc",
+    format: "ifc",
+    label: "厂房总图 IFC / 浏览器直读",
+    sizeLabel: "197MB IFC",
+    sourceLabel: "验证原始 IFC 是否保留构件",
+    timeoutMs: 240000,
+    url: "/external/bim/ifc/factory-masterplan.ifc",
   },
 ];
 
@@ -49,8 +88,8 @@ app.innerHTML = `
   <section class="viewer-shell">
     <header class="viewer-header">
       <div>
-        <span>xeokit XKT BIM 数据验证</span>
-        <h1>黔风智维 IFC 转 XKT 查看器</h1>
+        <span>xeokit BIM 数据验证</span>
+        <h1>黔风智维 IFC / XKT 查看器</h1>
       </div>
       <strong>独立页面，不改原大屏</strong>
     </header>
@@ -71,7 +110,7 @@ app.innerHTML = `
               (asset) => `
                 <button class="asset-button" type="button" data-asset-id="${asset.id}">
                   <strong>${asset.label}</strong>
-                  <small>${asset.sourceLabel} · ${asset.sizeLabel}</small>
+                  <small><em>${asset.format.toUpperCase()}</em>${asset.sourceLabel} · ${asset.sizeLabel}</small>
                 </button>
               `,
             )
@@ -90,7 +129,7 @@ app.innerHTML = `
         </section>
         <section class="panel-section">
           <h2>边界说明</h2>
-          <span>这是独立 xeokit 验证页，用来确认 XKT 能加载、对象能选择、外壳能隐藏。GIS+BIM 正式融合后续再单独设计，不污染原平台。</span>
+          <span>这是独立 xeokit 验证页。XKT 用来验证正式轻量化加载；IFC 直读用来判断源 IFC 是否保留对象层级和属性，不经过转换。</span>
         </section>
         <section class="object-list">
           <h2>可选对象</h2>
@@ -123,9 +162,11 @@ const viewer = new Viewer({
   pbrEnabled: false,
   readableGeometryEnabled: true,
 });
-const loader = new XKTLoaderPlugin(viewer);
+const xktLoader = new XKTLoaderPlugin(viewer);
 
 let currentModel: XeokitModel | undefined;
+let ifcLoader: WebIFCLoaderPlugin | undefined;
+let ifcLoaderInit: Promise<WebIFCLoaderPlugin> | undefined;
 let selectedObjectId: string | undefined;
 let loadingAssetId: AssetId | undefined;
 
@@ -143,8 +184,36 @@ function setMetric(target: HTMLElement, value: string): void {
   target.textContent = value;
 }
 
+function describeStats(stats: LoaderStats): string {
+  const parts = [
+    typeof stats.numMetaObjects === "number" ? `元对象 ${stats.numMetaObjects}` : "",
+    typeof stats.numPropertySets === "number" ? `属性集 ${stats.numPropertySets}` : "",
+    typeof stats.numTriangles === "number" ? `三角面 ${stats.numTriangles}` : "",
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
 function getObjectIds(): string[] {
   return Object.keys(viewer.scene.objects);
+}
+
+async function getIfcLoader(): Promise<WebIFCLoaderPlugin> {
+  if (ifcLoader) return ifcLoader;
+  if (!ifcLoaderInit) {
+    ifcLoaderInit = (async () => {
+      setStatus("正在初始化 IFC 直读引擎", "加载 web-ifc wasm，本模式用于诊断源 IFC 语义层级。");
+      const ifcAPI = new WebIFC.IfcAPI();
+      ifcAPI.SetWasmPath("/external/bim/web-ifc/");
+      await ifcAPI.Init();
+      ifcLoader = new WebIFCLoaderPlugin(viewer, {
+        WebIFC,
+        IfcAPI: ifcAPI,
+        excludeTypes: ["IfcSpace"],
+      });
+      return ifcLoader;
+    })();
+  }
+  return ifcLoaderInit;
 }
 
 function clearModel(): void {
@@ -234,17 +303,35 @@ async function loadAsset(assetId: AssetId): Promise<void> {
     button.classList.toggle("active", button.dataset.assetId === assetId);
   });
 
-  const model = loader.load({
-    id: asset.id,
-    src: asset.url,
-    edges: asset.id === "wind-turbines",
-    saoEnabled: true,
-    globalizeObjectIds: true,
-  }) as XeokitModel;
+  const stats: LoaderStats = {};
+  let model: XeokitModel;
+
+  if (asset.format === "ifc") {
+    const loader = await getIfcLoader();
+    setStatus(`正在直读 ${asset.label}`, `${asset.url}。大 IFC 首次解析可能需要几分钟。`);
+    model = loader.load({
+      id: asset.id,
+      src: asset.url,
+      edges: true,
+      loadMetadata: true,
+      saoEnabled: true,
+      backfaces: true,
+      globalizeObjectIds: true,
+      stats: stats as never,
+    }) as XeokitModel;
+  } else {
+    model = xktLoader.load({
+      id: asset.id,
+      src: asset.url,
+      edges: asset.id === "wind-turbines-xkt",
+      saoEnabled: true,
+      globalizeObjectIds: true,
+    }) as XeokitModel;
+  }
   currentModel = model;
 
   await new Promise<void>((resolve, reject) => {
-    const timeout = window.setTimeout(() => reject(new Error(`加载超时：${asset.url}`)), 30000);
+    const timeout = window.setTimeout(() => reject(new Error(`加载超时：${asset.url}`)), asset.timeoutMs);
     model.on?.("loaded", () => {
       window.clearTimeout(timeout);
       resolve();
@@ -258,7 +345,11 @@ async function loadAsset(assetId: AssetId): Promise<void> {
   loadingAssetId = undefined;
   refreshObjectList();
   fitToObjects(getObjectIds(), false);
-  setStatus(`${asset.label} 已加载`, "可以点击模型或对象列表验证构件级选择。");
+  const statsDetail = describeStats(stats);
+  setStatus(
+    `${asset.label} 已加载`,
+    statsDetail || "可以点击模型或对象列表验证构件级选择。",
+  );
 }
 
 function handleAction(action: string): void {
@@ -315,7 +406,7 @@ canvas.addEventListener("click", (event) => {
   if (objectId !== undefined) selectObject(String(objectId));
 });
 
-void loadAsset("wind-turbines").catch((error: Error) => {
+void loadAsset("wind-turbines-xkt").catch((error: Error) => {
   loadingAssetId = undefined;
-  setStatus("加载失败", `${error.message}。请先运行 npm run assets:ifc-xkt。`);
+  setStatus("加载失败", `${error.message}。请先运行 npm run assets:ifc-xkt 和 npm run assets:ifc-publish。`);
 });
