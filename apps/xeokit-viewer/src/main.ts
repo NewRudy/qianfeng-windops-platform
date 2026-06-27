@@ -91,6 +91,12 @@ const mountainNearBimTransform: BimTransform = {
   scale: 1,
 };
 
+const mountainCenterInXeokit = {
+  east: 0,
+  north: 0,
+  up: -35,
+};
+
 const assets: BimAsset[] = [
   {
     id: "wind-turbines-xkt",
@@ -287,15 +293,15 @@ app.innerHTML = `
             <div class="calibration-grid">
               <label>
                 东移 E / m
-                <input type="number" data-calibration="east" min="-3000" max="3000" step="5" />
+                <input type="number" data-calibration="east" min="-5000000" max="5000000" step="5" />
               </label>
               <label>
                 北移 N / m
-                <input type="number" data-calibration="north" min="-3000" max="3000" step="5" />
+                <input type="number" data-calibration="north" min="-5000000" max="5000000" step="5" />
               </label>
               <label>
                 高程 U / m
-                <input type="number" data-calibration="up" min="-800" max="800" step="1" />
+                <input type="number" data-calibration="up" min="-100000" max="100000" step="1" />
               </label>
               <label>
                 航向 / °
@@ -308,6 +314,7 @@ app.innerHTML = `
             </div>
             <div class="calibration-actions">
               <button type="button" data-calibration-action="apply">应用配准</button>
+              <button type="button" data-calibration-action="auto-align">自动配准</button>
               <button type="button" data-calibration-action="near-mountain">靠近山体</button>
               <button type="button" data-calibration-action="reset">归零</button>
             </div>
@@ -409,6 +416,13 @@ function syncCalibrationInputs(): void {
   calibrationReadout.textContent = formatTransform(bimTransform);
 }
 
+function sanitizeTransform(transform: BimTransform): BimTransform {
+  return {
+    ...transform,
+    scale: transform.scale > 0 ? transform.scale : 0.02,
+  };
+}
+
 function readCalibrationInputs(): BimTransform {
   const next = { ...bimTransform };
   calibrationInputs.forEach((input) => {
@@ -417,8 +431,7 @@ function readCalibrationInputs(): BimTransform {
     const parsed = Number(input.value);
     if (Number.isFinite(parsed)) next[key] = parsed;
   });
-  if (next.scale <= 0) next.scale = 0.02;
-  return next;
+  return sanitizeTransform(next);
 }
 
 function applyTransformToPosition(position?: number[]): number[] {
@@ -755,6 +768,43 @@ async function reloadCurrentAssetWithTransform(title: string): Promise<void> {
   await loadAsset(assetSelect.value);
 }
 
+function getAabbCenter(aabb: ArrayLike<number>): number[] {
+  return [
+    (Number(aabb[0] ?? 0) + Number(aabb[3] ?? 0)) / 2,
+    (Number(aabb[1] ?? 0) + Number(aabb[4] ?? 0)) / 2,
+    (Number(aabb[2] ?? 0) + Number(aabb[5] ?? 0)) / 2,
+  ];
+}
+
+function formatPoint(point: ArrayLike<number>): string {
+  return `X ${Number(point[0] ?? 0).toFixed(1)} / Y ${Number(point[1] ?? 0).toFixed(1)} / Z ${Number(point[2] ?? 0).toFixed(1)}`;
+}
+
+async function autoAlignLoadedModelToMountain(): Promise<void> {
+  const objectIds = getObjectIds();
+  if (objectIds.length === 0) {
+    setStatus("无法自动配准", "当前没有已加载的 BIM 对象。");
+    return;
+  }
+
+  syncCalibrationInputs();
+  const center = getAabbCenter(viewer.scene.getAABB(objectIds));
+  const nextTransform = sanitizeTransform({
+    ...bimTransform,
+    east: bimTransform.east + mountainCenterInXeokit.east - center[0],
+    north: bimTransform.north + mountainCenterInXeokit.north - center[2],
+    up: bimTransform.up + mountainCenterInXeokit.up - center[1],
+  });
+
+  bimTransform = nextTransform;
+  syncCalibrationInputs();
+  setStatus(
+    "正在自动配准到山体中心附近",
+    `当前 BIM 中心 ${formatPoint(center)}，目标 X 0.0 / Y -35.0 / Z 0.0。正在重载当前资产。`,
+  );
+  await loadAsset(assetSelect.value);
+}
+
 async function waitForModelLoaded(model: XeokitModel, timeoutMs: number, url: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const timeout = window.setTimeout(() => reject(new Error(`加载超时：${url}`)), timeoutMs);
@@ -908,14 +958,20 @@ calibrationInputs.forEach((input) => {
     calibrationReadout.textContent = formatTransform(readCalibrationInputs());
   });
   input.addEventListener("change", () => {
-    bimTransform = readCalibrationInputs();
-    syncCalibrationInputs();
+    calibrationReadout.textContent = formatTransform(readCalibrationInputs());
   });
 });
 
 document.querySelectorAll<HTMLButtonElement>("[data-calibration-action]").forEach((button) => {
   button.addEventListener("click", () => {
     const action = button.dataset.calibrationAction;
+    if (action === "auto-align") {
+      void autoAlignLoadedModelToMountain().catch((error: Error) => {
+        loadingAssetId = undefined;
+        setStatus("自动配准失败", error.message);
+      });
+      return;
+    }
     if (action === "near-mountain") {
       bimTransform = { ...mountainNearBimTransform };
       syncCalibrationInputs();
