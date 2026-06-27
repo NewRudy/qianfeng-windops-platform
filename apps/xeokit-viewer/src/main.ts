@@ -1,4 +1,17 @@
-import { Viewer, WebIFCLoaderPlugin, XKTLoaderPlugin } from "@xeokit/xeokit-sdk";
+import {
+  Cartesian3,
+  Cesium3DTileset,
+  Color,
+  DirectionalLight,
+  EllipsoidTerrainProvider,
+  Matrix4,
+  Rectangle,
+  Transforms,
+  UrlTemplateImageryProvider,
+  Viewer as CesiumViewer,
+} from "cesium";
+import "cesium/Build/Cesium/Widgets/widgets.css";
+import { Viewer as XeokitViewer, WebIFCLoaderPlugin, XKTLoaderPlugin } from "@xeokit/xeokit-sdk";
 import * as WebIFC from "web-ifc";
 import "./styles.css";
 
@@ -41,6 +54,17 @@ type LoaderStats = {
   numTriangles?: number;
   numVertices?: number;
 };
+
+type FusionMode = "bim" | "gis-bim";
+
+const fusionOrigin = {
+  height: 1250,
+  latitude: 26.5,
+  longitude: 106.6,
+};
+
+const localMountainTilesetUrl =
+  "/@fs/Users/rudy/Documents/geo_agent/qianfeng-windops-platform/data/external/tilesets/laoyeling-mountain/tileset.json";
 
 const assets: BimAsset[] = [
   {
@@ -190,6 +214,7 @@ app.innerHTML = `
     </header>
     <section class="viewer-main">
       <div class="canvas-wrap">
+        <div id="cesium-root" aria-label="Cesium GIS background"></div>
         <canvas id="xeokit-canvas" aria-label="xeokit BIM viewer"></canvas>
         <aside class="status-card">
           <span>当前状态</span>
@@ -215,7 +240,15 @@ app.innerHTML = `
             </select>
             <button type="button" data-load-selected>加载资产</button>
           </div>
+          <div class="mode-toggle" aria-label="视图模式">
+            <span>视图模式</span>
+            <button type="button" data-fusion-mode="bim">纯 BIM 验证</button>
+            <button type="button" data-fusion-mode="gis-bim">GIS+BIM 融合实验</button>
+          </div>
           <div class="asset-summary" data-asset-summary></div>
+          <div class="fusion-summary" data-fusion-summary>
+            Cesium 未启用。开启融合实验后，底层加载影像和本地山地 3D Tiles，顶层保留 xeokit 构件级选择。
+          </div>
         </section>
         <section class="stats-grid" aria-label="模型统计">
           <div class="metric"><span>对象数</span><strong data-object-count>--</strong></div>
@@ -256,8 +289,10 @@ const selection = requireElement<HTMLElement>("[data-selection]");
 const objectList = requireElement<HTMLElement>("[data-object-list]");
 const assetSelect = requireElement<HTMLSelectElement>("[data-asset-select]");
 const assetSummary = requireElement<HTMLElement>("[data-asset-summary]");
+const fusionSummary = requireElement<HTMLElement>("[data-fusion-summary]");
+const cesiumRoot = requireElement<HTMLDivElement>("#cesium-root");
 
-const viewer = new Viewer({
+const viewer = new XeokitViewer({
   canvasElement: canvas,
   transparent: true,
   antialias: true,
@@ -272,6 +307,11 @@ let ifcLoader: WebIFCLoaderPlugin | undefined;
 let ifcLoaderInit: Promise<WebIFCLoaderPlugin> | undefined;
 let selectedObjectId: string | undefined;
 let loadingAssetId: string | undefined;
+let activeFusionMode: FusionMode = "bim";
+let cesiumViewer: CesiumViewer | undefined;
+let cesiumInit: Promise<CesiumViewer> | undefined;
+let cesiumCameraSyncFrame: number | undefined;
+let localFrame: Matrix4 | undefined;
 
 viewer.camera.eye = [8, 5, 9];
 viewer.camera.look = [0, 0, 0];
@@ -295,6 +335,162 @@ function setAssetSelection(assetId: string): void {
     <strong>${escapeHtml(asset.label)}</strong>
     <span>${escapeHtml(asset.sourceLabel)} · ${escapeHtml(asset.sizeLabel)}${asset.localOnly ? " · 仅本机调试" : ""}</span>
   `;
+}
+
+function hideCesiumCredits(gisViewer: CesiumViewer): void {
+  const creditContainer = gisViewer.cesiumWidget.creditContainer as HTMLElement | undefined;
+  if (creditContainer) creditContainer.style.display = "none";
+}
+
+function xeokitPointToEnu(point: ArrayLike<number>): Cartesian3 {
+  return new Cartesian3(Number(point[0] ?? 0), Number(point[2] ?? 0), Number(point[1] ?? 0));
+}
+
+function xeokitPointToWorld(point: ArrayLike<number>): Cartesian3 {
+  if (!localFrame) {
+    localFrame = Transforms.eastNorthUpToFixedFrame(
+      Cartesian3.fromDegrees(fusionOrigin.longitude, fusionOrigin.latitude, fusionOrigin.height),
+    );
+  }
+  return Matrix4.multiplyByPoint(localFrame, xeokitPointToEnu(point), new Cartesian3());
+}
+
+function xeokitDirectionToWorld(direction: ArrayLike<number>): Cartesian3 {
+  if (!localFrame) {
+    localFrame = Transforms.eastNorthUpToFixedFrame(
+      Cartesian3.fromDegrees(fusionOrigin.longitude, fusionOrigin.latitude, fusionOrigin.height),
+    );
+  }
+  return Matrix4.multiplyByPointAsVector(localFrame, xeokitPointToEnu(direction), new Cartesian3());
+}
+
+async function initializeCesiumViewer(): Promise<CesiumViewer> {
+  if (cesiumViewer) return cesiumViewer;
+  if (cesiumInit) return cesiumInit;
+
+  cesiumInit = (async () => {
+    fusionSummary.textContent = "正在初始化 Cesium：加载开放影像、椭球地形和本地山地 3D Tiles。";
+    const gisViewer = new CesiumViewer(cesiumRoot, {
+      animation: false,
+      baseLayer: false,
+      baseLayerPicker: false,
+      fullscreenButton: false,
+      geocoder: false,
+      homeButton: false,
+      infoBox: false,
+      navigationHelpButton: false,
+      sceneModePicker: false,
+      selectionIndicator: false,
+      skyBox: false,
+      timeline: false,
+      terrainProvider: new EllipsoidTerrainProvider(),
+      useBrowserRecommendedResolution: false,
+    });
+
+    gisViewer.scene.globe.show = true;
+    gisViewer.scene.globe.baseColor = Color.fromCssColorString("#102129");
+    gisViewer.scene.globe.enableLighting = false;
+    gisViewer.scene.backgroundColor = Color.fromCssColorString("#06111d");
+    gisViewer.scene.highDynamicRange = false;
+    gisViewer.scene.fog.enabled = false;
+    gisViewer.scene.light = new DirectionalLight({
+      color: Color.WHITE,
+      direction: Cartesian3.normalize(new Cartesian3(0.35, 0.58, -0.74), new Cartesian3()),
+      intensity: 2.4,
+    });
+    gisViewer.resolutionScale = 1;
+    hideCesiumCredits(gisViewer);
+
+    gisViewer.imageryLayers.addImageryProvider(
+      new UrlTemplateImageryProvider({
+        credit: "OpenStreetMap",
+        maximumLevel: 18,
+        url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      }),
+    );
+
+    gisViewer.entities.add({
+      id: "fusion-anchor-zone",
+      rectangle: {
+        coordinates: Rectangle.fromDegrees(106.585, 26.488, 106.615, 26.512),
+        fill: true,
+        material: Color.fromCssColorString("#1fd6ff").withAlpha(0.12),
+        outline: true,
+        outlineColor: Color.fromCssColorString("#42e8ff").withAlpha(0.62),
+      },
+    });
+
+    try {
+      const mountain = await Cesium3DTileset.fromUrl(localMountainTilesetUrl);
+      mountain.maximumScreenSpaceError = 2;
+      gisViewer.scene.primitives.add(mountain);
+      fusionSummary.textContent =
+        "融合实验已启用：Cesium 底层加载开放影像 + 本地山地 3D Tiles，xeokit 顶层保留 XKT/IFC 构件选择；相机由 xeokit 同步到 Cesium。";
+    } catch (error) {
+      fusionSummary.textContent = `融合实验已启用，但本地山地 3D Tiles 未加载：${error instanceof Error ? error.message : String(error)}。当前仅显示影像和锚定范围。`;
+    }
+
+    cesiumViewer = gisViewer;
+    return gisViewer;
+  })();
+
+  return cesiumInit;
+}
+
+function syncCesiumCamera(): void {
+  if (!cesiumViewer || activeFusionMode !== "gis-bim") return;
+  const eye = xeokitPointToWorld(viewer.camera.eye as ArrayLike<number>);
+  const look = xeokitPointToWorld(viewer.camera.look as ArrayLike<number>);
+  const up = Cartesian3.normalize(
+    xeokitDirectionToWorld(viewer.camera.up as ArrayLike<number>),
+    new Cartesian3(),
+  );
+  const direction = Cartesian3.normalize(Cartesian3.subtract(look, eye, new Cartesian3()), new Cartesian3());
+
+  if (!Number.isFinite(direction.x) || !Number.isFinite(direction.y) || !Number.isFinite(direction.z)) return;
+
+  cesiumViewer.camera.setView({
+    destination: eye,
+    orientation: {
+      direction,
+      up,
+    },
+  });
+}
+
+function stopCesiumCameraSync(): void {
+  if (cesiumCameraSyncFrame !== undefined) {
+    window.cancelAnimationFrame(cesiumCameraSyncFrame);
+    cesiumCameraSyncFrame = undefined;
+  }
+}
+
+function startCesiumCameraSync(): void {
+  stopCesiumCameraSync();
+  const sync = () => {
+    syncCesiumCamera();
+    cesiumCameraSyncFrame = window.requestAnimationFrame(sync);
+  };
+  sync();
+}
+
+async function setFusionMode(mode: FusionMode): Promise<void> {
+  activeFusionMode = mode;
+  document.body.classList.toggle("fusion-enabled", mode === "gis-bim");
+  document.querySelectorAll<HTMLButtonElement>("[data-fusion-mode]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.fusionMode === mode);
+  });
+
+  if (mode === "gis-bim") {
+    await initializeCesiumViewer();
+    startCesiumCameraSync();
+    setStatus("GIS+BIM 融合实验已开启", "底层 Cesium 显示影像和山地 3D Tiles，顶层 xeokit 负责 XKT/IFC 构件级交互。");
+    return;
+  }
+
+  stopCesiumCameraSync();
+  fusionSummary.textContent =
+    "Cesium 未启用。开启融合实验后，底层加载影像和本地山地 3D Tiles，顶层保留 xeokit 构件级选择。";
 }
 
 function describeStats(stats: LoaderStats): string {
@@ -356,6 +552,7 @@ function fitToObjects(objectIds: string[], animated: boolean): void {
   } else {
     viewer.cameraFlight.jumpTo(target);
   }
+  syncCesiumCamera();
 }
 
 function refreshObjectList(): void {
@@ -537,6 +734,13 @@ document.querySelectorAll<HTMLButtonElement>("[data-action]").forEach((button) =
   });
 });
 
+document.querySelectorAll<HTMLButtonElement>("[data-fusion-mode]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const mode = button.dataset.fusionMode === "gis-bim" ? "gis-bim" : "bim";
+    void setFusionMode(mode);
+  });
+});
+
 canvas.addEventListener("click", (event) => {
   const rect = canvas.getBoundingClientRect();
   const hit = viewer.scene.pick({
@@ -547,10 +751,12 @@ canvas.addEventListener("click", (event) => {
 });
 
 const requestedAssetId = new URLSearchParams(window.location.search).get("asset");
+const requestedFusionMode = new URLSearchParams(window.location.search).get("fusion") === "1" ? "gis-bim" : "bim";
 const initialAssetId =
   visibleAssets.find((asset) => asset.id === requestedAssetId)?.id ?? visibleAssets[0]?.id ?? "wind-turbines-xkt";
 
 setAssetSelection(initialAssetId);
+void setFusionMode(requestedFusionMode);
 void loadAsset(initialAssetId).catch((error: Error) => {
   loadingAssetId = undefined;
   setStatus("加载失败", `${error.message}。请先运行 npm run assets:ifc-xkt 和 npm run assets:ifc-publish。`);

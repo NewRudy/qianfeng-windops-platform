@@ -9,12 +9,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "cesium": "^1.127.0",
     "@xeokit/xeokit-sdk": "^2.6.111",
     "web-ifc": "^0.0.70"
   },
   "devDependencies": {
     "@types/node": "^24.0.4",
     "typescript": "^5.8.3",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vite-plugin-cesium": "^1.2.23"
   }
 }
