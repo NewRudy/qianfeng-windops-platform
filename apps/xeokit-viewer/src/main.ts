@@ -2,8 +2,10 @@ import {
   Cartesian3,
   Cesium3DTileset,
   Color,
+  createWorldTerrainAsync,
   DirectionalLight,
   EllipsoidTerrainProvider,
+  Ion,
   Matrix4,
   Rectangle,
   Transforms,
@@ -64,7 +66,7 @@ type LoaderStats = {
 };
 
 type FusionMode = "bim" | "gis-bim";
-type GisDisplayMode = "map" | "mountain";
+type GisDisplayMode = "map" | "mountain" | "online-terrain";
 
 const fusionOrigin = {
   height: 1250,
@@ -74,6 +76,15 @@ const fusionOrigin = {
 
 const localMountainTilesetUrl =
   "/@fs/Users/rudy/Documents/geo_agent/qianfeng-windops-platform/data/external/tilesets/laoyeling-mountain/tileset.json";
+
+const cesiumIonToken =
+  import.meta.env.VITE_CESIUM_ION_TOKEN ||
+  window.localStorage.getItem("CESIUM_ION_TOKEN") ||
+  "";
+
+if (cesiumIonToken) {
+  Ion.defaultAccessToken = cesiumIonToken;
+}
 
 const defaultBimTransform: BimTransform = {
   east: 0,
@@ -277,8 +288,9 @@ app.innerHTML = `
             <button type="button" data-fusion-mode="gis-bim">山地 3D Tiles + BIM</button>
           </div>
           <div class="mode-toggle" aria-label="GIS 显示方式">
-            <span>GIS 显示方式</span>
+            <span>GIS 底座</span>
             <button type="button" data-gis-display="mountain">只看山体</button>
+            <button type="button" data-gis-display="online-terrain">在线地形</button>
             <button type="button" data-gis-display="map">影像+地球</button>
           </div>
           <div class="asset-summary" data-asset-summary></div>
@@ -387,6 +399,10 @@ let cesiumInit: Promise<CesiumViewer> | undefined;
 let cesiumCameraSyncFrame: number | undefined;
 let localFrame: Matrix4 | undefined;
 let mountainTilesetLoaded = false;
+let mountainTileset: Cesium3DTileset | undefined;
+let worldTerrainProviderInit: ReturnType<typeof createWorldTerrainAsync> | undefined;
+let worldTerrainProviderReady = false;
+let worldTerrainProviderError: string | undefined;
 let bimTransform: BimTransform = { ...mountainNearBimTransform };
 
 viewer.camera.eye = [8, 5, 9];
@@ -466,27 +482,78 @@ function hideCesiumCredits(gisViewer: CesiumViewer): void {
   if (creditContainer) creditContainer.style.display = "none";
 }
 
-function applyGisDisplayMode(): void {
+function ensureOpenStreetMapLayer(gisViewer: CesiumViewer): void {
+  gisViewer.imageryLayers.removeAll();
+  gisViewer.imageryLayers.addImageryProvider(
+    new UrlTemplateImageryProvider({
+      credit: "OpenStreetMap",
+      maximumLevel: 18,
+      url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    }),
+  );
+}
+
+async function ensureWorldTerrainProvider(): Promise<void> {
+  if (!cesiumViewer) return;
+  if (!worldTerrainProviderInit) {
+    worldTerrainProviderInit = createWorldTerrainAsync({
+      requestVertexNormals: true,
+      requestWaterMask: false,
+    });
+  }
+  try {
+    cesiumViewer.terrainProvider = await worldTerrainProviderInit;
+    worldTerrainProviderReady = true;
+    worldTerrainProviderError = undefined;
+  } catch (error) {
+    worldTerrainProviderReady = false;
+    worldTerrainProviderError = error instanceof Error ? error.message : String(error);
+    cesiumViewer.terrainProvider = new EllipsoidTerrainProvider();
+  }
+}
+
+function describeGisDisplayMode(): string {
+  if (activeGisDisplayMode === "online-terrain") {
+    return worldTerrainProviderReady
+      ? "在线地形融合实验已启用：Cesium 使用 World Terrain + OSM 影像，xeokit 顶层保留 XKT/IFC 构件级选择。"
+      : `在线地形未启用：${worldTerrainProviderError || "Cesium ion token 缺失或网络不可用"}。已回退到椭球地形。可在本机 localStorage 设置 CESIUM_ION_TOKEN。`;
+  }
+  if (activeGisDisplayMode === "map") {
+    return "影像+地球融合实验已启用：Cesium 使用 OSM 影像和椭球地形，用于观察 BIM 与地图底座的尺度、方向和漂浮问题。";
+  }
+  return mountainTilesetLoaded
+    ? "山地 3D Tiles 融合实验已启用：Cesium 底层显示本地山体瓦片，xeokit 顶层保留 XKT/IFC 构件级选择。"
+    : "山地 3D Tiles 尚未加载成功：当前只能验证 xeokit 模型与 Cesium 双画布叠加能力。";
+}
+
+async function applyGisDisplayMode(): Promise<void> {
   if (!cesiumViewer) return;
   const showMap = activeGisDisplayMode === "map";
-  cesiumViewer.scene.globe.show = showMap;
-  cesiumViewer.imageryLayers.removeAll();
-  if (showMap) {
-    cesiumViewer.imageryLayers.addImageryProvider(
-      new UrlTemplateImageryProvider({
-        credit: "OpenStreetMap",
-        maximumLevel: 18,
-        url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-      }),
-    );
+
+  if (activeGisDisplayMode === "online-terrain") {
+    if (mountainTileset) mountainTileset.show = false;
+    cesiumViewer.scene.globe.show = true;
+    ensureOpenStreetMapLayer(cesiumViewer);
+    await ensureWorldTerrainProvider();
+    cesiumViewer.scene.backgroundColor = Color.fromCssColorString("#06111d");
+  } else if (showMap) {
+    if (mountainTileset) mountainTileset.show = false;
+    cesiumViewer.scene.globe.show = true;
+    cesiumViewer.terrainProvider = new EllipsoidTerrainProvider();
+    ensureOpenStreetMapLayer(cesiumViewer);
     cesiumViewer.scene.backgroundColor = Color.fromCssColorString("#06111d");
   } else {
+    if (mountainTileset) mountainTileset.show = true;
+    cesiumViewer.scene.globe.show = false;
+    cesiumViewer.terrainProvider = new EllipsoidTerrainProvider();
+    cesiumViewer.imageryLayers.removeAll();
     cesiumViewer.scene.backgroundColor = Color.fromCssColorString("#020a12");
   }
-  document.body.classList.toggle("gis-map-enabled", showMap);
+  document.body.classList.toggle("gis-map-enabled", showMap || activeGisDisplayMode === "online-terrain");
   document.querySelectorAll<HTMLButtonElement>("[data-gis-display]").forEach((button) => {
     button.classList.toggle("active", button.dataset.gisDisplay === activeGisDisplayMode);
   });
+  fusionSummary.textContent = describeGisDisplayMode();
 }
 
 function xeokitPointToEnu(point: ArrayLike<number>): Cartesian3 {
@@ -563,6 +630,7 @@ async function initializeCesiumViewer(): Promise<CesiumViewer> {
       const mountain = await Cesium3DTileset.fromUrl(localMountainTilesetUrl);
       mountain.maximumScreenSpaceError = 2;
       gisViewer.scene.primitives.add(mountain);
+      mountainTileset = mountain;
       mountainTilesetLoaded = true;
       fusionSummary.textContent =
         "山地融合实验已启用：Cesium 底层加载本地山地 3D Tiles，xeokit 顶层保留 XKT/IFC 构件选择；相机由 xeokit 同步到 Cesium。";
@@ -572,7 +640,7 @@ async function initializeCesiumViewer(): Promise<CesiumViewer> {
     }
 
     cesiumViewer = gisViewer;
-    applyGisDisplayMode();
+    await applyGisDisplayMode();
     return gisViewer;
   })();
 
@@ -625,11 +693,19 @@ async function setFusionMode(mode: FusionMode): Promise<void> {
 
   if (mode === "gis-bim") {
     await initializeCesiumViewer();
-    applyGisDisplayMode();
+    await applyGisDisplayMode();
     startCesiumCameraSync();
     setStatus(
-      "山地 3D Tiles + BIM 实验已开启",
-      mountainTilesetLoaded
+      activeGisDisplayMode === "online-terrain"
+        ? "在线地形 + BIM 实验已开启"
+        : activeGisDisplayMode === "map"
+          ? "影像地球 + BIM 实验已开启"
+          : "山地 3D Tiles + BIM 实验已开启",
+      activeGisDisplayMode === "online-terrain"
+        ? worldTerrainProviderReady
+          ? "底层 Cesium 使用在线地形和影像，顶层 xeokit 负责 XKT/IFC 构件级交互。"
+          : `在线地形不可用，已回退到椭球地形：${worldTerrainProviderError || "请配置 CESIUM_ION_TOKEN。"}`
+        : mountainTilesetLoaded
         ? "底层 Cesium 显示本地山地 3D Tiles，顶层 xeokit 负责 XKT/IFC 构件级交互。"
         : "Cesium 已启动，但山地 3D Tiles 未加载成功，只能验证双画布叠加。",
     );
@@ -939,17 +1015,31 @@ document.querySelectorAll<HTMLButtonElement>("[data-fusion-mode]").forEach((butt
 
 document.querySelectorAll<HTMLButtonElement>("[data-gis-display]").forEach((button) => {
   button.addEventListener("click", () => {
-    activeGisDisplayMode = button.dataset.gisDisplay === "map" ? "map" : "mountain";
-    applyGisDisplayMode();
-    syncCesiumCamera();
-    if (activeFusionMode === "gis-bim") {
+    activeGisDisplayMode =
+      button.dataset.gisDisplay === "map"
+        ? "map"
+        : button.dataset.gisDisplay === "online-terrain"
+          ? "online-terrain"
+          : "mountain";
+    void (async () => {
+      await applyGisDisplayMode();
+      syncCesiumCamera();
+      if (activeFusionMode !== "gis-bim") return;
       setStatus(
-        activeGisDisplayMode === "map" ? "已切换到影像+地球" : "已切换到只看山体",
+        activeGisDisplayMode === "map"
+          ? "已切换到影像+地球"
+          : activeGisDisplayMode === "online-terrain"
+            ? "已切换到 Cesium 在线地形"
+            : "已切换到只看山体",
         activeGisDisplayMode === "map"
           ? "用于观察真实地图背景下的漂浮、遮挡和尺度问题。"
-          : "用于排除影像和地球干扰，单独判断山地 3D Tiles 与 XKT/IFC 的贴合度。",
+          : activeGisDisplayMode === "online-terrain"
+            ? worldTerrainProviderReady
+              ? "用于验证 XKT/IFC 在 Cesium World Terrain + 影像底座上的空间贴合度。"
+              : `在线地形不可用，已回退到椭球地形：${worldTerrainProviderError || "请配置 CESIUM_ION_TOKEN。"}`
+            : "用于排除影像和地球干扰，单独判断山地 3D Tiles 与 XKT/IFC 的贴合度。",
       );
-    }
+    })();
   });
 });
 
@@ -1009,7 +1099,12 @@ canvas.addEventListener("click", (event) => {
 const requestedAssetId = new URLSearchParams(window.location.search).get("asset");
 const searchParams = new URLSearchParams(window.location.search);
 const requestedFusionMode = searchParams.get("fusion") === "1" ? "gis-bim" : "bim";
-activeGisDisplayMode = searchParams.get("gis") === "map" ? "map" : "mountain";
+activeGisDisplayMode =
+  searchParams.get("gis") === "map"
+    ? "map"
+    : searchParams.get("gis") === "online-terrain"
+      ? "online-terrain"
+      : "mountain";
 const initialAssetId =
   visibleAssets.find((asset) => asset.id === requestedAssetId)?.id ?? visibleAssets[0]?.id ?? "wind-turbines-xkt";
 
