@@ -249,6 +249,77 @@ body.fusion-enabled #xeokit-canvas {
   line-height: 1.45;
 }
 
+.calibration-panel {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(91, 224, 246, 0.18);
+  background: rgba(0, 12, 22, 0.5);
+}
+
+.calibration-panel h2 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.calibration-panel span {
+  color: rgba(198, 239, 247, 0.66);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.calibration-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.calibration-grid label {
+  display: grid;
+  gap: 4px;
+  color: rgba(198, 239, 247, 0.68);
+  font-size: 11px;
+}
+
+.calibration-grid input {
+  width: 100%;
+  height: 32px;
+  border: 1px solid rgba(91, 224, 246, 0.2);
+  padding: 0 8px;
+  background: rgba(0, 8, 15, 0.72);
+  color: #effdff;
+  font: inherit;
+  outline: none;
+}
+
+.calibration-grid input:focus {
+  border-color: rgba(91, 224, 246, 0.72);
+}
+
+.calibration-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.calibration-actions button {
+  min-height: 32px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+
+.calibration-panel code {
+  display: block;
+  overflow: auto;
+  padding: 8px;
+  background: rgba(0, 8, 15, 0.62);
+  color: rgba(169, 246, 255, 0.88);
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
 .object-list strong {
   overflow: hidden;
   font-size: 13px;
@@ -411,6 +482,14 @@ body.fusion-enabled #xeokit-canvas {
   }
 
   .mode-toggle {
+    grid-template-columns: 1fr;
+  }
+
+  .calibration-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calibration-actions {
     grid-template-columns: 1fr;
   }
 

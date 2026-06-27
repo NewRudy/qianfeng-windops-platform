@@ -36,6 +36,14 @@ type BimAsset = {
   url?: string;
 };
 
+type BimTransform = {
+  east: number;
+  north: number;
+  up: number;
+  heading: number;
+  scale: number;
+};
+
 type XeokitModel = {
   destroy?: () => void;
   on?: (event: string, handler: (value?: unknown) => void) => void;
@@ -66,6 +74,22 @@ const fusionOrigin = {
 
 const localMountainTilesetUrl =
   "/@fs/Users/rudy/Documents/geo_agent/qianfeng-windops-platform/data/external/tilesets/laoyeling-mountain/tileset.json";
+
+const defaultBimTransform: BimTransform = {
+  east: 0,
+  north: 0,
+  up: 0,
+  heading: 0,
+  scale: 1,
+};
+
+const mountainNearBimTransform: BimTransform = {
+  east: 0,
+  north: 0,
+  up: -35,
+  heading: 0,
+  scale: 1,
+};
 
 const assets: BimAsset[] = [
   {
@@ -255,6 +279,40 @@ app.innerHTML = `
           <div class="fusion-summary" data-fusion-summary>
             Cesium 未启用。开启融合实验后，底层优先显示本地山地 3D Tiles，顶层保留 xeokit 构件级选择。
           </div>
+          <section class="calibration-panel" aria-label="BIM 配准调参">
+            <div>
+              <h2>配准调参</h2>
+              <span>X=东、Y=高程、Z=北；应用参数会重载当前 BIM 资产。</span>
+            </div>
+            <div class="calibration-grid">
+              <label>
+                东移 E / m
+                <input type="number" data-calibration="east" min="-3000" max="3000" step="5" />
+              </label>
+              <label>
+                北移 N / m
+                <input type="number" data-calibration="north" min="-3000" max="3000" step="5" />
+              </label>
+              <label>
+                高程 U / m
+                <input type="number" data-calibration="up" min="-800" max="800" step="1" />
+              </label>
+              <label>
+                航向 / °
+                <input type="number" data-calibration="heading" min="-180" max="180" step="1" />
+              </label>
+              <label>
+                比例
+                <input type="number" data-calibration="scale" min="0.02" max="20" step="0.02" />
+              </label>
+            </div>
+            <div class="calibration-actions">
+              <button type="button" data-calibration-action="apply">应用配准</button>
+              <button type="button" data-calibration-action="near-mountain">靠近山体</button>
+              <button type="button" data-calibration-action="reset">归零</button>
+            </div>
+            <code data-calibration-readout></code>
+          </section>
         </section>
         <section class="stats-grid" aria-label="模型统计">
           <div class="metric"><span>对象数</span><strong data-object-count>--</strong></div>
@@ -297,6 +355,8 @@ const assetSelect = requireElement<HTMLSelectElement>("[data-asset-select]");
 const assetSummary = requireElement<HTMLElement>("[data-asset-summary]");
 const fusionSummary = requireElement<HTMLElement>("[data-fusion-summary]");
 const cesiumRoot = requireElement<HTMLDivElement>("#cesium-root");
+const calibrationReadout = requireElement<HTMLElement>("[data-calibration-readout]");
+const calibrationInputs = Array.from(document.querySelectorAll<HTMLInputElement>("[data-calibration]"));
 
 const viewer = new XeokitViewer({
   canvasElement: canvas,
@@ -320,6 +380,7 @@ let cesiumInit: Promise<CesiumViewer> | undefined;
 let cesiumCameraSyncFrame: number | undefined;
 let localFrame: Matrix4 | undefined;
 let mountainTilesetLoaded = false;
+let bimTransform: BimTransform = { ...mountainNearBimTransform };
 
 viewer.camera.eye = [8, 5, 9];
 viewer.camera.look = [0, 0, 0];
@@ -333,6 +394,48 @@ function setStatus(title: string, detail: string): void {
 
 function setMetric(target: HTMLElement, value: string): void {
   target.textContent = value;
+}
+
+function formatTransform(transform: BimTransform): string {
+  return `E ${transform.east.toFixed(1)}m / N ${transform.north.toFixed(1)}m / U ${transform.up.toFixed(1)}m / H ${transform.heading.toFixed(1)}° / S ${transform.scale.toFixed(2)}`;
+}
+
+function syncCalibrationInputs(): void {
+  calibrationInputs.forEach((input) => {
+    const key = input.dataset.calibration as keyof BimTransform | undefined;
+    if (!key) return;
+    input.value = String(bimTransform[key]);
+  });
+  calibrationReadout.textContent = formatTransform(bimTransform);
+}
+
+function readCalibrationInputs(): BimTransform {
+  const next = { ...bimTransform };
+  calibrationInputs.forEach((input) => {
+    const key = input.dataset.calibration as keyof BimTransform | undefined;
+    if (!key) return;
+    const parsed = Number(input.value);
+    if (Number.isFinite(parsed)) next[key] = parsed;
+  });
+  if (next.scale <= 0) next.scale = 0.02;
+  return next;
+}
+
+function applyTransformToPosition(position?: number[]): number[] {
+  const base = position ?? [0, 0, 0];
+  return [
+    Number(base[0] ?? 0) + bimTransform.east,
+    Number(base[1] ?? 0) + bimTransform.up,
+    Number(base[2] ?? 0) + bimTransform.north,
+  ];
+}
+
+function modelScale(): number[] {
+  return [bimTransform.scale, bimTransform.scale, bimTransform.scale];
+}
+
+function modelRotation(): number[] {
+  return [0, bimTransform.heading, 0];
 }
 
 function setAssetSelection(assetId: string): void {
@@ -645,6 +748,13 @@ function getAssetItems(asset: BimAsset): BimAssetItem[] {
   ];
 }
 
+async function reloadCurrentAssetWithTransform(title: string): Promise<void> {
+  bimTransform = readCalibrationInputs();
+  syncCalibrationInputs();
+  setStatus(title, `${formatTransform(bimTransform)}。正在重载当前资产。`);
+  await loadAsset(assetSelect.value);
+}
+
 async function waitForModelLoaded(model: XeokitModel, timeoutMs: number, url: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const timeout = window.setTimeout(() => reject(new Error(`加载超时：${url}`)), timeoutMs);
@@ -686,7 +796,9 @@ async function loadAsset(assetId: string): Promise<void> {
         src: itemUrl,
         edges: true,
         loadMetadata: true,
-        position: item.position,
+        position: applyTransformToPosition(item.position),
+        rotation: modelRotation(),
+        scale: modelScale(),
         saoEnabled: true,
         backfaces: true,
         globalizeObjectIds: true,
@@ -697,7 +809,9 @@ async function loadAsset(assetId: string): Promise<void> {
         id: item.id,
         src: itemUrl,
         edges: asset.id === "wind-turbines-xkt",
-        position: item.position,
+        position: applyTransformToPosition(item.position),
+        rotation: modelRotation(),
+        scale: modelScale(),
         saoEnabled: true,
         globalizeObjectIds: true,
       }) as XeokitModel;
@@ -715,7 +829,7 @@ async function loadAsset(assetId: string): Promise<void> {
   fitToObjects(getObjectIds(), false);
   setStatus(
     `${asset.label} 已加载`,
-    loadedStats.join("；") || `已加载 ${items.length} 个模型，可以点击模型或对象列表验证构件级选择。`,
+    `${loadedStats.join("；") || `已加载 ${items.length} 个模型，可以点击模型或对象列表验证构件级选择。`} 当前配准：${formatTransform(bimTransform)}。`,
   );
 }
 
@@ -789,6 +903,44 @@ document.querySelectorAll<HTMLButtonElement>("[data-gis-display]").forEach((butt
   });
 });
 
+calibrationInputs.forEach((input) => {
+  input.addEventListener("input", () => {
+    calibrationReadout.textContent = formatTransform(readCalibrationInputs());
+  });
+  input.addEventListener("change", () => {
+    bimTransform = readCalibrationInputs();
+    syncCalibrationInputs();
+  });
+});
+
+document.querySelectorAll<HTMLButtonElement>("[data-calibration-action]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const action = button.dataset.calibrationAction;
+    if (action === "near-mountain") {
+      bimTransform = { ...mountainNearBimTransform };
+      syncCalibrationInputs();
+      void reloadCurrentAssetWithTransform("已切换到靠近山体预设").catch((error: Error) => {
+        loadingAssetId = undefined;
+        setStatus("配准重载失败", error.message);
+      });
+      return;
+    }
+    if (action === "reset") {
+      bimTransform = { ...defaultBimTransform };
+      syncCalibrationInputs();
+      void reloadCurrentAssetWithTransform("已归零 BIM 偏移").catch((error: Error) => {
+        loadingAssetId = undefined;
+        setStatus("配准重载失败", error.message);
+      });
+      return;
+    }
+    void reloadCurrentAssetWithTransform("正在应用 BIM 配准参数").catch((error: Error) => {
+      loadingAssetId = undefined;
+      setStatus("配准重载失败", error.message);
+    });
+  });
+});
+
 canvas.addEventListener("click", (event) => {
   const rect = canvas.getBoundingClientRect();
   const hit = viewer.scene.pick({
@@ -806,6 +958,7 @@ const initialAssetId =
   visibleAssets.find((asset) => asset.id === requestedAssetId)?.id ?? visibleAssets[0]?.id ?? "wind-turbines-xkt";
 
 setAssetSelection(initialAssetId);
+syncCalibrationInputs();
 void setFusionMode(requestedFusionMode);
 void loadAsset(initialAssetId).catch((error: Error) => {
   loadingAssetId = undefined;
