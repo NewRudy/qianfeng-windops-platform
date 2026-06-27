@@ -11,6 +11,7 @@
     "build:xeokit": "npm --workspace apps/xeokit-viewer run build",
     "assets:ifc-xkt": "node scripts/convert-ifc-xkt.mjs",
     "assets:ifc-publish": "node scripts/publish-ifc-assets.mjs",
+    "assets:banda-ifc": "node scripts/prepare-banda-ifc-assets.mjs",
     "assets:laoyeling": "node scripts/convert-laoyeling-tileset.mjs",
     "test": "npm --workspace apps/web run test",
     "typecheck": "npm --workspace apps/web run typecheck"

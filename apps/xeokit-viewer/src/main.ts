@@ -2,23 +2,25 @@ import { Viewer, WebIFCLoaderPlugin, XKTLoaderPlugin } from "@xeokit/xeokit-sdk"
 import * as WebIFC from "web-ifc";
 import "./styles.css";
 
-type AssetId =
-  | "factory-masterplan-ifc"
-  | "factory-masterplan-xkt"
-  | "wind-turbines-ifc"
-  | "wind-turbines-xkt";
-
 type AssetFormat = "ifc" | "xkt";
 
+type BimAssetItem = {
+  id: string;
+  label: string;
+  position?: number[];
+  url: string;
+};
+
 type BimAsset = {
-  id: AssetId;
+  id: string;
   format: AssetFormat;
+  items?: BimAssetItem[];
   label: string;
   localOnly?: boolean;
   sizeLabel: string;
   sourceLabel: string;
   timeoutMs: number;
-  url: string;
+  url?: string;
 };
 
 type XeokitModel = {
@@ -77,6 +79,88 @@ const assets: BimAsset[] = [
     sourceLabel: "本地诊断原始 IFC 是否保留构件",
     timeoutMs: 240000,
     url: "/external/bim/ifc/factory-masterplan.ifc",
+  },
+  {
+    id: "banda-camp-core-ifc",
+    format: "ifc",
+    label: "班达营地 IFC / 5 文件同场景",
+    localOnly: true,
+    sizeLabel: "约 74MB IFC",
+    sourceLabel: "办公中心、综合楼、休息楼、运动中心、值班楼直读",
+    timeoutMs: 240000,
+    items: [
+      {
+        id: "banda-ifc-office-center-architecture",
+        label: "01 办公中心建筑",
+        url: "/external/bim/ifc/banda-camp-core/office-center-architecture.ifc",
+        position: [-120, 0, 0],
+      },
+      {
+        id: "banda-ifc-multipurpose-building-architecture",
+        label: "02 多功能综合楼建筑",
+        url: "/external/bim/ifc/banda-camp-core/multipurpose-building-architecture.ifc",
+        position: [0, 0, 0],
+      },
+      {
+        id: "banda-ifc-staff-rest-building-architecture",
+        label: "03 职工休息楼建筑",
+        url: "/external/bim/ifc/banda-camp-core/staff-rest-building-architecture.ifc",
+        position: [120, 0, 0],
+      },
+      {
+        id: "banda-ifc-staff-sports-center",
+        label: "04 职工运动中心",
+        url: "/external/bim/ifc/banda-camp-core/staff-sports-center.ifc",
+        position: [-60, 0, 110],
+      },
+      {
+        id: "banda-ifc-duty-building-1",
+        label: "05 1# 值班楼",
+        url: "/external/bim/ifc/banda-camp-core/duty-building-1.ifc",
+        position: [80, 0, 120],
+      },
+    ],
+  },
+  {
+    id: "banda-camp-core-xkt",
+    format: "xkt",
+    label: "班达营地 XKT / 5 文件同场景",
+    localOnly: true,
+    sizeLabel: "转换后 XKT",
+    sourceLabel: "同一批 IFC 转 XKT 后加载，对比速度和对象层级",
+    timeoutMs: 90000,
+    items: [
+      {
+        id: "banda-xkt-office-center-architecture",
+        label: "01 办公中心建筑",
+        url: "/external/bim/xkt/banda-camp-core/office-center-architecture.xkt",
+        position: [-120, 0, 0],
+      },
+      {
+        id: "banda-xkt-multipurpose-building-architecture",
+        label: "02 多功能综合楼建筑",
+        url: "/external/bim/xkt/banda-camp-core/multipurpose-building-architecture.xkt",
+        position: [0, 0, 0],
+      },
+      {
+        id: "banda-xkt-staff-rest-building-architecture",
+        label: "03 职工休息楼建筑",
+        url: "/external/bim/xkt/banda-camp-core/staff-rest-building-architecture.xkt",
+        position: [120, 0, 0],
+      },
+      {
+        id: "banda-xkt-staff-sports-center",
+        label: "04 职工运动中心",
+        url: "/external/bim/xkt/banda-camp-core/staff-sports-center.xkt",
+        position: [-60, 0, 110],
+      },
+      {
+        id: "banda-xkt-duty-building-1",
+        label: "05 1# 值班楼",
+        url: "/external/bim/xkt/banda-camp-core/duty-building-1.xkt",
+        position: [80, 0, 120],
+      },
+    ],
   },
 ];
 
@@ -183,11 +267,11 @@ const viewer = new Viewer({
 });
 const xktLoader = new XKTLoaderPlugin(viewer);
 
-let currentModel: XeokitModel | undefined;
+let currentModels: XeokitModel[] = [];
 let ifcLoader: WebIFCLoaderPlugin | undefined;
 let ifcLoaderInit: Promise<WebIFCLoaderPlugin> | undefined;
 let selectedObjectId: string | undefined;
-let loadingAssetId: AssetId | undefined;
+let loadingAssetId: string | undefined;
 
 viewer.camera.eye = [8, 5, 9];
 viewer.camera.look = [0, 0, 0];
@@ -203,7 +287,7 @@ function setMetric(target: HTMLElement, value: string): void {
   target.textContent = value;
 }
 
-function setAssetSelection(assetId: AssetId): void {
+function setAssetSelection(assetId: string): void {
   const asset = visibleAssets.find((item) => item.id === assetId) ?? visibleAssets[0];
   if (!asset) return;
   assetSelect.value = asset.id;
@@ -246,8 +330,8 @@ async function getIfcLoader(): Promise<WebIFCLoaderPlugin> {
 }
 
 function clearModel(): void {
-  currentModel?.destroy?.();
-  currentModel = undefined;
+  currentModels.forEach((model) => model.destroy?.());
+  currentModels = [];
   selectedObjectId = undefined;
   setMetric(objectCount, "--");
   setMetric(typeCount, "--");
@@ -320,46 +404,21 @@ function selectObject(objectId: string): void {
   fitToObjects([objectId], true);
 }
 
-async function loadAsset(assetId: AssetId): Promise<void> {
-  if (loadingAssetId === assetId) return;
-  const asset = visibleAssets.find((item) => item.id === assetId);
-  if (!asset) return;
-
-  loadingAssetId = assetId;
-  clearModel();
-  setAssetSelection(asset.id);
-  const assetUrl = appAssetUrl(asset.url);
-  setStatus(`正在加载 ${asset.label}`, assetUrl);
-
-  const stats: LoaderStats = {};
-  let model: XeokitModel;
-
-  if (asset.format === "ifc") {
-    const loader = await getIfcLoader();
-    setStatus(`正在直读 ${asset.label}`, `${assetUrl}。大 IFC 首次解析可能需要几分钟。`);
-    model = loader.load({
+function getAssetItems(asset: BimAsset): BimAssetItem[] {
+  if (asset.items) return asset.items;
+  if (!asset.url) return [];
+  return [
+    {
       id: asset.id,
-      src: assetUrl,
-      edges: true,
-      loadMetadata: true,
-      saoEnabled: true,
-      backfaces: true,
-      globalizeObjectIds: true,
-      stats: stats as never,
-    }) as XeokitModel;
-  } else {
-    model = xktLoader.load({
-      id: asset.id,
-      src: assetUrl,
-      edges: asset.id === "wind-turbines-xkt",
-      saoEnabled: true,
-      globalizeObjectIds: true,
-    }) as XeokitModel;
-  }
-  currentModel = model;
+      label: asset.label,
+      url: asset.url,
+    },
+  ];
+}
 
+async function waitForModelLoaded(model: XeokitModel, timeoutMs: number, url: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const timeout = window.setTimeout(() => reject(new Error(`加载超时：${assetUrl}`)), asset.timeoutMs);
+    const timeout = window.setTimeout(() => reject(new Error(`加载超时：${url}`)), timeoutMs);
     model.on?.("loaded", () => {
       window.clearTimeout(timeout);
       resolve();
@@ -369,14 +428,65 @@ async function loadAsset(assetId: AssetId): Promise<void> {
       reject(error instanceof Error ? error : new Error(String(error)));
     });
   });
+}
+
+async function loadAsset(assetId: string): Promise<void> {
+  if (loadingAssetId === assetId) return;
+  const asset = visibleAssets.find((item) => item.id === assetId);
+  if (!asset) return;
+
+  loadingAssetId = assetId;
+  clearModel();
+  setAssetSelection(asset.id);
+
+  const items = getAssetItems(asset);
+  const loadedStats: string[] = [];
+
+  for (const [index, item] of items.entries()) {
+    const itemUrl = appAssetUrl(item.url);
+    setStatus(`正在加载 ${asset.label}`, `${index + 1}/${items.length} ${item.label} · ${itemUrl}`);
+
+    const stats: LoaderStats = {};
+    let model: XeokitModel;
+
+    if (asset.format === "ifc") {
+      const loader = await getIfcLoader();
+      setStatus(`正在直读 ${item.label}`, "IFC 直读会保留源语义，但浏览器解析明显更慢。");
+      model = loader.load({
+        id: item.id,
+        src: itemUrl,
+        edges: true,
+        loadMetadata: true,
+        position: item.position,
+        saoEnabled: true,
+        backfaces: true,
+        globalizeObjectIds: true,
+        stats: stats as never,
+      }) as XeokitModel;
+    } else {
+      model = xktLoader.load({
+        id: item.id,
+        src: itemUrl,
+        edges: asset.id === "wind-turbines-xkt",
+        position: item.position,
+        saoEnabled: true,
+        globalizeObjectIds: true,
+      }) as XeokitModel;
+    }
+
+    currentModels.push(model);
+    await waitForModelLoaded(model, asset.timeoutMs, itemUrl);
+
+    const statsDetail = describeStats(stats);
+    if (statsDetail) loadedStats.push(`${item.label}: ${statsDetail}`);
+  }
 
   loadingAssetId = undefined;
   refreshObjectList();
   fitToObjects(getObjectIds(), false);
-  const statsDetail = describeStats(stats);
   setStatus(
     `${asset.label} 已加载`,
-    statsDetail || "可以点击模型或对象列表验证构件级选择。",
+    loadedStats.join("；") || `已加载 ${items.length} 个模型，可以点击模型或对象列表验证构件级选择。`,
   );
 }
 
@@ -411,11 +521,11 @@ function handleAction(action: string): void {
 }
 
 assetSelect.addEventListener("change", () => {
-  setAssetSelection(assetSelect.value as AssetId);
+  setAssetSelection(assetSelect.value);
 });
 
 requireElement<HTMLButtonElement>("[data-load-selected]").addEventListener("click", () => {
-  void loadAsset(assetSelect.value as AssetId).catch((error: Error) => {
+  void loadAsset(assetSelect.value).catch((error: Error) => {
     loadingAssetId = undefined;
     setStatus("加载失败", error.message);
   });
@@ -436,8 +546,12 @@ canvas.addEventListener("click", (event) => {
   if (objectId !== undefined) selectObject(String(objectId));
 });
 
-setAssetSelection((visibleAssets[0]?.id ?? "wind-turbines-xkt") as AssetId);
-void loadAsset((visibleAssets[0]?.id ?? "wind-turbines-xkt") as AssetId).catch((error: Error) => {
+const requestedAssetId = new URLSearchParams(window.location.search).get("asset");
+const initialAssetId =
+  visibleAssets.find((asset) => asset.id === requestedAssetId)?.id ?? visibleAssets[0]?.id ?? "wind-turbines-xkt";
+
+setAssetSelection(initialAssetId);
+void loadAsset(initialAssetId).catch((error: Error) => {
   loadingAssetId = undefined;
   setStatus("加载失败", `${error.message}。请先运行 npm run assets:ifc-xkt 和 npm run assets:ifc-publish。`);
 });
